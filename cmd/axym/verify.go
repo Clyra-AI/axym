@@ -29,13 +29,7 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 		Short: "Verify chain or bundle integrity",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if (chain && bundlePath != "") || (!chain && bundlePath == "") {
-				return &cliError{code: exitInvalidInput, msg: "specify exactly one of --chain or --bundle"}
-			}
-			if tempDir == "" {
-				tempDir = filepath.Join(storeDir, "tmp", "verify")
-			}
-			if err := coreVerify.EnsureManagedTempDir(tempDir); err != nil {
-				return emitVerifyError(err, stdout, stderr, global)
+				return emitVerifyInvalidInput("specify exactly one of --chain or --bundle", stdout, stderr, global)
 			}
 			if chain {
 				result, err := coreVerify.VerifyChainFromStoreDir(storeDir)
@@ -49,6 +43,12 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				return nil
 			}
 
+			if tempDir == "" {
+				tempDir = filepath.Join(storeDir, "tmp", "verify")
+			}
+			if err := coreVerify.EnsureManagedTempDir(tempDir); err != nil {
+				return emitVerifyError(err, stdout, stderr, global)
+			}
 			result, err := coreVerify.VerifyBundle(bundlePath)
 			if err != nil {
 				return emitVerifyError(err, stdout, stderr, global)
@@ -96,4 +96,17 @@ func emitVerifyError(err error, stdout io.Writer, stderr io.Writer, global *glob
 		})
 	}
 	return &cliError{code: exitRuntimeFailure, msg: err.Error()}
+}
+
+func emitVerifyInvalidInput(message string, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
+	if global.JSON {
+		_ = printJSON(stdout, envelope{
+			OK:      false,
+			Command: "verify",
+			Error:   &errorEnvelope{Reason: "invalid_input", Message: message},
+		})
+	} else if !global.Quiet {
+		_, _ = fmt.Fprintln(stderr, message)
+	}
+	return &cliError{code: exitInvalidInput, msg: message}
 }

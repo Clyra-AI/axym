@@ -34,7 +34,7 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 	root.PersistentFlags().BoolVar(&flags.Quiet, "quiet", false, "Suppress human-readable output")
 	root.PersistentFlags().BoolVar(&flags.Explain, "explain", false, "Emit additional rationale in human output")
 
-	root.AddCommand(newVersionCmd(stdout))
+	root.AddCommand(newVersionCmd(stdout, flags))
 	root.AddCommand(newCollectCmd(stdout, flags))
 	root.AddCommand(newVerifyCmd(stdout, stderr, flags))
 	return root

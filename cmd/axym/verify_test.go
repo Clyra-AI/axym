@@ -108,8 +108,30 @@ func TestVerifyRejectsUnsafeTempPath(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	exit := execute([]string{"verify", "--chain", "--store-dir", filepath.Join(t.TempDir(), "store"), "--temp-dir", unsafeDir, "--json"}, &stdout, &stderr)
+	exit := execute([]string{"verify", "--bundle", filepath.Join("fixtures", "bundles", "good"), "--temp-dir", unsafeDir, "--json"}, &stdout, &stderr)
 	if exit != exitUnsafeBlocked {
 		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitUnsafeBlocked, stdout.String(), stderr.String())
+	}
+}
+
+func TestVerifyInvalidTargetJSONContract(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"verify", "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitInvalidInput, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v output=%s", err, stdout.String())
+	}
+	if ok, _ := payload["ok"].(bool); ok {
+		t.Fatalf("expected ok=false output=%s", stdout.String())
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "invalid_input" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
 	}
 }
