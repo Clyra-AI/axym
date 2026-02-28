@@ -52,7 +52,11 @@ func runAxymContract(t *testing.T, args ...string) (string, int) {
 		t.Fatal("runtime.Caller failed")
 	}
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
-	binaryPath := filepath.Join(t.TempDir(), "axym")
+	binaryName := "axym"
+	if runtime.GOOS == "windows" {
+		binaryName = "axym.exe"
+	}
+	binaryPath := filepath.Join(t.TempDir(), binaryName)
 	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/axym")
 	build.Dir = repoRoot
 	if out, err := build.CombinedOutput(); err != nil {
