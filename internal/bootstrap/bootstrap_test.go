@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -58,5 +59,20 @@ func TestEntrypointHasMainFunction(t *testing.T) {
 
 	if file.Name.Name != "main" {
 		t.Fatalf("expected package main, got %q", file.Name.Name)
+	}
+
+	hasMain := false
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		if fn.Recv == nil && fn.Name != nil && fn.Name.Name == "main" {
+			hasMain = true
+			break
+		}
+	}
+	if !hasMain {
+		t.Fatal("expected cmd/axym/main.go to define func main()")
 	}
 }
