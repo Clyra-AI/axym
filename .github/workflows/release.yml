@@ -41,8 +41,15 @@ jobs:
           subject-path: "dist/**"
       - name: Verify release integrity
         run: sha256sum -c dist/checksums.txt
-      - name: Publish
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --clean
+      - name: Publish verified artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "${TAG}" >/dev/null 2>&1 || gh release create "${TAG}" --title "${TAG}" --notes ""
+          mapfile -t files < <(find dist -maxdepth 1 -type f -print)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no release artifacts found in dist/"
+            exit 1
+          fi
+          gh release upload "${TAG}" "${files[@]}" --clobber
