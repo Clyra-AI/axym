@@ -1,2 +1,4 @@
 Axym local docs index
 
+- README.md
+- docs-site/public/llm/axym.md

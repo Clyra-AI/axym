@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/record/normalized-input.schema.json",
+  "title": "Axym Normalized Record Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source",
+    "source_product",
+    "record_type",
+    "timestamp",
+    "event",
+    "controls"
+  ],
+  "properties": {
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_product": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "permissions_enforced"
+      ],
+      "properties": {
+        "permissions_enforced": {
+          "type": "boolean"
+        },
+        "approved_scope": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

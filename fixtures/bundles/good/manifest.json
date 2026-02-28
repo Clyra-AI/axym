@@ -1,0 +1,10 @@
+{
+  "files": [
+    {
+      "path": "evidence.json",
+      "sha256": "sha256:94a0cd0444accd67dc387fdf5a2ecbc15bd4317cb72672244e63566f0405e3f8"
+    }
+  ],
+  "algo_id": "sha256",
+  "salt_id": ""
+}
