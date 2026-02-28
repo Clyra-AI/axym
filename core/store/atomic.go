@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func WriteJSONAtomic(path string, data []byte, fsync bool) error {
@@ -55,10 +56,26 @@ func syncDir(path string) error {
 	defer func() { _ = dir.Close() }()
 	if err := dir.Sync(); err != nil {
 		// Windows runners may deny directory sync on temp paths; writes are still durable to file path.
-		if runtime.GOOS == "windows" && os.IsPermission(err) {
+		if shouldIgnoreWindowsDirSyncError(runtime.GOOS, path, err) {
 			return nil
 		}
 		return fmt.Errorf("sync directory: %w", err)
 	}
 	return nil
+}
+
+func shouldIgnoreWindowsDirSyncError(goos string, path string, err error) bool {
+	if goos != "windows" || !os.IsPermission(err) {
+		return false
+	}
+	tempRoot := filepath.Clean(os.TempDir())
+	target := filepath.Clean(path)
+	rel, relErr := filepath.Rel(tempRoot, target)
+	if relErr != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	return !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != ".."
 }
