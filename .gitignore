@@ -3,8 +3,8 @@ bin/
 dist/
 coverage.out
 *.test
-axym
-axym.exe
+/axym
+/axym.exe
 .codeql/
 
 # OS/editor noise
