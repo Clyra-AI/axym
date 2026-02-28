@@ -11,7 +11,7 @@ Execute this workflow for: "implement the plan", "execute PLAN_NEXT", "ship plan
 ## Scope
 
 - Repository: `.`
-- Default input plan: `./product/PLAN_NEXT.md`
+- Default input plan: `./product/PLAN_NEXT.md` or `./product/PLAN_v1.0.md`
 - Optional input plan: user-specified file under `./product/`
 - Optional scope selector: specific epic number from the input plan (`epic_number`)
 - This skill executes code/docs/tests for planned stories.

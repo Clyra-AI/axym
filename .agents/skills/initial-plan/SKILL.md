@@ -15,7 +15,7 @@ Execute this workflow when asked to create the initial execution plan from the A
 - Standards sources of truth:
   - `./product/dev_guides.md`
   - `./product/architecture_guides.md`
-- Style reference (structure and depth): `/Users/tr/wrkr/product/PLAN_v1.md`
+- Style reference (structure and depth): `./product/PLAN_v1.md`
 - Default output: `./product/PLAN_v1.0.md` (unless user specifies a different target path)
 - Planning only. Do not implement code or docs outside the target plan file.
 
