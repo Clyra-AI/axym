@@ -85,6 +85,7 @@ func promote(payload map[string]any) (collector.Candidate, error) {
 
 	actor, _ := payload["actor"].(map[string]any)
 	target, _ := payload["target"].(map[string]any)
+	source, _ := payload["source"].(string)
 	action, _ := payload["action"].(string)
 	metadata, _ := payload["metadata"].(map[string]any)
 
@@ -97,6 +98,9 @@ func promote(payload map[string]any) (collector.Candidate, error) {
 		Timestamp:     timestamp.UTC().Truncate(time.Second),
 		Event: map[string]any{
 			"governance_event_type": eventType,
+			"governance_source":     source,
+			"actor_id":              actor["id"],
+			"actor_type":            actor["type"],
 			"action":                action,
 			"target_kind":           target["kind"],
 			"target_id":             target["id"],

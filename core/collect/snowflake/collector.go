@@ -28,20 +28,7 @@ func (c Collector) Collect(_ context.Context, req collector.Request) (collector.
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load snowflake fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:06:00Z",
-			Event: map[string]any{
-				"job_name":       "daily_models",
-				"query_text":     "select count(*) from analytics.fact_orders",
-				"query_tag":      "CHANGE-1234",
-				"enriched_at":    "2026-02-28T00:10:00Z",
-				"requestor":      "alice",
-				"approver":       "bob",
-				"deployer":       "carol",
-				"warehouse_name": "COMPLIANCE_WH",
-			},
-			Metadata: map[string]any{"evidence_source": "snowflake"},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 	maxLag := c.MaxEnrichmentLag
 	if maxLag <= 0 {

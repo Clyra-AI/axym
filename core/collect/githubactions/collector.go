@@ -21,17 +21,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load githubactions fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:03:00Z",
-			Event: map[string]any{
-				"workflow": "deploy",
-				"status":   "success",
-			},
-			Metadata: map[string]any{
-				"evidence_source": "githubactions",
-				"run_id":          "1001",
-			},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	fallback := req.Now

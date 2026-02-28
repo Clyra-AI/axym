@@ -21,16 +21,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load gitmeta fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:04:00Z",
-			Event: map[string]any{
-				"commit_sha": "0000000000000000000000000000000000000001",
-				"branch":     "main",
-			},
-			Metadata: map[string]any{
-				"evidence_source": "gitmeta",
-			},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	fallback := req.Now

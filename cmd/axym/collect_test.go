@@ -60,6 +60,30 @@ func TestCollectWriteJSONAppendsRecords(t *testing.T) {
 	}
 }
 
+func TestCollectWriteJSONWithoutInputsDoesNotSynthesizeEvidence(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"collect", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	if appended, _ := data["appended"].(float64); appended != 0 {
+		t.Fatalf("expected no appended records without source inputs, payload=%s", stdout.String())
+	}
+	if captured, _ := data["captured"].(float64); captured != 0 {
+		t.Fatalf("expected no captured records without source inputs, payload=%s", stdout.String())
+	}
+}
+
 func fixtureDir(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
