@@ -1,0 +1,48 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make prepush
+      - name: Build
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean --skip publish
+      - name: Verify checksums
+        run: sha256sum -c dist/checksums.txt
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          artifact-name: axym-sbom.spdx.json
+          path: dist
+      - name: Vulnerability scan
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 && govulncheck -mode=binary ./cmd/axym
+      - name: Sign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign checksums
+        run: cosign sign-blob --yes --bundle dist/checksums.bundle.json dist/checksums.txt
+      - name: Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/**"
+      - name: Verify release integrity
+        run: sha256sum -c dist/checksums.txt
+      - name: Publish
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean

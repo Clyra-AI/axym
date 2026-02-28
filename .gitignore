@@ -1,0 +1,17 @@
+# Build/test outputs
+bin/
+dist/
+coverage.out
+*.test
+.codeql/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets and env files
+.env
+.env.*
+*.pem
+*.key
