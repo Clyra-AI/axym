@@ -1,0 +1,15 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:03Z",
+      "event": {
+        "webhook_id": "wh-42",
+        "event_name": "approval.requested"
+      },
+      "metadata": {
+        "signature": "abc123",
+        "evidence_source": "webhook"
+      }
+    }
+  ]
+}

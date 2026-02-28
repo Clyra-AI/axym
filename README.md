@@ -9,13 +9,18 @@ go build ./cmd/axym
 go test ./...
 ```
 
-## Epic 1 command surface
+## Collect command surface
 
 ```bash
 ./axym collect --dry-run --json
+./axym collect --json
+./axym collect --json --plugin "./my-collector"
+./axym collect --json --governance-event-file ./events.jsonl
 ./axym verify --chain --json
 ./axym verify --bundle ./fixtures/bundles/good --json
 ```
+
+`collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin/governance payloads out of the proof chain.
 
 ## Exit codes
 

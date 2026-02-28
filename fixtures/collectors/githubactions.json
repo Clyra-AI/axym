@@ -1,0 +1,15 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:04Z",
+      "event": {
+        "workflow": "deploy",
+        "status": "success"
+      },
+      "metadata": {
+        "run_id": "1234",
+        "evidence_source": "githubactions"
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:07Z",
+      "event": {
+        "job_name": "daily_models",
+        "warehouse_name": "COMPLIANCE_WH",
+        "query_text": "select count(*) from analytics.fact_orders",
+        "query_tag": "CHANGE-1234",
+        "enriched_at": "2026-02-28T09:10:00Z"
+      },
+      "metadata": {
+        "evidence_source": "snowflake"
+      }
+    }
+  ]
+}

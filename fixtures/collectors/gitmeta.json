@@ -1,0 +1,14 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:05Z",
+      "event": {
+        "commit_sha": "ffffffffffffffffffffffffffffffffffffffff",
+        "branch": "main"
+      },
+      "metadata": {
+        "evidence_source": "gitmeta"
+      }
+    }
+  ]
+}

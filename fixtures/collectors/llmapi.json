@@ -1,0 +1,16 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:02Z",
+      "agent_id": "agent-llm",
+      "event": {
+        "model": "gpt-4.1",
+        "decision": "allow"
+      },
+      "metadata": {
+        "api_key": "llm-key",
+        "evidence_source": "llmapi"
+      }
+    }
+  ]
+}

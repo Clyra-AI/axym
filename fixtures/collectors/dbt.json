@@ -1,0 +1,23 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:06Z",
+      "event": {
+        "job_name": "daily_models",
+        "git_sha": "dddddddddddddddddddddddddddddddddddddddd",
+        "requestor": "alice",
+        "approver": "bob",
+        "deployer": "carol",
+        "models": [
+          {
+            "name": "fact_orders",
+            "sql": "select  *  from raw.orders"
+          }
+        ]
+      },
+      "metadata": {
+        "evidence_source": "dbt"
+      }
+    }
+  ]
+}
