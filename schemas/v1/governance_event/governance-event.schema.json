@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/governance_event/governance-event.schema.json",
+  "title": "Axym Governance Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_type",
+    "source",
+    "timestamp",
+    "actor",
+    "action",
+    "target"
+  ],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "minLength": 1}
+      }
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

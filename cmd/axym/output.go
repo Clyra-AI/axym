@@ -15,7 +15,7 @@ type globalFlags struct {
 type envelope struct {
 	OK      bool           `json:"ok"`
 	Command string         `json:"command"`
-	Data    map[string]any `json:"data,omitempty"`
+	Data    any            `json:"data,omitempty"`
 	Error   *errorEnvelope `json:"error,omitempty"`
 }
 

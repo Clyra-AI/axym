@@ -53,9 +53,37 @@ var contracts = map[string]sourceContract{
 		DefaultRecordType: "deployment",
 		RequiredEventKeys: []string{"pipeline"},
 	},
+	"githubactions": {
+		DefaultRecordType: "deployment",
+		RequiredEventKeys: []string{"workflow"},
+	},
 	"data_pipeline": {
 		DefaultRecordType: "data_pipeline_run",
 		RequiredEventKeys: []string{"job_name"},
+	},
+	"dbt": {
+		DefaultRecordType: "data_pipeline_run",
+		RequiredEventKeys: []string{"job_name"},
+	},
+	"snowflake": {
+		DefaultRecordType: "data_pipeline_run",
+		RequiredEventKeys: []string{"job_name"},
+	},
+	"webhook": {
+		DefaultRecordType: "policy_enforcement",
+		RequiredEventKeys: []string{"webhook_id"},
+	},
+	"gitmeta": {
+		DefaultRecordType: "model_change",
+		RequiredEventKeys: []string{"commit_sha"},
+	},
+	"governance_event": {
+		DefaultRecordType: "policy_enforcement",
+		RequiredEventKeys: []string{"governance_event_type"},
+	},
+	"plugin": {
+		DefaultRecordType: "tool_invocation",
+		RequiredEventKeys: []string{},
 	},
 	"wrkr": {
 		DefaultRecordType: "scan_finding",

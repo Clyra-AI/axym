@@ -1,0 +1,16 @@
+{
+  "events": [
+    {
+      "timestamp": "2026-02-28T09:00:01Z",
+      "agent_id": "agent-mcp",
+      "event": {
+        "tool_name": "filesystem.read",
+        "action": "read"
+      },
+      "metadata": {
+        "auth_token": "mcp-secret",
+        "evidence_source": "mcp"
+      }
+    }
+  ]
+}
