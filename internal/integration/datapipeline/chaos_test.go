@@ -22,6 +22,10 @@ func TestChaosCollectorMalformedPayloadDoesNotBlockOtherCollectors(t *testing.T)
 	if err := os.WriteFile(filepath.Join(fixtureDir, "snowflake.json"), badSnowflake, 0o600); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
+	mcpFixture := []byte(`{"events":[{"timestamp":"2026-02-28T09:00:01Z","event":{"tool_name":"filesystem.read","action":"read"},"metadata":{"evidence_source":"mcp"}}]}`)
+	if err := os.WriteFile(filepath.Join(fixtureDir, "mcp.json"), mcpFixture, 0o600); err != nil {
+		t.Fatalf("write mcp fixture: %v", err)
+	}
 
 	req := collector.Request{Now: time.Date(2026, 2, 28, 9, 0, 0, 0, time.UTC), FixtureDir: fixtureDir}
 	registry, err := coreCollect.BuildRegistry(req)

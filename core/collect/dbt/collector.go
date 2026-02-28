@@ -24,20 +24,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load dbt fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:05:00Z",
-			Event: map[string]any{
-				"job_name":  "daily_models",
-				"git_sha":   "0000000000000000000000000000000000000002",
-				"requestor": "alice",
-				"approver":  "bob",
-				"deployer":  "carol",
-				"models": []any{
-					map[string]any{"name": "fact_orders", "sql": "select * from raw.orders"},
-				},
-			},
-			Metadata: map[string]any{"evidence_source": "dbt"},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 	fallback := req.Now
 	if fallback.IsZero() {

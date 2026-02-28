@@ -21,17 +21,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load llmapi fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:01:00Z",
-			Event: map[string]any{
-				"model":    "gpt-4.1",
-				"decision": "allow",
-			},
-			Metadata: map[string]any{
-				"evidence_source": "llmapi",
-				"api_key":         "secret-key-placeholder",
-			},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	fallback := req.Now

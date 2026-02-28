@@ -21,17 +21,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load webhook fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:02:00Z",
-			Event: map[string]any{
-				"webhook_id": "wh-001",
-				"event_name": "approval.requested",
-			},
-			Metadata: map[string]any{
-				"evidence_source": "webhook",
-				"signature":       "sig-placeholder",
-			},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	fallback := req.Now

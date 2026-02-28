@@ -21,17 +21,7 @@ func (Collector) Collect(_ context.Context, req collector.Request) (collector.Re
 		return collector.Result{}, collectorerr.New(reasonFixtureError, "load mcp fixture", err)
 	}
 	if len(events) == 0 {
-		events = []fixtureutil.Event{{
-			Timestamp: "2026-02-28T00:00:00Z",
-			Event: map[string]any{
-				"tool_name": "fetch",
-				"action":    "read",
-			},
-			Metadata: map[string]any{
-				"evidence_source": "mcp",
-				"auth_token":      "token-placeholder",
-			},
-		}}
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	candidates := make([]collector.Candidate, 0, len(events))

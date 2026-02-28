@@ -25,8 +25,12 @@ func TestGovernanceEventPromotion(t *testing.T) {
 	if len(result.Candidates) != 1 {
 		t.Fatalf("candidate count mismatch: %+v", result)
 	}
-	if result.Candidates[0].RecordType != "policy_enforcement" {
-		t.Fatalf("record type mismatch: %+v", result.Candidates[0])
+	candidate := result.Candidates[0]
+	if candidate.RecordType != "policy_enforcement" {
+		t.Fatalf("record type mismatch: %+v", candidate)
+	}
+	if candidate.Event["governance_source"] != "agent-fw" || candidate.Event["actor_id"] != "agent-1" {
+		t.Fatalf("missing governance provenance fields: %+v", candidate.Event)
 	}
 }
 
