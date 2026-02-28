@@ -1,0 +1,44 @@
+package contracts
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestCIWorkflowFilesExist(t *testing.T) {
+	t.Parallel()
+
+	required := []string{
+		".github/workflows/pr.yml",
+		".github/workflows/main.yml",
+		".github/workflows/nightly.yml",
+		".github/workflows/release.yml",
+		".goreleaser.yaml",
+		"scripts/check_branch_protection_contract.sh",
+	}
+
+	for _, path := range required {
+		if _, err := os.Stat(filepath.Join(testRepoRoot(t), filepath.FromSlash(path))); err != nil {
+			t.Fatalf("required CI artifact missing: %s: %v", path, err)
+		}
+	}
+}
+
+func TestWorkflowsDoNotUseLatestFloatingTags(t *testing.T) {
+	t.Parallel()
+
+	files := []string{
+		".github/workflows/pr.yml",
+		".github/workflows/main.yml",
+		".github/workflows/nightly.yml",
+		".github/workflows/release.yml",
+	}
+	for _, path := range files {
+		content := readRepoFile(t, path)
+		if strings.Contains(content, "@latest") {
+			t.Fatalf("workflow has floating @latest reference: %s", path)
+		}
+	}
+}

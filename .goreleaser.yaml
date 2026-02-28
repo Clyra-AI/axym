@@ -1,0 +1,28 @@
+version: 2
+
+project_name: axym
+
+builds:
+  - id: axym
+    main: ./cmd/axym
+    binary: axym
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: axym
+    formats: [tar.gz]
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+

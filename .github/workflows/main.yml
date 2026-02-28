@@ -1,0 +1,23 @@
+name: main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  core:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make lint-fast
+      - run: make test-fast
+      - run: make test-contracts
+

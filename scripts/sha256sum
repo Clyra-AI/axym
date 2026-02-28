@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v /usr/bin/sha256sum >/dev/null 2>&1; then
+  exec /usr/bin/sha256sum "$@"
+fi
+
+self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+if command -v sha256sum >/dev/null 2>&1; then
+  candidate="$(command -v sha256sum)"
+  if [[ "$candidate" != "$self" ]]; then
+    exec "$candidate" "$@"
+  fi
+fi
+
+if command -v shasum >/dev/null 2>&1; then
+  if [[ "${1:-}" == "-c" ]]; then
+    file="${2:-}"
+    [[ -n "$file" ]] || { echo "missing checksum file for -c" >&2; exit 1; }
+    base_dir="$(cd "$(dirname "$file")" && pwd)"
+    while read -r expected path; do
+      [[ -n "$expected" && -n "$path" ]] || continue
+      actual="$(shasum -a 256 "$base_dir/$path" | awk '{print $1}')"
+      if [[ "$actual" != "$expected" ]]; then
+        echo "$path: FAILED" >&2
+        exit 1
+      fi
+      echo "$path: OK"
+    done <"$file"
+    exit 0
+  fi
+  exec shasum -a 256 "$@"
+fi
+
+echo "no sha256 utility available" >&2
+exit 127
