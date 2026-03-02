@@ -74,6 +74,15 @@ func TestReadZipPack(t *testing.T) {
 	}
 }
 
+func TestReadDirectoryPackRejectsEmptyDirectory(t *testing.T) {
+	t.Parallel()
+
+	_, err := Read(t.TempDir())
+	if err == nil {
+		t.Fatal("expected error for empty gait pack directory")
+	}
+}
+
 func writeProofFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(buildProofLine(t)+"\n"), 0o600); err != nil {

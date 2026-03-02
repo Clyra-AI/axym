@@ -77,6 +77,32 @@ func TestIngestWrkrAppendsRecords(t *testing.T) {
 	}
 }
 
+func TestIngestWrkrUsesStoreDirForStateWhenStateDirOmitted(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	inputPath := filepath.Join(root, "wrkr.jsonl")
+	writeWrkrInput(t, inputPath)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{
+		"ingest",
+		"--source", "wrkr",
+		"--input", inputPath,
+		"--store-dir", storeDir,
+		"--json",
+	}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	if _, err := os.Stat(filepath.Join(storeDir, "wrkr-last-ingest.json")); err != nil {
+		t.Fatalf("expected wrkr state in store dir: %v", err)
+	}
+}
+
 func TestIngestGaitNoInputContract(t *testing.T) {
 	t.Parallel()
 
