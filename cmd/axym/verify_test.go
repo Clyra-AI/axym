@@ -135,3 +135,42 @@ func TestVerifyInvalidTargetJSONContract(t *testing.T) {
 		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
 	}
 }
+
+func TestVerifyBundleIncludesComplianceEnvelope(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	bundleDir := filepath.Join(t.TempDir(), "bundle")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"collect", "--fixture-dir", filepath.Join("fixtures", "collectors"), "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("collect setup failed: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"bundle", "--audit", "Q3-2026", "--frameworks", "eu-ai-act,soc2", "--store-dir", storeDir, "--output", bundleDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("bundle setup failed: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"verify", "--bundle", bundleDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("verify failed: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode verify output: %v", err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	verification, _ := data["verification"].(map[string]any)
+	if verification["compliance_verified"] != true {
+		t.Fatalf("expected compliance_verified=true output=%s", stdout.String())
+	}
+	if verification["oscal_valid"] != true {
+		t.Fatalf("expected oscal_valid=true output=%s", stdout.String())
+	}
+}

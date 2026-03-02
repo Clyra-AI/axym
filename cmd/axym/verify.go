@@ -21,6 +21,7 @@ func (e *cliError) ExitCode() int { return e.code }
 func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.Command {
 	var chain bool
 	var bundlePath string
+	var frameworks []string
 	var storeDir string
 	var tempDir string
 
@@ -49,7 +50,7 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if err := coreVerify.EnsureManagedTempDir(tempDir); err != nil {
 				return emitVerifyError(err, stdout, stderr, global)
 			}
-			result, err := coreVerify.VerifyBundle(bundlePath)
+			result, err := coreVerify.VerifyBundle(bundlePath, normalizeFrameworkInput(frameworks))
 			if err != nil {
 				return emitVerifyError(err, stdout, stderr, global)
 			}
@@ -63,6 +64,7 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 
 	cmd.Flags().BoolVar(&chain, "chain", false, "Verify local append-only chain")
 	cmd.Flags().StringVar(&bundlePath, "bundle", "", "Verify bundle directory")
+	cmd.Flags().StringSliceVar(&frameworks, "frameworks", nil, "Framework IDs for compliance completeness checks (comma-separated)")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
 	cmd.Flags().StringVar(&tempDir, "temp-dir", "", "Path for verify temporary artifacts")
 	return cmd

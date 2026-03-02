@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	bundleverify "github.com/Clyra-AI/axym/core/verify/bundle"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -52,9 +53,13 @@ type ChainResult struct {
 }
 
 type BundleResult struct {
-	Path  string `json:"path"`
-	Files int    `json:"files"`
-	Algo  string `json:"algo"`
+	Path               string         `json:"path"`
+	Files              int            `json:"files"`
+	Algo               string         `json:"algo"`
+	Cryptographic      bool           `json:"cryptographic"`
+	ComplianceVerified bool           `json:"compliance_verified"`
+	OSCALValid         bool           `json:"oscal_valid"`
+	Compliance         map[string]any `json:"compliance,omitempty"`
 }
 
 func VerifyChainFromStoreDir(storeDir string) (ChainResult, error) {
@@ -90,10 +95,40 @@ func VerifyChainFromStoreDir(storeDir string) (ChainResult, error) {
 	}, nil
 }
 
-func VerifyBundle(path string) (BundleResult, error) {
-	manifest, err := proof.VerifyBundle(path, proof.BundleVerifyOpts{})
+func VerifyBundle(path string, frameworkIDs []string) (BundleResult, error) {
+	result, err := bundleverify.Verify(path, frameworkIDs)
 	if err != nil {
+		var bErr *bundleverify.Error
+		if errors.As(err, &bErr) {
+			return BundleResult{}, &Error{
+				ReasonCode: bErr.ReasonCode,
+				Message:    bErr.Message,
+				ExitCode:   bErr.ExitCode,
+				Err:        bErr.Err,
+			}
+		}
 		return BundleResult{}, &Error{ReasonCode: ReasonBundleVerify, Message: "bundle verification failed", ExitCode: 2, Err: err}
 	}
-	return BundleResult{Path: path, Files: len(manifest.Files), Algo: manifest.AlgoID}, nil
+
+	compliance := map[string]any{
+		"required_record_types":   result.Compliance.RequiredRecordTypes,
+		"observed_record_types":   result.Compliance.ObservedRecordTypes,
+		"missing_record_types":    result.Compliance.MissingRecordTypes,
+		"incomplete_controls":     result.Compliance.IncompleteControls,
+		"controls_missing_fields": result.Compliance.ControlsMissing,
+		"complete":                result.Compliance.Complete,
+		"grade":                   result.Compliance.Grade,
+	}
+	if !result.ComplianceVerified {
+		compliance = nil
+	}
+	return BundleResult{
+		Path:               result.Path,
+		Files:              result.Files,
+		Algo:               result.Algo,
+		Cryptographic:      result.Cryptographic,
+		ComplianceVerified: result.ComplianceVerified,
+		OSCALValid:         result.OSCALValid,
+		Compliance:         compliance,
+	}, nil
 }

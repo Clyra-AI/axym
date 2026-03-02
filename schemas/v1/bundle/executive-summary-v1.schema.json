@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "version",
+    "audit",
+    "frameworks",
+    "record_count",
+    "compliance"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frameworks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fixed_timestamp": {
+      "type": "string"
+    },
+    "compliance": {
+      "type": "object",
+      "required": [
+        "required_record_types",
+        "observed_record_types",
+        "missing_record_types",
+        "incomplete_controls",
+        "controls_missing_fields",
+        "complete",
+        "grade"
+      ],
+      "properties": {
+        "required_record_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed_record_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_record_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "incomplete_controls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "controls_missing_fields": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "grade": {
+          "type": "object",
+          "required": [
+            "letter",
+            "score",
+            "reason"
+          ],
+          "properties": {
+            "letter": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

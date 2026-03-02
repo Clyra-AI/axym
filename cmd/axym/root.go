@@ -39,6 +39,7 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 	root.AddCommand(newIngestCmd(stdout, stderr, flags))
 	root.AddCommand(newMapCmd(stdout, stderr, flags))
 	root.AddCommand(newGapsCmd(stdout, stderr, flags))
+	root.AddCommand(newBundleCmd(stdout, stderr, flags))
 	root.AddCommand(newVerifyCmd(stdout, stderr, flags))
 	return root
 }
