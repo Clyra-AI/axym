@@ -6,6 +6,7 @@ coverage.out
 /axym
 /axym.exe
 .codeql/
+.axym/
 
 # OS/editor noise
 .DS_Store
