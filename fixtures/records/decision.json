@@ -1,0 +1,20 @@
+{
+  "record_version": "v1",
+  "record_id": "fixture-record-001",
+  "source": "axym",
+  "source_product": "axym",
+  "agent_id": "agent-fixture",
+  "record_type": "decision",
+  "timestamp": "2026-03-01T00:00:00Z",
+  "event": {
+    "action": "allow"
+  },
+  "metadata": {
+    "reason_code": "MATCHED"
+  },
+  "controls": {
+    "permissions_enforced": true,
+    "approved_scope": "default"
+  }
+}
+

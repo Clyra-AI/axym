@@ -12,14 +12,18 @@ go test ./...
 ## Collect command surface
 
 ```bash
+./axym init --json
 ./axym collect --dry-run --json
 ./axym collect --json
 ./axym collect --json --plugin "./my-collector"
 ./axym collect --json --governance-event-file ./events.jsonl
+./axym record add --input ./fixtures/records/decision.json --json
 ./axym ingest --source wrkr --json --input ./fixtures/ingest/wrkr/proof_records.jsonl
 ./axym ingest --source gait --json --input ./fixtures/ingest/gait
 ./axym map --frameworks eu-ai-act,soc2 --json
 ./axym gaps --frameworks eu-ai-act,soc2 --json
+./axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json
+./axym regress run --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json
 ./axym review --date 2026-09-15 --json
 ./axym review --date 2026-09-15 --format csv
 ./axym override create --bundle Q3-2026 --reason "fixture" --signer ops-key --json
@@ -35,7 +39,13 @@ go test ./...
 
 `map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`/`partial`/`gap` outcomes.
 
-`map`/`gaps` default to `eu-ai-act,soc2` when `--frameworks` is omitted.
+`init` bootstraps local store material and an `axym-policy.yaml` file with deterministic defaults.
+
+`record add` appends a user-supplied proof record JSON payload to the local chain with deterministic dedupe semantics.
+
+`map`/`gaps` default to frameworks from `axym-policy.yaml` when present, otherwise `eu-ai-act,soc2`. Invalid policy config fails closed with exit `6`.
+
+`regress init` captures deterministic per-control coverage baselines. `regress run` compares current coverage to baseline and exits `5` on drift with stable `regressed_controls` output.
 
 `gaps` ranks `partial`/`gap` controls with deterministic remediation and auditability grade output; `--min-coverage` or `--policy-config` can enforce fail-closed coverage thresholds.
 

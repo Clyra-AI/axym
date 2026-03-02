@@ -1,0 +1,4 @@
+version: v1
+compliance:
+  global_min_coverage: 0.9
+
