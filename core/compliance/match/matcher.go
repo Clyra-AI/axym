@@ -144,17 +144,17 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 			continue
 		}
 		result.CandidateCount++
+		matchedFields, missingFields := evaluateFields(record, requiredFields)
 
 		if opts.ExcludeInvalidEvidence {
 			if invalid, invalidCode := threshold.IsInvalidEvidenceClass(record); invalid {
 				result.InvalidExcluded++
 				result.FailedCount++
-				result.Evidence = append(result.Evidence, buildRecordMatch(record, nil, requiredFields, RecordStatusFailed, []string{"INVALID_EVIDENCE", invalidCode}))
+				result.Evidence = append(result.Evidence, buildRecordMatch(record, matchedFields, missingFields, RecordStatusFailed, []string{"INVALID_EVIDENCE", invalidCode}))
 				continue
 			}
 		}
 
-		matchedFields, missingFields := evaluateFields(record, requiredFields)
 		recordStatus := RecordStatusFailed
 		reasons := []string{"MISSING_REQUIRED_FIELDS"}
 		switch {

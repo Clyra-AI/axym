@@ -23,7 +23,15 @@ func newGapsCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 		Short: "Compute deterministic compliance gaps",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			normalizedFrameworks := normalizeFrameworkInput(frameworks)
-			run, err := runCompliance(normalizedFrameworks, storeDir, policyConfig, thresholdOverride(minCoverage))
+			coverageOverride := thresholdOverride(minCoverage)
+			if cmd.Flags().Changed("min-coverage") {
+				if minCoverage < 0 || minCoverage > 1 {
+					return emitGapsInvalidInput("min-coverage must be within [0,1]", stdout, stderr, global)
+				}
+				coverageOverride = &minCoverage
+			}
+
+			run, err := runCompliance(normalizedFrameworks, storeDir, policyConfig, coverageOverride)
 			if err != nil {
 				return emitGapsError(err, stdout, stderr, global)
 			}
@@ -80,4 +88,13 @@ func emitGapsError(err error, stdout io.Writer, stderr io.Writer, global *global
 		_, _ = fmt.Fprintln(stderr, err.Error())
 	}
 	return &cliError{code: exitRuntimeFailure, msg: err.Error()}
+}
+
+func emitGapsInvalidInput(message string, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
+	if global.JSON {
+		_ = printJSON(stdout, envelope{OK: false, Command: "gaps", Error: &errorEnvelope{Reason: "invalid_input", Message: message}})
+	} else if !global.Quiet {
+		_, _ = fmt.Fprintln(stderr, message)
+	}
+	return &cliError{code: exitInvalidInput, msg: message}
 }
