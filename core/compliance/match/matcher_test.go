@@ -54,6 +54,49 @@ func TestEvaluateExcludesInvalidEvidenceFromCoverage(t *testing.T) {
 	}
 }
 
+func TestEvaluateInvalidEvidencePreservesActualMissingFields(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{{
+		ID:      "fw",
+		Version: "v1",
+		Title:   "Framework",
+		Controls: []framework.Control{{
+			FrameworkID:         "fw",
+			ID:                  "c1",
+			Title:               "Control",
+			RequiredRecordTypes: []string{"decision"},
+			RequiredFields:      []string{"record_id", "timestamp", "event", "integrity.record_hash", "event.model", "event.decision"},
+			MinimumFrequency:    "continuous",
+		}},
+	}}
+
+	invalid := mustRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+		Source:        "llmapi",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"model": "x", "decision": "deny"},
+		Metadata:      map[string]any{"reason_code": "schema_error"},
+		Controls:      proof.Controls{PermissionsEnforced: true},
+	})
+
+	result := Evaluate(defs, []proof.Record{invalid}, Options{ExcludeInvalidEvidence: true})
+	control := result.Frameworks[0].Controls[0]
+	if control.InvalidExcluded != 1 {
+		t.Fatalf("invalid exclusion mismatch: %+v", control)
+	}
+	if len(control.Evidence) != 1 {
+		t.Fatalf("evidence count mismatch: %+v", control)
+	}
+	if len(control.Evidence[0].Missing) != 0 {
+		t.Fatalf("unexpected missing fields for fully populated invalid record: %+v", control.Evidence[0].Missing)
+	}
+	if len(control.Evidence[0].Matched) == 0 {
+		t.Fatalf("expected matched fields for invalid record evidence")
+	}
+}
+
 func TestEvaluateDeterministicOutput(t *testing.T) {
 	t.Parallel()
 

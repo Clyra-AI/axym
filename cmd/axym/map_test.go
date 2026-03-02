@@ -83,6 +83,28 @@ func TestMapThresholdFailureExitAndReason(t *testing.T) {
 	}
 }
 
+func TestMapRejectsInvalidMinCoverageInput(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	mustCollectFixtures(t, storeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"map", "--store-dir", storeDir, "--min-coverage", "-0.1", "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitInvalidInput, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode output: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "invalid_input" {
+		t.Fatalf("reason mismatch: %s", stdout.String())
+	}
+}
+
 func mustCollectFixtures(t *testing.T, storeDir string) {
 	t.Helper()
 	var stdout bytes.Buffer
