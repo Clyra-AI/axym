@@ -13,6 +13,7 @@ import (
 const (
 	wrkrStateFile = "wrkr-last-ingest.json"
 	wrkrLockFile  = "wrkr-last-ingest.lock"
+	wrkrLockTTL   = 5 * time.Minute
 )
 
 var ErrStateLocked = errors.New("wrkr ingest state is locked")
@@ -48,12 +49,9 @@ func (m *WrkrManager) WithLockedState(fn func(*WrkrState) error) error {
 	}
 
 	lockPath := filepath.Join(m.rootDir, wrkrLockFile)
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	lockFile, err := m.acquireLock(lockPath)
 	if err != nil {
-		if errors.Is(err, os.ErrExist) {
-			return ErrStateLocked
-		}
-		return fmt.Errorf("acquire wrkr state lock: %w", err)
+		return err
 	}
 	_ = lockFile.Close()
 	defer func() { _ = os.Remove(lockPath) }()
@@ -70,6 +68,47 @@ func (m *WrkrManager) WithLockedState(fn func(*WrkrState) error) error {
 	state.UpdatedAt = m.now().Format(time.RFC3339)
 	normalizeBaseline(state)
 	return writeJSONAtomic(m.StatePath(), state)
+}
+
+func (m *WrkrManager) acquireLock(lockPath string) (*os.File, error) {
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err == nil {
+		return lockFile, nil
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return nil, fmt.Errorf("acquire wrkr state lock: %w", err)
+	}
+
+	stale, staleErr := m.lockIsStale(lockPath)
+	if staleErr != nil {
+		return nil, fmt.Errorf("inspect wrkr state lock: %w", staleErr)
+	}
+	if !stale {
+		return nil, ErrStateLocked
+	}
+	if err := os.Remove(lockPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("remove stale wrkr state lock: %w", err)
+	}
+	lockFile, err = os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, ErrStateLocked
+		}
+		return nil, fmt.Errorf("acquire wrkr state lock: %w", err)
+	}
+	return lockFile, nil
+}
+
+func (m *WrkrManager) lockIsStale(lockPath string) (bool, error) {
+	info, err := os.Stat(lockPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	age := m.now().Sub(info.ModTime().UTC())
+	return age > wrkrLockTTL, nil
 }
 
 func (m *WrkrManager) load() (*WrkrState, error) {

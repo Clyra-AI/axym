@@ -52,8 +52,10 @@ func Read(path string) (Result, error) {
 
 func readDirectory(dir string) (Result, error) {
 	result := Result{}
+	foundSupportedEntry := false
 	proofPath := filepath.Join(dir, "proof_records.jsonl")
 	if _, err := os.Stat(proofPath); err == nil {
+		foundSupportedEntry = true
 		proofRecords, parseErr := parseProofJSONLFile(proofPath)
 		if parseErr != nil {
 			return Result{}, parseErr
@@ -63,11 +65,15 @@ func readDirectory(dir string) (Result, error) {
 
 	nativePath := filepath.Join(dir, "native_records.jsonl")
 	if _, err := os.Stat(nativePath); err == nil {
+		foundSupportedEntry = true
 		nativeRecords, parseErr := parseNativeJSONLFile(nativePath)
 		if parseErr != nil {
 			return Result{}, parseErr
 		}
 		result.NativeRecords = append(result.NativeRecords, nativeRecords...)
+	}
+	if !foundSupportedEntry {
+		return Result{}, fmt.Errorf("gait pack directory %s must contain at least one of proof_records.jsonl or native_records.jsonl", dir)
 	}
 	return result, nil
 }

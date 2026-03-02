@@ -33,6 +33,10 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if selectedSource == "" {
 				return emitIngestInvalidInput("source is required (wrkr|gait)", stdout, stderr, global)
 			}
+			resolvedStateDir := strings.TrimSpace(stateDir)
+			if resolvedStateDir == "" {
+				resolvedStateDir = storeDir
+			}
 
 			evidenceStore, err := store.New(store.Config{RootDir: storeDir})
 			if err != nil {
@@ -48,7 +52,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				result, err := wrkr.Ingest(context.Background(), wrkr.Request{
 					InputPaths: inputPaths,
 					Store:      evidenceStore,
-					StateDir:   stateDir,
+					StateDir:   resolvedStateDir,
 				})
 				if err != nil {
 					return emitIngestError(err, stdout, stderr, global)
@@ -108,7 +112,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait)")
 	cmd.Flags().StringSliceVar(&inputPaths, "input", nil, "Input file or directory path(s)")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
-	cmd.Flags().StringVar(&stateDir, "state-dir", ".axym", "Path to ingest state directory")
+	cmd.Flags().StringVar(&stateDir, "state-dir", "", "Path to ingest state directory (defaults to --store-dir)")
 	cmd.Flags().DurationVar(&sessionGapThreshold, "session-gap-threshold", 30*time.Minute, "Maximum allowed time between adjacent records before signaling CHAIN_SESSION_GAP")
 	return cmd
 }
