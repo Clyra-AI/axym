@@ -99,8 +99,8 @@ func TestVerifyBundleInvalidOSCALContractExit(t *testing.T) {
 		t.Fatalf("update manifest hash: %v", err)
 	}
 	out, exit := runAxymContract(t, "verify", "--bundle", bundleDir, "--json")
-	if exit != 6 {
-		t.Fatalf("exit mismatch: got=%d want=6 output=%s", exit, out)
+	if exit != 3 {
+		t.Fatalf("exit mismatch: got=%d want=3 output=%s", exit, out)
 	}
 }
 
