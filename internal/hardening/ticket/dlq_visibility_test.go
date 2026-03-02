@@ -31,6 +31,7 @@ func TestHardeningDLQVisibilityInReview(t *testing.T) {
 		DLQ:         queue,
 		MaxAttempts: 3,
 		Clock:       func() time.Time { return time.Date(2026, 9, 15, 13, 0, 0, 0, time.UTC) },
+		Sleep:       func(context.Context, time.Duration) error { return nil },
 	}
 	result, err := processor.Process(context.Background(), coreticket.Request{
 		ChangeID:    "CHG-888",

@@ -66,11 +66,13 @@ type Result struct {
 }
 
 type Processor struct {
-	Adapter     Adapter
-	Store       *store.Store
-	DLQ         *dlq.Queue
-	Clock       func() time.Time
-	MaxAttempts int
+	Adapter      Adapter
+	Store        *store.Store
+	DLQ          *dlq.Queue
+	Clock        func() time.Time
+	RetryBackoff func(attempt int, reasonCode string) time.Duration
+	Sleep        func(ctx context.Context, delay time.Duration) error
+	MaxAttempts  int
 }
 
 type Error struct {
@@ -121,7 +123,15 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 	if clock == nil {
 		clock = func() time.Time { return time.Now().UTC().Truncate(time.Second) }
 	}
-	now := clock().UTC().Truncate(time.Second)
+	sleepFn := p.Sleep
+	if sleepFn == nil {
+		sleepFn = sleepWithContext
+	}
+	backoffFn := p.RetryBackoff
+	if backoffFn == nil {
+		backoffFn = defaultRetryBackoff
+	}
+	startedAt := clock().UTC().Truncate(time.Second)
 	reasons := make([]string, 0)
 
 	status := StatusDLQ
@@ -142,6 +152,9 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 		if err != nil {
 			reasons = append(reasons, ReasonRemoteError)
 			if attempts < maxAttempts {
+				if err := sleepFn(ctx, backoffFn(attempts, ReasonRemoteError)); err != nil {
+					return Result{}, &Error{ReasonCode: ReasonRemoteError, Message: "retry wait interrupted", Err: err}
+				}
 				continue
 			}
 			break
@@ -154,6 +167,9 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 		if resp.StatusCode == 429 {
 			reasons = append(reasons, ReasonRateLimited)
 			if attempts < maxAttempts {
+				if err := sleepFn(ctx, backoffFn(attempts, ReasonRateLimited)); err != nil {
+					return Result{}, &Error{ReasonCode: ReasonRemoteError, Message: "retry wait interrupted", Err: err}
+				}
 				continue
 			}
 			break
@@ -161,6 +177,9 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 		if resp.StatusCode >= 500 {
 			reasons = append(reasons, ReasonRemoteError)
 			if attempts < maxAttempts {
+				if err := sleepFn(ctx, backoffFn(attempts, ReasonRemoteError)); err != nil {
+					return Result{}, &Error{ReasonCode: ReasonRemoteError, Message: "retry wait interrupted", Err: err}
+				}
 				continue
 			}
 			break
@@ -169,7 +188,8 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 		break
 	}
 
-	slaWithin := evaluateSLA(now, req.OpenedAt, req.SLA)
+	completedAt := clock().UTC().Truncate(time.Second)
+	slaWithin := evaluateSLA(completedAt, req.OpenedAt, req.SLA)
 	if status != StatusAttached {
 		reasons = append(reasons, ReasonDLQ)
 		if p.DLQ != nil {
@@ -180,7 +200,7 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 				PayloadHash: req.PayloadHash,
 				ReasonCodes: uniqueSorted(reasons),
 				Attempts:    attempts,
-				OccurredAt:  now.Format(time.RFC3339),
+				OccurredAt:  completedAt.Format(time.RFC3339),
 			})
 			if err != nil {
 				return Result{}, &Error{ReasonCode: ReasonDLQ, Message: "persist dlq entry", Err: err}
@@ -196,9 +216,9 @@ func (p Processor) Process(ctx context.Context, req Request) (Result, error) {
 		ReasonCodes: uniqueSorted(reasons),
 		DLQPath:     dlqPath,
 		SLAWithin:   slaWithin,
-		OccurredAt:  now.Format(time.RFC3339),
+		OccurredAt:  completedAt.Format(time.RFC3339),
 	}
-	recordID, err := p.emitResultRecord(now, req, result)
+	recordID, err := p.emitResultRecord(startedAt, req, result)
 	if err != nil {
 		return Result{}, err
 	}
@@ -260,6 +280,34 @@ func evaluateSLA(now time.Time, openedAt time.Time, sla time.Duration) bool {
 		return true
 	}
 	return !now.After(openedAt.UTC().Add(sla))
+}
+
+func defaultRetryBackoff(attempt int, reasonCode string) time.Duration {
+	if attempt <= 0 {
+		return 0
+	}
+	switch reasonCode {
+	case ReasonRateLimited:
+		return time.Duration(attempt) * 100 * time.Millisecond
+	case ReasonRemoteError:
+		return time.Duration(attempt) * 50 * time.Millisecond
+	default:
+		return 0
+	}
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func uniqueSorted(in []string) []string {

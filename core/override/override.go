@@ -124,21 +124,23 @@ func Create(req Request) (Result, error) {
 	}
 
 	artifactPath := filepath.Join(storeDir, "overrides", "overrides.jsonl")
-	artifact, err := json.Marshal(map[string]any{
-		"record_id":            record.RecordID,
-		"bundle":               bundle,
-		"reason":               reason,
-		"signer":               signer,
-		"expires_at":           expiresAt.Format(time.RFC3339),
-		"timestamp":            now.Format(time.RFC3339),
-		"record_hash":          record.Integrity.RecordHash,
-		"previous_record_hash": record.Integrity.PreviousRecordHash,
-	})
-	if err != nil {
-		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "marshal override artifact", Err: err}
-	}
-	if err := appendLine(artifactPath, artifact); err != nil {
-		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "persist override artifact", Err: err}
+	if appendResult.Appended {
+		artifact, err := json.Marshal(map[string]any{
+			"record_id":            record.RecordID,
+			"bundle":               bundle,
+			"reason":               reason,
+			"signer":               signer,
+			"expires_at":           expiresAt.Format(time.RFC3339),
+			"timestamp":            now.Format(time.RFC3339),
+			"record_hash":          record.Integrity.RecordHash,
+			"previous_record_hash": record.Integrity.PreviousRecordHash,
+		})
+		if err != nil {
+			return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "marshal override artifact", Err: err}
+		}
+		if err := appendLine(artifactPath, artifact); err != nil {
+			return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "persist override artifact", Err: err}
+		}
 	}
 
 	return Result{
