@@ -35,10 +35,13 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 	root.PersistentFlags().BoolVar(&flags.Explain, "explain", false, "Emit additional rationale in human output")
 
 	root.AddCommand(newVersionCmd(stdout, flags))
+	root.AddCommand(newInitCmd(stdout, stderr, flags))
 	root.AddCommand(newCollectCmd(stdout, flags))
+	root.AddCommand(newRecordCmd(stdout, stderr, flags))
 	root.AddCommand(newIngestCmd(stdout, stderr, flags))
 	root.AddCommand(newMapCmd(stdout, stderr, flags))
 	root.AddCommand(newGapsCmd(stdout, stderr, flags))
+	root.AddCommand(newRegressCmd(stdout, stderr, flags))
 	root.AddCommand(newReviewCmd(stdout, stderr, flags))
 	root.AddCommand(newOverrideCmd(stdout, stderr, flags))
 	root.AddCommand(newReplayCmd(stdout, stderr, flags))

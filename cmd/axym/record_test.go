@@ -1,0 +1,74 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestRecordAddJSONAppendsAndDedupes(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	recordPath := filepath.Join(root, "record.json")
+	recordPayload := map[string]any{
+		"record_id":      "rec-test-001",
+		"source":         "axym",
+		"source_product": "axym",
+		"agent_id":       "agent-1",
+		"record_type":    "decision",
+		"timestamp":      "2026-03-01T00:00:00Z",
+		"event":          map[string]any{"action": "approve"},
+		"metadata":       map[string]any{"ticket": "ABC-1"},
+		"controls": map[string]any{
+			"permissions_enforced": true,
+			"approved_scope":       "default",
+		},
+	}
+	raw, err := json.Marshal(recordPayload)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
+		t.Fatalf("write record fixture: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("first add exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("second add exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode output: %v output=%s", err, stdout.String())
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing data envelope: %s", stdout.String())
+	}
+	if data["deduped"] != true {
+		t.Fatalf("expected deduped=true output=%s", stdout.String())
+	}
+}
+
+func TestRecordAddMissingInputExitCode(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d output=%s", exit, exitInvalidInput, stdout.String())
+	}
+}

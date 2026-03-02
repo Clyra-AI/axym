@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://axym.dev/schemas/v1/config/axym-policy-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_dir", "frameworks"],
+      "properties": {
+        "store_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "global_min_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "framework_min_coverage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}
+

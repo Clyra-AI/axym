@@ -22,7 +22,16 @@ func newGapsCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 		Use:   "gaps",
 		Short: "Compute deterministic compliance gaps",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			normalizedFrameworks := normalizeFrameworkInput(frameworks)
+			policy, _, err := resolvePolicyRuntime(policyConfig)
+			if err != nil {
+				return emitGapsInvalidInput(fmt.Sprintf("invalid policy config: %v", err), stdout, stderr, global)
+			}
+			normalizedFrameworks := resolveFrameworkInput(policy, frameworks)
+			explicitStoreDir := ""
+			if cmd.Flags().Changed("store-dir") {
+				explicitStoreDir = storeDir
+			}
+			resolvedStoreDir := resolveStoreDir(policy, explicitStoreDir)
 			coverageOverride := thresholdOverride(minCoverage)
 			if cmd.Flags().Changed("min-coverage") {
 				if minCoverage < 0 || minCoverage > 1 {
@@ -31,7 +40,7 @@ func newGapsCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 				coverageOverride = &minCoverage
 			}
 
-			run, err := runCompliance(normalizedFrameworks, storeDir, policyConfig, coverageOverride)
+			run, err := runCompliance(normalizedFrameworks, resolvedStoreDir, policy.ThresholdPolicy(), coverageOverride)
 			if err != nil {
 				return emitGapsError(err, stdout, stderr, global)
 			}
@@ -66,7 +75,7 @@ func newGapsCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 
 	cmd.Flags().StringSliceVar(&frameworks, "frameworks", nil, "Framework IDs to evaluate (comma-separated), e.g. eu-ai-act,soc2")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
-	cmd.Flags().StringVar(&policyConfig, "policy-config", "", "Optional JSON policy config with coverage thresholds")
+	cmd.Flags().StringVar(&policyConfig, "policy-config", "", "Optional policy config path (defaults to axym-policy.yaml when present)")
 	cmd.Flags().Float64Var(&minCoverage, "min-coverage", -1, "Optional minimum coverage threshold (0..1)")
 	return cmd
 }

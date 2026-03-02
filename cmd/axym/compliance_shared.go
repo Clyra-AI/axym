@@ -8,10 +8,9 @@ import (
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/compliance/match"
 	"github.com/Clyra-AI/axym/core/compliance/threshold"
+	"github.com/Clyra-AI/axym/core/config"
 	"github.com/Clyra-AI/axym/core/store"
 )
-
-var defaultFrameworkIDs = []string{"eu-ai-act", "soc2"}
 
 type complianceRun struct {
 	frameworks     []framework.Definition
@@ -20,7 +19,7 @@ type complianceRun struct {
 	thresholdEval  threshold.Evaluation
 }
 
-func runCompliance(frameworkIDs []string, storeDir string, policyPath string, thresholdOverride *float64) (complianceRun, error) {
+func runCompliance(frameworkIDs []string, storeDir string, policy threshold.PolicyConfig, thresholdOverride *float64) (complianceRun, error) {
 	definitions, err := framework.LoadMany(frameworkIDs)
 	if err != nil {
 		return complianceRun{}, err
@@ -36,10 +35,6 @@ func runCompliance(frameworkIDs []string, storeDir string, policyPath string, th
 
 	matchResult := match.Evaluate(definitions, chain.Records, match.Options{ExcludeInvalidEvidence: true})
 	coverageReport := coverage.Build(matchResult)
-	policy, err := threshold.LoadPolicy(policyPath)
-	if err != nil {
-		return complianceRun{}, err
-	}
 	thresholdEval := threshold.Evaluate(toFrameworkCoverage(coverageReport), policy, thresholdOverride)
 	return complianceRun{
 		frameworks:     definitions,
@@ -61,6 +56,18 @@ func toFrameworkCoverage(report coverage.Report) []threshold.FrameworkCoverage {
 	return frameworks
 }
 
+func resolvePolicyRuntime(path string) (config.Policy, bool, error) {
+	return config.Discover(path)
+}
+
+func resolveFrameworkInput(policy config.Policy, values []string) []string {
+	return policy.ResolveFrameworks(values)
+}
+
+func resolveStoreDir(policy config.Policy, explicit string) string {
+	return policy.ResolveStoreDir(explicit)
+}
+
 func normalizeFrameworkInput(values []string) []string {
 	result := make([]string, 0)
 	for _, value := range values {
@@ -71,8 +78,9 @@ func normalizeFrameworkInput(values []string) []string {
 			}
 		}
 	}
+	defaults := config.DefaultPolicy().Defaults.Frameworks
 	if len(result) == 0 {
-		return append([]string(nil), defaultFrameworkIDs...)
+		return append([]string(nil), defaults...)
 	}
 	return result
 }

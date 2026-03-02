@@ -1,0 +1,11 @@
+framework:
+  id: regress-minimal
+  version: "1"
+  title: Regress Minimal
+controls:
+  - id: R1
+    title: Decision record exists
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+
