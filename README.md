@@ -20,8 +20,9 @@ go test ./...
 ./axym ingest --source gait --json --input ./fixtures/ingest/gait
 ./axym map --frameworks eu-ai-act,soc2 --json
 ./axym gaps --frameworks eu-ai-act,soc2 --json
+./axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json
 ./axym verify --chain --json
-./axym verify --bundle ./fixtures/bundles/good --json
+./axym verify --bundle ./axym-evidence --json
 ```
 
 `collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin/governance payloads out of the proof chain.
@@ -33,6 +34,10 @@ go test ./...
 `map`/`gaps` default to `eu-ai-act,soc2` when `--frameworks` is omitted.
 
 `gaps` ranks `partial`/`gap` controls with deterministic remediation and auditability grade output; `--min-coverage` or `--policy-config` can enforce fail-closed coverage thresholds.
+
+`bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
+
+`verify --bundle` reports cryptographic integrity plus deterministic Axym compliance-completeness checks (required record classes, field-coverage state, grade recomputation, and OSCAL schema validation).
 
 ## Exit codes
 

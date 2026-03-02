@@ -5,6 +5,7 @@ coverage.out
 *.test
 /axym
 /axym.exe
+/axym-evidence/
 .codeql/
 .axym/
 
