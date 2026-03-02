@@ -63,7 +63,7 @@ func TestWithLockedStateRecoversFromStaleLock(t *testing.T) {
 		t.Fatalf("Chtimes: %v", err)
 	}
 	manager.now = func() time.Time {
-		return old.Add(wrkrLockTTL + time.Minute)
+		return old.Add(manager.lockTTL + time.Minute)
 	}
 
 	err := manager.WithLockedState(func(st *WrkrState) error {
@@ -75,5 +75,52 @@ func TestWithLockedStateRecoversFromStaleLock(t *testing.T) {
 	}
 	if _, statErr := os.Stat(manager.StatePath()); statErr != nil {
 		t.Fatalf("expected state file after stale-lock recovery: %v", statErr)
+	}
+}
+
+func TestWithLockedStateDoesNotReclaimActiveLongRunningLock(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	holder := NewWrkrManager(root)
+	holder.lockTTL = 150 * time.Millisecond
+	holder.lockHeartbeat = 20 * time.Millisecond
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	holderErr := make(chan error, 1)
+	go func() {
+		holderErr <- holder.WithLockedState(func(st *WrkrState) error {
+			close(entered)
+			<-release
+			return nil
+		})
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for holder lock acquisition")
+	}
+
+	time.Sleep(250 * time.Millisecond)
+
+	contender := NewWrkrManager(root)
+	contender.lockTTL = 150 * time.Millisecond
+	contender.lockHeartbeat = 20 * time.Millisecond
+
+	err := contender.WithLockedState(func(st *WrkrState) error { return nil })
+	if !errors.Is(err, ErrStateLocked) {
+		t.Fatalf("expected ErrStateLocked for active long-running lock, got %v", err)
+	}
+
+	close(release)
+	select {
+	case err := <-holderErr:
+		if err != nil {
+			t.Fatalf("holder lock failed: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for holder completion")
 	}
 }

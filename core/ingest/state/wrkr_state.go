@@ -13,7 +13,9 @@ import (
 const (
 	wrkrStateFile = "wrkr-last-ingest.json"
 	wrkrLockFile  = "wrkr-last-ingest.lock"
-	wrkrLockTTL   = 5 * time.Minute
+
+	defaultWrkrLockTTL       = 5 * time.Minute
+	defaultWrkrLockHeartbeat = 30 * time.Second
 )
 
 var ErrStateLocked = errors.New("wrkr ingest state is locked")
@@ -25,14 +27,18 @@ type WrkrState struct {
 }
 
 type WrkrManager struct {
-	rootDir string
-	now     func() time.Time
+	rootDir       string
+	now           func() time.Time
+	lockTTL       time.Duration
+	lockHeartbeat time.Duration
 }
 
 func NewWrkrManager(rootDir string) *WrkrManager {
 	return &WrkrManager{
-		rootDir: rootDir,
-		now:     func() time.Time { return time.Now().UTC().Truncate(time.Second) },
+		rootDir:       rootDir,
+		now:           func() time.Time { return time.Now().UTC().Truncate(time.Second) },
+		lockTTL:       defaultWrkrLockTTL,
+		lockHeartbeat: defaultWrkrLockHeartbeat,
 	}
 }
 
@@ -53,8 +59,15 @@ func (m *WrkrManager) WithLockedState(fn func(*WrkrState) error) error {
 	if err != nil {
 		return err
 	}
-	_ = lockFile.Close()
-	defer func() { _ = os.Remove(lockPath) }()
+	stopHeartbeat := make(chan struct{})
+	heartbeatDone := make(chan struct{})
+	go m.refreshLock(lockPath, stopHeartbeat, heartbeatDone)
+	defer func() {
+		close(stopHeartbeat)
+		<-heartbeatDone
+		_ = lockFile.Close()
+		_ = os.Remove(lockPath)
+	}()
 
 	state, err := m.load()
 	if err != nil {
@@ -107,8 +120,47 @@ func (m *WrkrManager) lockIsStale(lockPath string) (bool, error) {
 		}
 		return false, err
 	}
+	lockTTL := m.lockTTL
+	if lockTTL <= 0 {
+		lockTTL = defaultWrkrLockTTL
+	}
 	age := m.now().Sub(info.ModTime().UTC())
-	return age > wrkrLockTTL, nil
+	return age > lockTTL, nil
+}
+
+func (m *WrkrManager) refreshLock(lockPath string, stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+
+	interval := m.lockHeartbeat
+	lockTTL := m.lockTTL
+	if lockTTL <= 0 {
+		lockTTL = defaultWrkrLockTTL
+	}
+	if interval <= 0 || interval >= lockTTL {
+		interval = lockTTL / 2
+	}
+	if interval <= 0 {
+		return
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			now := m.now()
+			if now.IsZero() {
+				now = time.Now().UTC().Truncate(time.Second)
+			}
+			if err := os.Chtimes(lockPath, now, now); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					return
+				}
+			}
+		}
+	}
 }
 
 func (m *WrkrManager) load() (*WrkrState, error) {
