@@ -62,6 +62,38 @@ func TestDiscoverReturnsDefaultWhenFileMissing(t *testing.T) {
 	}
 }
 
+func TestResolveFrameworksPreservesPathValues(t *testing.T) {
+	t.Parallel()
+
+	absPath := filepath.Join(t.TempDir(), "Custom-Framework.yaml")
+	policy := Policy{
+		Version: VersionV1,
+		Defaults: Defaults{
+			StoreDir: ".axym",
+			Frameworks: []string{
+				"EU-AI-ACT",
+				absPath,
+				"./fixtures/frameworks/Regress-Minimal.yaml",
+			},
+		},
+	}
+
+	got := policy.ResolveFrameworks(nil)
+	want := []string{
+		"./fixtures/frameworks/Regress-Minimal.yaml",
+		absPath,
+		"eu-ai-act",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("framework count mismatch: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("framework mismatch at %d: got=%q want=%q", i, got[i], want[i])
+		}
+	}
+}
+
 func osWriteFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o600)
 }

@@ -181,18 +181,35 @@ func normalizeFrameworks(values []string) []string {
 	seen := map[string]struct{}{}
 	out := make([]string, 0, len(values))
 	for _, value := range values {
-		trimmed := strings.ToLower(strings.TrimSpace(value))
+		trimmed := strings.TrimSpace(value)
 		if trimmed == "" {
 			continue
 		}
-		if _, ok := seen[trimmed]; ok {
+		normalized := trimmed
+		if !isLikelyPath(trimmed) {
+			normalized = strings.ToLower(trimmed)
+		}
+		if _, ok := seen[normalized]; ok {
 			continue
 		}
-		seen[trimmed] = struct{}{}
-		out = append(out, trimmed)
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
 	}
 	sort.Strings(out)
 	return out
+}
+
+func isLikelyPath(value string) bool {
+	if value == "" {
+		return false
+	}
+	if filepath.IsAbs(value) {
+		return true
+	}
+	if strings.HasPrefix(value, ".") {
+		return true
+	}
+	return strings.ContainsAny(value, `/\`)
 }
 
 func normalizeThresholdMap(values map[string]float64) map[string]float64 {
