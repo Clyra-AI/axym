@@ -83,8 +83,8 @@ func TestWithLockedStateDoesNotReclaimActiveLongRunningLock(t *testing.T) {
 
 	root := t.TempDir()
 	holder := NewWrkrManager(root)
-	holder.lockTTL = 150 * time.Millisecond
-	holder.lockHeartbeat = 20 * time.Millisecond
+	holder.lockTTL = 2 * time.Second
+	holder.lockHeartbeat = 200 * time.Millisecond
 
 	entered := make(chan struct{})
 	release := make(chan struct{})
@@ -103,11 +103,13 @@ func TestWithLockedStateDoesNotReclaimActiveLongRunningLock(t *testing.T) {
 		t.Fatal("timed out waiting for holder lock acquisition")
 	}
 
-	time.Sleep(250 * time.Millisecond)
+	// Wait long enough that the original lock timestamp would be stale without
+	// heartbeat refresh updates.
+	time.Sleep(3200 * time.Millisecond)
 
 	contender := NewWrkrManager(root)
-	contender.lockTTL = 150 * time.Millisecond
-	contender.lockHeartbeat = 20 * time.Millisecond
+	contender.lockTTL = 2 * time.Second
+	contender.lockHeartbeat = 200 * time.Millisecond
 
 	err := contender.WithLockedState(func(st *WrkrState) error { return nil })
 	if !errors.Is(err, ErrStateLocked) {
@@ -120,7 +122,7 @@ func TestWithLockedStateDoesNotReclaimActiveLongRunningLock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("holder lock failed: %v", err)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for holder completion")
 	}
 }
