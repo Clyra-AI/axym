@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/regress"
 	"github.com/spf13/cobra"
 )
@@ -129,6 +130,23 @@ func newRegressRunCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 }
 
 func emitRegressError(err error, command string, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
+	var frameworkErr *framework.Error
+	if errors.As(err, &frameworkErr) {
+		if global.JSON {
+			_ = printJSON(stdout, envelope{
+				OK:      false,
+				Command: command,
+				Error: &errorEnvelope{
+					Reason:  strings.ToLower(frameworkErr.ReasonCode),
+					Message: frameworkErr.Message,
+				},
+			})
+		} else if !global.Quiet {
+			_, _ = fmt.Fprintln(stderr, frameworkErr.Error())
+		}
+		return &cliError{code: exitInvalidInput, msg: frameworkErr.Error()}
+	}
+
 	var regressErr *regress.Error
 	if errors.As(err, &regressErr) {
 		if global.JSON {

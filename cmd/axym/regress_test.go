@@ -19,6 +19,20 @@ func TestRegressBaselineRequired(t *testing.T) {
 	}
 }
 
+func TestRegressInvalidFrameworkExitCode(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	baselinePath := filepath.Join(root, "baseline.json")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"regress", "run", "--baseline", baselinePath, "--frameworks", "does-not-exist-framework", "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d output=%s", exit, exitInvalidInput, stdout.String())
+	}
+}
+
 func TestRegressRunExit5OnDrift(t *testing.T) {
 	t.Parallel()
 
