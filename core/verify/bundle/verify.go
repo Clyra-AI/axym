@@ -22,6 +22,7 @@ const (
 	ReasonBundleVerify       = "bundle_verify_failed"
 	ReasonBundleCompleteness = "bundle_completeness_failed"
 	ReasonInvalidInput       = "invalid_input"
+	ReasonSchemaViolation    = "schema_violation"
 )
 
 type Error struct {
@@ -97,7 +98,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read executive summary", ExitCode: 6, Err: err}
 	}
 	if err := bundleschema.ValidateExecutiveSummary(summaryRaw); err != nil {
-		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "executive summary schema validation failed", ExitCode: 6, Err: err}
+		return Result{}, &Error{ReasonCode: ReasonSchemaViolation, Message: "executive summary schema validation failed", ExitCode: 3, Err: err}
 	}
 	var summary executiveSummary
 	if err := json.Unmarshal(summaryRaw, &summary); err != nil {
@@ -120,6 +121,13 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	var chain proof.Chain
 	if err := json.Unmarshal(chainRaw, &chain); err != nil {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "decode chain artifact", ExitCode: 6, Err: err}
+	}
+	chainVerification, err := proof.VerifyChain(&chain)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleVerify, Message: "verify chain artifact", ExitCode: 2, Err: err}
+	}
+	if !chainVerification.Intact {
+		return Result{}, &Error{ReasonCode: ReasonBundleVerify, Message: "chain integrity check failed", ExitCode: 2}
 	}
 
 	matchResult := match.Evaluate(definitions, chain.Records, match.Options{ExcludeInvalidEvidence: true})
@@ -148,7 +156,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read oscal export", ExitCode: 6, Err: err}
 	}
 	if err := bundleschema.ValidateOSCAL(oscalRaw); err != nil {
-		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "oscal schema validation failed", ExitCode: 6, Err: err}
+		return Result{}, &Error{ReasonCode: ReasonSchemaViolation, Message: "oscal schema validation failed", ExitCode: 3, Err: err}
 	}
 
 	result.ComplianceVerified = true
