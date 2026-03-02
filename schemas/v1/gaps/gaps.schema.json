@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/gaps.schema.json",
+  "type": "object",
+  "required": ["summary", "grade", "gaps"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "required": ["total", "gap_count", "partial_count", "covered_count"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "gap_count": {"type": "integer", "minimum": 0},
+        "partial_count": {"type": "integer", "minimum": 0},
+        "covered_count": {"type": "integer", "minimum": 0},
+        "highest_priority": {"type": "integer", "minimum": 0},
+        "lowest_priority": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "grade": {
+      "type": "object",
+      "required": ["letter", "score", "reason"],
+      "properties": {
+        "letter": {"type": "string", "enum": ["A", "B", "C", "D", "E", "F"]},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rank", "framework_id", "control_id", "status", "priority", "reason_codes", "remediation", "effort"],
+        "properties": {
+          "rank": {"type": "integer", "minimum": 1},
+          "framework_id": {"type": "string", "minLength": 1},
+          "control_id": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "enum": ["gap", "partial"]},
+          "priority": {"type": "integer", "minimum": 0},
+          "reason_codes": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "missing_record_types": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "missing_fields": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "remediation": {"type": "string", "minLength": 1},
+          "effort": {"type": "string", "enum": ["low", "medium", "high"]},
+          "evidence_count": {"type": "integer", "minimum": 0},
+          "invalid_excluded": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
