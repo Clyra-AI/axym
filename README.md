@@ -20,6 +20,10 @@ go test ./...
 ./axym ingest --source gait --json --input ./fixtures/ingest/gait
 ./axym map --frameworks eu-ai-act,soc2 --json
 ./axym gaps --frameworks eu-ai-act,soc2 --json
+./axym review --date 2026-09-15 --json
+./axym review --date 2026-09-15 --format csv
+./axym override create --bundle Q3-2026 --reason "fixture" --signer ops-key --json
+./axym replay --model payments-agent --tier A --json
 ./axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json
 ./axym verify --chain --json
 ./axym verify --bundle ./axym-evidence --json
@@ -34,6 +38,12 @@ go test ./...
 `map`/`gaps` default to `eu-ai-act,soc2` when `--frameworks` is omitted.
 
 `gaps` ranks `partial`/`gap` controls with deterministic remediation and auditability grade output; `--min-coverage` or `--policy-config` can enforce fail-closed coverage thresholds.
+
+`review` emits deterministic daily exception packs with fixed exception classes (`sod`, `approvals`, `enrichment`, `attach`, `replay`, `freeze`, `chain-session-gap`), per-record auditability, replay tier distributions, and attach SLA/status envelopes.
+
+`override create` appends signed override evidence records and append-only override artifacts under `.axym/overrides/`.
+
+`replay` emits `replay_certification` proof records with deterministic tier classification and blast-radius summary fields.
 
 `bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
 
