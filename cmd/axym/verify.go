@@ -50,7 +50,11 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if err := coreVerify.EnsureManagedTempDir(tempDir); err != nil {
 				return emitVerifyError(err, stdout, stderr, global)
 			}
-			result, err := coreVerify.VerifyBundle(bundlePath, normalizeFrameworkInput(frameworks))
+			frameworkIDs := []string(nil)
+			if cmd.Flags().Changed("frameworks") {
+				frameworkIDs = normalizeFrameworkInput(frameworks)
+			}
+			result, err := coreVerify.VerifyBundle(bundlePath, frameworkIDs)
 			if err != nil {
 				return emitVerifyError(err, stdout, stderr, global)
 			}

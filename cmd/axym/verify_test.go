@@ -174,3 +174,30 @@ func TestVerifyBundleIncludesComplianceEnvelope(t *testing.T) {
 		t.Fatalf("expected oscal_valid=true output=%s", stdout.String())
 	}
 }
+
+func TestVerifyBundleUsesBundleDeclaredFrameworksWhenFlagOmitted(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	bundleDir := filepath.Join(t.TempDir(), "bundle")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"collect", "--fixture-dir", filepath.Join("fixtures", "collectors"), "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("collect setup failed: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"bundle", "--audit", "Q3-2026", "--frameworks", "sox,pci-dss", "--store-dir", storeDir, "--output", bundleDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("bundle setup failed: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"verify", "--bundle", bundleDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("verify should succeed with bundle-declared frameworks: exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+}
