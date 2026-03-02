@@ -85,9 +85,10 @@ func Run(req Request) (Result, error) {
 	}
 	clock := req.Now
 	if clock == nil {
-		clock = func() time.Time { return time.Now().UTC().Truncate(time.Second) }
+		clock = func() time.Time { return time.Now().UTC() }
 	}
-	now := clock().UTC().Truncate(time.Second)
+	startedAt := clock().UTC()
+	now := startedAt.Truncate(time.Second)
 
 	evidenceStore, err := store.New(store.Config{RootDir: storeDir, ComplianceMode: true})
 	if err != nil {
@@ -116,7 +117,7 @@ func Run(req Request) (Result, error) {
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "build replay record", Err: err}
 	}
-	key, err := dedupe.BuildKey(record.SourceProduct, record.RecordType, record.Event)
+	key, err := dedupe.BuildKey(record.SourceProduct, record.RecordType, replayDedupeEvent(record.Event, startedAt))
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "build replay dedupe key", Err: err}
 	}
@@ -166,4 +167,14 @@ func source(candidate string) string {
 		return "axym-replay"
 	}
 	return candidate
+}
+
+func replayDedupeEvent(event map[string]any, startedAt time.Time) map[string]any {
+	out := make(map[string]any, len(event)+1)
+	for key, value := range event {
+		out[key] = value
+	}
+	// Replay runs should always emit new evidence; dedupe keeps per-run identity.
+	out["run_identity"] = startedAt.UTC().Format(time.RFC3339Nano)
+	return out
 }
