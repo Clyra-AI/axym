@@ -16,11 +16,15 @@ go test ./...
 ./axym collect --json
 ./axym collect --json --plugin "./my-collector"
 ./axym collect --json --governance-event-file ./events.jsonl
+./axym ingest --source wrkr --json --input ./fixtures/ingest/wrkr/proof_records.jsonl
+./axym ingest --source gait --json --input ./fixtures/ingest/gait
 ./axym verify --chain --json
 ./axym verify --bundle ./fixtures/bundles/good --json
 ```
 
 `collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin/governance payloads out of the proof chain.
+
+`ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip/extracted/explicit-path packs and translates `trace`, `approval_token`, and `delegation_token` native records to proof records while preserving relationship envelopes.
 
 ## Exit codes
 

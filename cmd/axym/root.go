@@ -36,6 +36,7 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 
 	root.AddCommand(newVersionCmd(stdout, flags))
 	root.AddCommand(newCollectCmd(stdout, flags))
+	root.AddCommand(newIngestCmd(stdout, stderr, flags))
 	root.AddCommand(newVerifyCmd(stdout, stderr, flags))
 	return root
 }
