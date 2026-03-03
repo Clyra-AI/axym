@@ -62,6 +62,7 @@ Rules:
 3. Implement one story at a time (no parallel story execution).
 4. For each story:
 - implement scoped code/docs/tests only
+- keep orchestration thin; move parsing/persistence/reporting/policy logic into focused packages when boundary stories are in scope
 - run story `Run commands`
 - run story `Test requirements`
 - run story `Matrix wiring` lanes
@@ -76,6 +77,13 @@ Rules:
 - plan Definition of Done
 - plan Exit Criteria
 - Output `met/not met` with command evidence for each item.
+
+## Execution Waves (Mandatory)
+
+- Execute in two waves to keep blast radius controlled:
+- Wave 1: contract/runtime correctness and architecture boundaries.
+- Wave 2: docs, OSS hygiene, and distribution UX.
+- Do not start Wave 2 work for a touched surface before Wave 1 acceptance criteria are met for that surface.
 
 ## Command Contract (JSON Required)
 
@@ -96,6 +104,7 @@ When collecting evidence or emitting machine-readable status, use `axym` command
 - `cmd/axym/*_test.go` command coverage
 - `--json` stability checks
 - exit-code contract checks
+- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Gate/policy/fail-closed changes:
 - deterministic allow/block/require_approval and `decision.pass` fixtures
@@ -117,11 +126,14 @@ When collecting evidence or emitting machine-readable status, use `axym` command
 - atomic write/crash safety tests
 - contention/concurrency tests
 - chaos lanes when scoped
+- end-to-end cancellation/timeout propagation tests across CLI -> orchestration -> adapters
 
 6. SDK/adapter boundary changes:
 - wrapper behavior/error-mapping tests
 - adapter conformance/parity tests
 - `make test-adapter-parity` when applicable
+- structured machine-readable error envelope tests for SDK/library paths
+- extension-point compatibility tests when new enterprise integration seams are introduced
 
 7. Voice/context changes:
 - `relevant scenario acceptance suites` as applicable
@@ -129,6 +141,9 @@ When collecting evidence or emitting machine-readable status, use `axym` command
 8. Docs/examples changes:
 - `make test-docs-consistency`
 - `make test-docs-storyline` when flow changes
+- README first-screen checks (what it is, who it is for, integration path, first value)
+- source-of-truth checks between repo docs and generated/public docs
+- problem -> solution framing and integration-before-internals checks for touched docs
 
 ## Test Matrix Wiring (Enforcement)
 
@@ -149,11 +164,19 @@ No story is complete if any required lane is skipped or failing.
 - `./docs/`
 - `./docs-site/public/llms.txt`
 - `./docs-site/public/llm/*.md`
-- If internal-only behavior with no user-visible impact, avoid unnecessary doc churn.
+
+Doc updates must preserve:
+- first-screen README clarity for value and integration path
+- integration guidance before internal architecture detail
+- one canonical file/state lifecycle path model (diagram + path narrative) for touched workflows
+- source-of-truth linkage between repo docs and generated/public docs
+
+If internal-only behavior with no user-visible impact, avoid unnecessary doc churn.
 
 ## Safety Rules
 
 - Preserve determinism, offline-first defaults, fail-closed enforcement, schema stability, and exit-code stability.
+- Keep side effects explicit in API names/signatures and preserve symmetrical API semantics.
 - Never weaken unapproved posture => regression failure behavior.
 - Do not allow recursive cleanup on user-supplied paths without explicit ownership validation tests.
 - No destructive git operations unless explicitly requested.
@@ -166,6 +189,7 @@ No story is complete if any required lane is skipped or failing.
 - Do not claim tests ran if they were not run.
 - Tests must use temp dirs for generated artifacts; do not leak test outputs into tracked source paths.
 - If docs/CLI drift occurs due to user-visible changes, patch docs in same story.
+- For touched contracts, ensure public/internal/shim/deprecated API classification and schema version/migration notes are updated.
 
 ## Blocker Handling
 
@@ -191,4 +215,5 @@ Implementation is complete only when all are true:
 - Change log: key files per story
 - Validation log: commands and pass/fail
 - Revalidation report: acceptance criteria + DoD + exit criteria (`met/not met` with evidence)
+- Wave status: Wave 1 vs Wave 2 completion for touched surfaces
 - Residual risk: remaining gaps and next required actions

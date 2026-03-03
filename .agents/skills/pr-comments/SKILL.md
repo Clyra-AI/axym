@@ -88,6 +88,7 @@ For each PR:
 - collect all comments per Comment Collection Contract
 - establish working branch per Branch Strategy
 - implement changes needed to address fetched comments
+- prioritize Wave 1 fixes first (contract/runtime correctness and architecture boundaries), then Wave 2 fixes (docs/OSS/distribution UX)
 - keep fixes minimal and scoped to comment evidence
 - classify every fetched comment (`implemented`, `already_satisfied`, `blocked`)
 - run required tests per work type (see Test Requirements by Work Type)
@@ -107,6 +108,7 @@ For each PR:
 - targeted CLI tests for touched commands
 - JSON key and exit-code compatibility checks
 - `make test-contracts` when contract surfaces are touched
+- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Policy/regression/fail-closed changes:
 - deterministic allow/block/approval fixtures
@@ -119,6 +121,7 @@ For each PR:
 
 5. Integration/runtime behavior changes:
 - targeted integration/e2e tests for touched surfaces
+- end-to-end timeout/cancellation propagation checks for long-running workflows
 
 ## Test Matrix Wiring
 
@@ -141,12 +144,14 @@ Collect machine-readable evidence with:
 
 Prioritize fixes affecting:
 1. Fail-closed behavior and safety boundaries
-2. Determinism and reproducibility contracts
-3. CLI/schema/output compatibility (`--json`, exit codes, stable keys)
-4. Security/privacy and unsafe operation guards
-5. Lifecycle/regression correctness
-6. Cross-platform portability and CI stability
-7. User-visible docs drift when behavior changed
+2. Contract/runtime correctness and architecture boundaries (API symmetry, explicit side effects, timeout/cancellation propagation)
+3. Determinism and reproducibility contracts
+4. CLI/schema/output compatibility (`--json`, exit codes, stable keys, version discoverability)
+5. Security/privacy and unsafe operation guards
+6. Lifecycle/regression correctness
+7. Structured machine-readable error compatibility for SDK/library paths
+8. Cross-platform portability and CI stability
+9. User-visible docs/OSS/distribution drift when behavior changed
 
 ## Safety Rules
 
@@ -164,6 +169,7 @@ Prioritize fixes affecting:
 - Distinguish facts from inference.
 - Do not claim tests ran if they were not run.
 - Prefer minimal-risk fixes over broad refactors.
+- For touched contracts, keep public/internal/shim/deprecated classification and schema version/migration notes coherent.
 
 ## Blocker Handling
 

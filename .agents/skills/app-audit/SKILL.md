@@ -16,21 +16,27 @@ Execute this workflow when asked to perform app review, release readiness, archi
 
 ## Workflow
 
-1. Build whiteboard mental model from onboarding to sustained use.
+1. Build whiteboard mental model from onboarding to sustained use, including the first-10-min path.
 2. Map personas, JTBD, and MVP user-story coverage.
 3. List required inputs/config/secrets/dependencies and setup friction.
 4. Evaluate “aha” moments per primary user story.
-5. Run technical validation on affected surfaces (build/lint/tests as needed).
+5. Run technical validation on affected surfaces (build/lint/tests as needed), including architecture-boundary enforcement in code.
 6. Audit docs for integration clarity:
    - where Axym sits in runtime path
    - what is customer code vs Axym vs tool/provider
    - sync vs async behavior and failure handling
-7. Compare stated product intent vs implemented behavior.
+   - README first screen: what it is, who it is for, integration path, first value
+   - problem -> solution framing before primitive/feature lists
+   - lifecycle/path model clarity and docs source-of-truth linkage (repo docs vs generated/public docs)
+7. Compare stated product intent vs implemented behavior, including API surface map quality (stable/internal/shim/deprecated), schema/versioning policy clarity, and structured machine-readable error support.
 8. Assess security posture and fail-closed guarantees.
    - explicitly test filesystem mutation boundaries on user-supplied output paths
    - confirm cleanup/reset flows reject non-managed dirs and reject marker symlink/directory types
-9. Assess market wedge sharpness for existing personas only.
-10. Produce final go/no-go verdict with minimum blocker set.
+9. Assess OSS readiness baseline and governance context:
+   - `CONTRIBUTING`, `CHANGELOG`, `CODE_OF_CONDUCT`, issue/PR templates, and security policy links
+   - maintainer/support expectations and standalone vs ecosystem dependency clarity
+10. Assess market wedge sharpness for existing personas only.
+11. Produce final go/no-go verdict with minimum blocker set and two-wave remediation order.
 
 ## Non-Negotiables
 
@@ -39,6 +45,7 @@ Execute this workflow when asked to perform app review, release readiness, archi
 - Incident-first: lead with failure scenarios and operational impact.
 - No cosmetics as blockers.
 - Distinguish facts vs inference.
+- Recommend fixes in two waves: Wave 1 contracts/runtime/architecture boundaries, then Wave 2 docs/OSS/distribution UX.
 
 ## Command Anchors
 
@@ -62,6 +69,7 @@ Execute this workflow when asked to perform app review, release readiness, archi
 - Section 5: Technical audit + release readiness
 - Section 6: Business/market fit assessment
 - Section 7: Final verdict (go/no-go) + top 3 launch risks
+- Section 8: Fix wave plan (Wave 1 blockers, Wave 2 blockers)
 
 Each section must include:
 - Findings

@@ -83,6 +83,7 @@ Rules:
 
 3. Execute one story at a time:
 - Implement only scoped story changes.
+- Keep orchestration thin; move parsing/persistence/reporting/policy logic into focused packages when boundary stories are in scope.
 - Update tests required by story type.
 - Update docs surgically only if user-facing behavior changed.
 - Do not start next story until current story is validated.
@@ -113,6 +114,14 @@ Rules:
 - Mark all other plan-level exit criteria as `deferred (out of scope)`; do not fail epic completion for those items.
 - Produce a `met/not met` checklist with command evidence for each item.
 
+## Execution Waves (Mandatory)
+
+- Execute in two waves to keep blast radius controlled:
+- Wave 1: contract/runtime correctness and architecture boundaries.
+- Wave 2: docs, OSS hygiene, and distribution UX.
+- In `epic-only` mode, apply the same wave ordering within selected stories.
+- Do not start Wave 2 work for a touched surface before Wave 1 acceptance criteria are met for that surface.
+
 ## Command Anchors
 
 - `axym collect --dry-run --json` to verify local environment and dependency readiness before implementation.
@@ -131,6 +140,7 @@ Rules:
 - Command tests in `cmd/axym/*_test.go`
 - JSON output stability tests
 - Exit-code contract tests
+- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Gate/policy/fail-closed changes:
 - Deterministic allow/block/require_approval and `decision.pass` fixture tests
@@ -152,11 +162,14 @@ Rules:
 - Atomic-write/crash-safety tests
 - Contention/concurrency tests
 - Chaos tests when scoped
+- End-to-end cancellation/timeout propagation tests across CLI -> orchestration -> adapters
 
 6. SDK/adapter boundary changes:
 - Wrapper behavior/error-mapping tests
 - Adapter parity/conformance tests
 - `make test-adapter-parity` when relevant
+- Structured machine-readable error envelope tests for SDK/library paths
+- Extension-point compatibility tests when new enterprise integration seams are introduced
 
 7. Voice/context evidence changes:
 - `relevant scenario acceptance suites` as applicable
@@ -164,6 +177,9 @@ Rules:
 8. Docs/examples changes:
 - `make test-docs-consistency`
 - `make test-docs-storyline` when operator flow changes
+- README first-screen checks (what it is, who it is for, integration path, first value)
+- Source-of-truth checks between repo docs and generated/public docs
+- Problem -> solution framing and integration-before-internals checks for touched docs
 
 ## Test Matrix Wiring (Enforcement)
 
@@ -187,11 +203,18 @@ If a story introduces user-visible behavior changes, update only impacted docs i
 - `./docs-site/public/llms.txt`
 - `./docs-site/public/llm/*.md`
 
+Doc updates must preserve:
+- first-screen README clarity for value and integration path
+- integration guidance before internal architecture detail
+- one canonical file/state lifecycle path model (diagram + path narrative) for touched workflows
+- source-of-truth linkage between repo docs and generated/public docs
+
 If story is internal-only and behavior is unchanged, do not force doc churn.
 
 ## Safety Rules
 
 - Preserve non-negotiables: determinism, offline-first, fail-closed, schema stability, stable exit codes.
+- Keep side effects explicit in API names/signatures and preserve symmetrical API semantics.
 - Never weaken unapproved posture => regression failure paths.
 - Do not allow recursive cleanup on user-supplied paths without explicit ownership validation tests.
 - No destructive git operations unless explicitly requested.
@@ -205,6 +228,7 @@ If story is internal-only and behavior is unchanged, do not force doc churn.
 - No silent skips of required checks.
 - Tests must use temp output paths (no artifact leakage into source tree).
 - If code/docs drift is introduced by user-facing change, patch docs in same story.
+- For touched contracts, ensure public/internal/shim/deprecated API classification and schema version/migration notes are updated.
 
 ## Blocker Handling
 
@@ -243,4 +267,5 @@ Implementation is complete only when all are true for active mode:
 - `Validation log`: commands and pass/fail results
 - `Revalidation report`: story acceptance + DoD + exit criteria (`met/not met` with evidence)
 - `Deferred criteria report`: plan-level criteria outside selected epic scope (required in `epic-only` mode)
+- `Wave status`: Wave 1 vs Wave 2 completion for touched surfaces
 - `Residual risk`: remaining gaps and next required stories

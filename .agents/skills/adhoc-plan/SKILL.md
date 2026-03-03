@@ -62,11 +62,21 @@ Validation rules:
 - TDD first failing test(s)
 - cost/perf impact (`low|medium|high`)
 - chaos/failure hypothesis (required for risk-bearing stories)
-8. Add plan-level `Test Matrix Wiring`.
-9. Add `Recommendation Traceability` mapping recommendations to epic/story IDs.
-10. Add `Minimum-Now Sequence`, `Exit Criteria`, and `Definition of Done`.
-11. Verify quality gates.
-12. Overwrite `output_plan_path` with the final plan.
+8. For every story, enforce contract-discipline fields:
+- contract surface (`public|internal|shim|deprecated`)
+- versioning/migration impact
+- structured-error impact
+- API symmetry/side-effect invariants
+- timeout/cancellation invariants for long-running workflows
+9. Add a `Contract Surface Map` section that lists stable public APIs, internal-only surfaces, compatibility shims, and active deprecations.
+10. Add plan-level `Test Matrix Wiring`.
+11. Add `Recommendation Traceability` mapping recommendations to epic/story IDs.
+12. Add `Minimum-Now Sequence`, `Exit Criteria`, and `Definition of Done`, and enforce two-wave ordering:
+- Wave 1: contract/runtime correctness and architecture boundaries.
+- Wave 2: docs, OSS hygiene, and distribution UX.
+13. Add docs/DX readiness work where user-visible behavior changes: README first-screen clarity, integration-before-internals flow, lifecycle/path model, and source-of-truth linkage.
+14. Verify quality gates.
+15. Overwrite `output_plan_path` with the final plan.
 
 ## Handoff Contract (Planning -> Implementation)
 
@@ -98,6 +108,7 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - No dashboard-first scope in core backlog.
 - No minor polish as primary backlog.
 - Every story must include tests and matrix wiring.
+- Sequence work in two waves (Wave 1 contracts/runtime first, Wave 2 docs/OSS/distribution UX second).
 
 ## Architecture Guides Enforcement Contract
 
@@ -125,6 +136,7 @@ For performance-sensitive stories, plan wiring must include:
 - help/usage tests
 - `--json` stability tests
 - exit-code contract tests
+- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Gate/policy/fail-closed changes:
 - deterministic allow/block/require_approval fixtures
@@ -144,10 +156,13 @@ For performance-sensitive stories, plan wiring must include:
 - crash-safe/atomic-write tests
 - contention/concurrency tests
 - chaos suites when applicable
+- end-to-end timeout/cancellation propagation checks for long-running workflows
 
 6. SDK/adapter boundary changes:
 - wrapper error-mapping tests
 - adapter parity/conformance tests
+- structured machine-readable error envelope tests for library/SDK consumers
+- extension-point compatibility tests when enterprise integration seams are introduced
 
 7. Voice/context-proof changes:
 - relevant scenario acceptance suites as applicable
@@ -155,6 +170,8 @@ For performance-sensitive stories, plan wiring must include:
 8. Docs/examples changes:
 - docs consistency checks
 - storyline/smoke checks when user flow changes
+- README first-screen checks (what it is, for whom, integration path, first value)
+- source-of-truth checks between repo docs and generated/public docs
 
 ## Test Matrix Wiring Contract (Plan-Level)
 
@@ -179,11 +196,12 @@ Required sections:
 4. `Current Baseline (Observed)`
 5. `Exit Criteria`
 6. `Recommendation Traceability`
-7. `Test Matrix Wiring`
-8. Epic sections with objectives and stories
-9. `Minimum-Now Sequence`
-10. `Explicit Non-Goals`
-11. `Definition of Done`
+7. `Contract Surface Map`
+8. `Test Matrix Wiring`
+9. Epic sections with objectives and stories
+10. `Minimum-Now Sequence` (with Wave 1/Wave 2 ordering)
+11. `Explicit Non-Goals`
+12. `Definition of Done`
 
 Story template:
 
@@ -196,10 +214,15 @@ Story template:
 - `Matrix wiring:`
 - `Acceptance criteria:`
 - `Architecture constraints:`
+- `Contract surface: public|internal|shim|deprecated`
+- `Versioning/migration impact: none|minor|major + migration expectation`
+- `Structured errors impact: none|update_required`
+- `API symmetry/side-effect invariants:`
 - `ADR required: yes|no`
 - `TDD first failing test(s):`
 - `Cost/perf impact: low|medium|high`
 - `Chaos/failure hypothesis:` (required for risk-bearing stories)
+- `Timeout/cancellation invariants:` (required for long-running workflows)
 - Optional: `Dependencies:`, `Risks:`
 
 ## Quality Gate
@@ -213,8 +236,12 @@ Before finalizing:
 - Test requirements match story type.
 - Matrix wiring exists for every story.
 - Every story maps to enforceable rules from both guides (`dev_guides.md`, `architecture_guides.md`).
+- Contract surface map and story-level contract fields are complete and consistent.
 - High-risk stories include hardening/chaos lane wiring.
 - CLI contract stories include explicit `--json` and exit-code invariants.
+- `Minimum-Now Sequence` applies Wave 1 before Wave 2 for touched surfaces.
+- Docs stories preserve README first-screen clarity, integration-first flow, and docs source-of-truth linkage.
+- OSS/distribution stories include trust-baseline artifacts and support/maintainer context when applicable.
 - Sequence is dependency-aware and implementation-ready.
 
 ## Failure Mode

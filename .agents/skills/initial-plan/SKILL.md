@@ -46,6 +46,7 @@ If these are missing, stop and output a gap note instead of inventing policy.
 - acceptance criteria (ACs)
 - architecture boundaries and non-goals
 - CLI contracts (`--json`, `--explain`, `--quiet`, exit behavior)
+- API surface expectations (public/internal/shim/deprecated), versioning/migration rules, and machine-readable error expectations where applicable
 
 2. Read `product/dev_guides.md` and extract locked implementation standards:
 - toolchain pins (Go/Python/Node)
@@ -70,14 +71,16 @@ If these are missing, stop and output a gap note instead of inventing policy.
 - current command surfaces and gaps versus PRD
 
 6. Build epics by implementation dependency, not by document order:
-- Epic 0 foundations/scaffold/contracts
+- Epic 0 foundations/scaffold/contracts (Wave 1: contract/runtime correctness and architecture boundaries)
 - core runtime epics (collectors/adapters, ingestion/translation, proof emission, context enrichment, compliance mapping/gaps)
 - CLI, regressions, daily review, and remediation flows
-- docs/acceptance/release hardening epics
+- docs/acceptance/release hardening epics (Wave 2: docs, OSS hygiene, distribution UX)
 
-7. Decompose every epic into execution-ready stories with explicit tasks and test wiring.
+7. Decompose every epic into execution-ready stories with explicit tasks, test wiring, and contract-discipline fields (contract surface, versioning impact, structured-error impact, API symmetry/side-effect invariants, timeout/cancellation invariants for long-running workflows).
 
-8. Add a plan-level `Test Matrix Wiring` section that maps stories to:
+8. Add a `Contract Surface Map` section listing stable public APIs, internal-only surfaces, compatibility shims, and active deprecations.
+
+9. Add a plan-level `Test Matrix Wiring` section that maps stories to:
 - Fast lane
 - Core CI lane
 - Acceptance lane
@@ -85,11 +88,11 @@ If these are missing, stop and output a gap note instead of inventing policy.
 - Risk lane
 - Gating rule
 
-9. Add a dependency-aware `Minimum-Now Sequence` with phased/week execution order.
+10. Add a dependency-aware `Minimum-Now Sequence` with phased/week execution order and explicit Wave 1 -> Wave 2 progression.
 
-10. Add `Explicit Non-Goals` and `Definition of Done`.
+11. Add `Explicit Non-Goals` and `Definition of Done`.
 
-11. Write the plan to the target file, replacing prior contents.
+12. Write the plan to the target file, replacing prior contents.
 
 ## Handoff Contract (Planning -> Implementation)
 
@@ -104,6 +107,7 @@ If these are missing, stop and output a gap note instead of inventing policy.
 - Go core remains authoritative for enforcement and verification logic; Python remains a thin adoption layer.
 - Do not introduce hosted-only dependencies into v1 core.
 - Do not produce cosmetic/backlog fluff. Every story must be executable by an engineer without clarification meetings.
+- Sequence work in two waves (Wave 1 contracts/runtime first, Wave 2 docs/OSS/distribution UX second).
 - No story is complete without same-change tests unless explicitly justified docs-only scope.
 
 ## Plan Format Contract
@@ -115,11 +119,12 @@ Required top sections:
 3. `Global Decisions (Locked)`
 4. `Current Baseline (Observed)`
 5. `Exit Criteria`
-6. `Test Matrix Wiring`
-7. `Epic` sections with objective and story breakdowns
-8. `Minimum-Now Sequence` (phased, dependency-aware)
-9. `Explicit Non-Goals`
-10. `Definition of Done`
+6. `Contract Surface Map`
+7. `Test Matrix Wiring`
+8. `Epic` sections with objective and story breakdowns
+9. `Minimum-Now Sequence` (phased, dependency-aware, Wave 1/Wave 2)
+10. `Explicit Non-Goals`
+11. `Definition of Done`
 
 Story template (required fields):
 
@@ -132,10 +137,15 @@ Story template (required fields):
 - `Matrix wiring:`
 - `Acceptance criteria:`
 - `Architecture constraints:`
+- `Contract surface: public|internal|shim|deprecated`
+- `Versioning/migration impact: none|minor|major + migration expectation`
+- `Structured errors impact: none|update_required`
+- `API symmetry/side-effect invariants:`
 - `ADR required: yes|no`
 - `TDD first failing test(s):`
 - `Cost/perf impact: low|medium|high`
 - `Chaos/failure hypothesis:` (required for risk-bearing stories)
+- `Timeout/cancellation invariants:` (required for long-running workflows)
 - `Semantic invariants:` (required for stories touching ingestion/dedup/chain/regress behavior)
 - Optional when needed:
 - `Dependencies:`
@@ -153,6 +163,7 @@ For every story, derive required checks from `product/dev_guides.md` by work typ
 - Add CLI behavior tests and `--json` shape checks.
 - Add exit code contract checks.
 - Add docs parity checks for command/flag naming.
+- Add `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched.
 
 3. Schema/artifact/proof changes:
 - Add schema validation and compatibility tests.
@@ -171,6 +182,7 @@ For every story, derive required checks from `product/dev_guides.md` by work typ
 5. Runtime/state/concurrency:
 - Add atomic write/checkpoint/lock contention tests.
 - Add crash/retry/recovery behavior tests.
+- Add end-to-end timeout/cancellation propagation checks for long-running workflows.
 
 6. CI/release/security work:
 - Wire required lint/security jobs (golangci-lint, gosec, govulncheck, ruff/mypy/bandit where applicable).
@@ -179,6 +191,15 @@ For every story, derive required checks from `product/dev_guides.md` by work typ
 7. Docs/examples contract changes:
 - Add command-smoke checks for documented flows.
 - Update acceptance scripts if operator workflow changed.
+- Add README first-screen checks (what it is, for whom, integration path, first value).
+- Add docs source-of-truth linkage checks between repo docs and generated/public docs.
+- Add integration-before-internals and problem -> solution framing checks for touched docs.
+
+8. API/library contract management:
+- Require explicit public/internal/shim/deprecated classification for touched surfaces.
+- Require plain-language schema/versioning migration expectations for breaking changes.
+- Require structured machine-readable error envelope compatibility for SDK/library consumers.
+- Require extension-point strategy for enterprise integration seams to avoid fork-only paths.
 
 ## Architecture Guides Enforcement Contract
 
@@ -266,8 +287,13 @@ Before finalizing, verify:
 - test requirements match `dev_guides.md` and `architecture_guides.md` requirements
 - ingestion/chain/dedup/regress stories include explicit semantic invariants
 - every story includes architecture constraints, TDD first-failing-test requirement, and cost/perf impact
+- contract surface map and story-level contract fields are complete and consistent
 - high-risk stories include hardening/chaos lane wiring
 - CLI contract stories include explicit `--json` and exit-code invariants
+- sequence applies Wave 1 before Wave 2 for touched surfaces
+- docs stories preserve README first-screen clarity, integration-first flow, lifecycle/path model, and docs source-of-truth linkage
+- OSS/distribution stories include trust-baseline artifacts and maintainer/support context when applicable
+- naming taxonomy/capability labels and first-10-min onboarding flow remain consistent with portfolio standards when cross-repo docs are touched
 - matrix wiring exists for every story
 - sequence is dependency-aware and executable end-to-end
 - plan respects Axym boundaries (Prove product only; no Wrkr/Gait feature scope creep)
