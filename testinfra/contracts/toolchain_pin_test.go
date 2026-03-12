@@ -33,7 +33,7 @@ func TestToolVersionsPinned(t *testing.T) {
 
 	content := readRepoFile(t, ".tool-versions")
 	expected := []string{
-		"golang 1.25.7",
+		"golang 1.26.1",
 		"python 3.13.0",
 		"nodejs 22.0.0",
 	}
@@ -78,7 +78,7 @@ func TestProofDependencyPolicy(t *testing.T) {
 	if major != 0 {
 		t.Fatalf("unexpected proof major version: %d", major)
 	}
-	if minor < 4 || (minor == 4 && patch < 5) {
-		t.Fatalf("proof version below policy floor (v0.4.5): v%d.%d.%d", major, minor, patch)
+	if minor < 4 || (minor == 4 && patch < 6) {
+		t.Fatalf("proof version below policy floor (v0.4.6): v%d.%d.%d", major, minor, patch)
 	}
 }

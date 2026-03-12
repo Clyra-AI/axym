@@ -10,12 +10,9 @@ Execute this workflow when the user asks to turn recommended items into a concre
 
 ## Scope
 
-- Repository root: `.`
+- Repository root: `/Users/tr/axym`
 - Recommendation source: user-provided recommended items for this run
-- Standards sources of truth:
-  - `./product/dev_guides.md`
-  - `./product/architecture_guides.md`
-- No dependency on `./product/ideas.md`
+- No dependency on `/Users/tr/axym/product/ideas.md`
 - Planning-only skill. Do not implement code in this workflow.
 
 ## Input Contract (Mandatory)
@@ -28,27 +25,21 @@ Validation rules:
 - `output_plan_path` must resolve inside the repository and be writable.
 - If either input is missing or invalid, stop and output a blocker report.
 
-## Preconditions
-
-- `./product/dev_guides.md` must exist and be readable.
-- `./product/architecture_guides.md` must exist and be readable.
-- Both guides must contain enforceable rules for:
-  - testing and CI gating
-  - determinism and contract stability
-  - architecture/TDD/chaos/frugal governance requirements
-- If guides are missing or incomplete, stop and output a blocker report.
-
 ## Workflow
 
-1. Read `product/dev_guides.md` and `product/architecture_guides.md`; extract locked implementation and architecture constraints.
-2. Parse `recommended_items` and normalize each item to:
+1. Parse `recommended_items` and normalize each item to:
 - recommendation
 - why
 - strategic direction
 - expected moat/benefit
-3. Remove duplicates and out-of-scope items.
-4. Cluster recommendations into coherent epics.
-5. Prioritize with `P0/P1/P2` using contract risk, moat gain, adoption leverage, and dependency order.
+2. Remove duplicates and out-of-scope items.
+3. Cluster recommendations into coherent epics.
+4. Prioritize with `P0/P1/P2` using contract risk, moat gain, adoption leverage, and dependency order.
+5. Sequence work in dependency-driven waves:
+- Use `Wave 1 .. Wave N` and corresponding epic IDs `W1 .. WN`, where `N >= 1`.
+- Create only one wave when scope is small and a split adds no implementation value.
+- Create multiple waves when dependency order, risk reduction, or reviewability benefits from staging.
+- When both classes exist, contract/runtime correctness and architecture-boundary work must complete in earlier waves before docs, OSS hygiene, onboarding, or distribution UX waves.
 6. Create execution-ready stories with:
 - tasks
 - repo paths
@@ -56,33 +47,11 @@ Validation rules:
 - test requirements
 - matrix wiring
 - acceptance criteria
-7. For every story, enforce architecture fields:
-- architecture constraints
-- ADR required (`yes/no`)
-- TDD first failing test(s)
-- cost/perf impact (`low|medium|high`)
-- chaos/failure hypothesis (required for risk-bearing stories)
-8. For every story, enforce contract-discipline fields:
-- contract surface (`public|internal|shim|deprecated`)
-- versioning/migration impact
-- structured-error impact
-- API symmetry/side-effect invariants
-- timeout/cancellation invariants for long-running workflows
-9. Add a `Contract Surface Map` section that lists stable public APIs, internal-only surfaces, compatibility shims, and active deprecations.
-10. Add plan-level `Test Matrix Wiring`.
-11. Add `Recommendation Traceability` mapping recommendations to epic/story IDs.
-12. Add `Minimum-Now Sequence`, `Exit Criteria`, and `Definition of Done`, and enforce two-wave ordering:
-- Wave 1: contract/runtime correctness and architecture boundaries.
-- Wave 2: docs, OSS hygiene, and distribution UX.
-13. Add docs/DX readiness work where user-visible behavior changes: README first-screen clarity, integration-before-internals flow, lifecycle/path model, and source-of-truth linkage.
-14. Verify quality gates.
-15. Overwrite `output_plan_path` with the final plan.
-
-## Handoff Contract (Planning -> Implementation)
-
-- This skill intentionally leaves `output_plan_path` modified in the working tree.
-- Expected follow-up is `adhoc-implement` with the same `plan_path` on a new branch.
-- If additional dirty files exist beyond the generated plan file, stop and scope/clean before implementation.
+7. Add plan-level `Test Matrix Wiring`.
+8. Add `Recommendation Traceability` mapping recommendations to epic/story IDs.
+9. Add `Minimum-Now Sequence`, `Exit Criteria`, and `Definition of Done`, with the explicit wave order and rationale.
+10. Verify quality gates.
+11. Overwrite `output_plan_path` with the final plan.
 
 ## Command Contract (JSON Required)
 
@@ -102,28 +71,18 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - Respect architecture boundaries:
 - Go core authoritative for enforcement/verification
 - Python remains thin adoption layer
-- Enforce both standards guides in every generated plan:
-  - `product/dev_guides.md`
-  - `product/architecture_guides.md`
+- Treat architecture as enforceable code boundaries, not doc-only intent.
+- Prefer thin orchestration and focused packages for parsing, persistence, reporting, and policy logic.
+- Make side effects explicit in names/signatures and avoid ambiguous `plan` vs `apply` or `read` vs `read+validate` semantics.
+- Public-surface stories must cover versioning/deprecation expectations, machine-readable error behavior, and install/version discoverability where relevant.
+- Long-running workflow stories must include cancellation/timeout propagation expectations.
+- Prefer extension points over enterprise forks when the recommendation implies customization pressure.
 - No dashboard-first scope in core backlog.
 - No minor polish as primary backlog.
 - Every story must include tests and matrix wiring.
-- Sequence work in two waves (Wave 1 contracts/runtime first, Wave 2 docs/OSS/distribution UX second).
-
-## Architecture Guides Enforcement Contract
-
-For stories touching architecture/risk/adapter/failure semantics, plan wiring must include:
-
-- `make prepush-full`
-
-For reliability/fault-tolerance stories, plan wiring must include:
-
-- `make test-hardening`
-- `make test-chaos`
-
-For performance-sensitive stories, plan wiring must include:
-
-- `make test-perf`
+- Use dependency-driven wave sequencing instead of a fixed two-wave template.
+- It may be 1 wave or many waves depending on complexity, dependencies, and implementation risk.
+- When both contract/runtime and docs/onboarding/distribution classes exist, all contract/runtime waves must precede later docs/onboarding/distribution waves.
 
 ## Test Requirements by Work Type (Mandatory)
 
@@ -170,8 +129,10 @@ For performance-sensitive stories, plan wiring must include:
 8. Docs/examples changes:
 - docs consistency checks
 - storyline/smoke checks when user flow changes
-- README first-screen checks (what it is, for whom, integration path, first value)
-- source-of-truth checks between repo docs and generated/public docs
+- README/quickstart/integration coverage checks when public docs change
+- install/version discoverability checks when onboarding changes
+- docs source-of-truth sync tasks for `README.md`, `docs/`, `docs-site/public/llms.txt`, and `docs-site/public/llm/*.md`
+- OSS trust-baseline updates when public launch/support expectations change
 
 ## Test Matrix Wiring Contract (Plan-Level)
 
@@ -196,12 +157,17 @@ Required sections:
 4. `Current Baseline (Observed)`
 5. `Exit Criteria`
 6. `Recommendation Traceability`
-7. `Contract Surface Map`
-8. `Test Matrix Wiring`
-9. Epic sections with objectives and stories
-10. `Minimum-Now Sequence` (with Wave 1/Wave 2 ordering)
-11. `Explicit Non-Goals`
-12. `Definition of Done`
+7. `Test Matrix Wiring`
+8. Epic sections with objectives and stories
+9. `Minimum-Now Sequence`
+10. `Explicit Non-Goals`
+11. `Definition of Done`
+
+Epic and wave numbering contract:
+
+- Use `## Epic W1: ...`, `## Epic W2: ...`, through `## Epic WN: ...` as needed.
+- Story IDs under each epic must follow the same wave prefix, for example `W3-S2`.
+- Do not invent extra waves unless they improve dependency ordering, risk control, or reviewability.
 
 Story template:
 
@@ -213,16 +179,6 @@ Story template:
 - `Test requirements:`
 - `Matrix wiring:`
 - `Acceptance criteria:`
-- `Architecture constraints:`
-- `Contract surface: public|internal|shim|deprecated`
-- `Versioning/migration impact: none|minor|major + migration expectation`
-- `Structured errors impact: none|update_required`
-- `API symmetry/side-effect invariants:`
-- `ADR required: yes|no`
-- `TDD first failing test(s):`
-- `Cost/perf impact: low|medium|high`
-- `Chaos/failure hypothesis:` (required for risk-bearing stories)
-- `Timeout/cancellation invariants:` (required for long-running workflows)
 - Optional: `Dependencies:`, `Risks:`
 
 ## Quality Gate
@@ -235,14 +191,11 @@ Before finalizing:
 - Paths are real and repo-relevant.
 - Test requirements match story type.
 - Matrix wiring exists for every story.
-- Every story maps to enforceable rules from both guides (`dev_guides.md`, `architecture_guides.md`).
-- Contract surface map and story-level contract fields are complete and consistent.
-- High-risk stories include hardening/chaos lane wiring.
-- CLI contract stories include explicit `--json` and exit-code invariants.
-- `Minimum-Now Sequence` applies Wave 1 before Wave 2 for touched surfaces.
-- Docs stories preserve README first-screen clarity, integration-first flow, and docs source-of-truth linkage.
-- OSS/distribution stories include trust-baseline artifacts and support/maintainer context when applicable.
 - Sequence is dependency-aware and implementation-ready.
+- Wave numbering is explicit, sequential, and justified by dependency order.
+- Earlier waves cover contract/runtime and architecture-boundary work before later docs/OSS/onboarding/distribution waves when both classes are present.
+- Public/internal boundaries, integration hooks, and side effects are explicit where stories affect user-facing surfaces.
+- Launch-facing plans include OSS trust-baseline and docs source-of-truth work when relevant.
 
 ## Failure Mode
 

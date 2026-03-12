@@ -9,6 +9,8 @@ go build ./cmd/axym
 go test ./...
 ```
 
+Requires Go `1.26.1`.
+
 ## Collect command surface
 
 ```bash
