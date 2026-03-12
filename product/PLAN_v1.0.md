@@ -11,7 +11,7 @@ This is an execution plan. Every story is implementation-ready with concrete pat
 ## Global Decisions (Locked)
 
 - Axym runtime is Go-first and deterministic by default; no LLM calls in collect/map/gaps/verify paths.
-- Toolchain contract is pinned: Go `1.25.7`, Python `3.13+` (tooling only), Node `22` (docs/UI only).
+- Toolchain contract is pinned: Go `1.26.1`, Python `3.13+` (tooling only), Node `22` (docs/UI only).
 - `Clyra-AI/proof` is a hard dependency and interface contract: Axym must remain within one minor release of latest and never below minimum supported baseline.
 - Zero evidence exfiltration is default. Evidence artifacts remain local unless user explicitly exports or integrates.
 - Evidence is file-based, append-only, portable, and verifiable.

@@ -14,8 +14,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-      - run: govulncheck -mode=binary ./cmd/axym
+      - run: mkdir -p .tmp && go build -o .tmp/axym ./cmd/axym
+      - run: govulncheck -mode=binary .tmp/axym
       - run: make test-hardening
       - run: make test-chaos
       - run: make test-perf
-

@@ -1,9 +1,9 @@
 module github.com/Clyra-AI/axym
 
-go 1.25.7
+go 1.26.1
 
 require (
-	github.com/Clyra-AI/proof v0.4.5
+	github.com/Clyra-AI/proof v0.4.6
 	github.com/gowebpki/jcs v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.8.1

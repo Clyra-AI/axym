@@ -29,8 +29,10 @@ jobs:
         with:
           artifact-name: axym-sbom.spdx.json
           path: dist
+      - name: Build scanner target
+        run: mkdir -p .tmp && go build -o .tmp/axym ./cmd/axym
       - name: Vulnerability scan
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 && govulncheck -mode=binary ./cmd/axym
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 && govulncheck -mode=binary .tmp/axym
       - name: Sign
         uses: sigstore/cosign-installer@v3
       - name: Sign checksums
