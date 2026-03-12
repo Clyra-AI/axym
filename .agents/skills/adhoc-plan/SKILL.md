@@ -10,9 +10,9 @@ Execute this workflow when the user asks to turn recommended items into a concre
 
 ## Scope
 
-- Repository root: `/Users/tr/axym`
+- Repository root: `.`
 - Recommendation source: user-provided recommended items for this run
-- No dependency on `/Users/tr/axym/product/ideas.md`
+- No dependency on `./product/ideas.md`
 - Planning-only skill. Do not implement code in this workflow.
 
 ## Input Contract (Mandatory)
