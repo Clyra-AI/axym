@@ -3,6 +3,7 @@ set -euo pipefail
 
 dist_dir="dist"
 binary_name="axym"
+release_binary=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -12,6 +13,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --binary-name)
       binary_name="$2"
+      shift 2
+      ;;
+    --release-binary)
+      release_binary="$2"
       shift 2
       ;;
     *)
@@ -40,7 +45,10 @@ source_smoke() {
 }
 
 release_binary_smoke() {
-  local binary_path="$dist_dir/$binary_name"
+  local binary_path="$release_binary"
+  if [[ -z "$binary_path" ]]; then
+    binary_path="$dist_dir/$binary_name"
+  fi
   require_file "$binary_path"
   chmod +x "$binary_path"
   "$binary_path" version --json >/dev/null

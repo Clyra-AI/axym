@@ -53,9 +53,9 @@ jobs:
         run: |
           printf '{"builder":"github-actions","tag":"%s","subject":"dist/**"}\n' "${GITHUB_REF_NAME}" > dist/github-attestation.provenance.json
       - name: Build release smoke binary
-        run: go build -o dist/axym ./cmd/axym
+        run: go build -o .tmp/axym-release-smoke ./cmd/axym
       - name: Verify release integrity
-        run: ./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+        run: ./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym --release-binary .tmp/axym-release-smoke
       - name: Publish verified artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

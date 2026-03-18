@@ -45,3 +45,21 @@ func TestGoReleaserDefinesHomebrewTap(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseWorkflowSmokeBinaryStaysOutOfDistRoot(t *testing.T) {
+	t.Parallel()
+
+	release := readRepoFile(t, ".github/workflows/release.yml")
+	required := []string{
+		"go build -o .tmp/axym-release-smoke ./cmd/axym",
+		"--release-binary .tmp/axym-release-smoke",
+	}
+	for _, snippet := range required {
+		if !strings.Contains(release, snippet) {
+			t.Fatalf("release workflow missing smoke-binary safeguard %q", snippet)
+		}
+	}
+	if strings.Contains(release, "go build -o dist/axym ./cmd/axym") {
+		t.Fatal("release workflow must not build the smoke binary into dist/")
+	}
+}
