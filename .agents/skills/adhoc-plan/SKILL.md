@@ -47,6 +47,7 @@ Validation rules:
 - test requirements
 - matrix wiring
 - acceptance criteria
+- If a story affects public surfaces, include stable/internal boundary notes, migration expectations, and where users integrate Axym into their workflow or pipeline.
 7. Add plan-level `Test Matrix Wiring`.
 8. Add `Recommendation Traceability` mapping recommendations to epic/story IDs.
 9. Add `Minimum-Now Sequence`, `Exit Criteria`, and `Definition of Done`, with the explicit wave order and rationale.
@@ -69,8 +70,13 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - schema stability
 - exit code stability
 - Respect architecture boundaries:
-- Go core authoritative for enforcement/verification
-- Python remains thin adoption layer
+- source adapters and collector acquisition
+- event normalization and proof record construction
+- proof emission
+- sibling ingestion and translation
+- context enrichment and compliance matching
+- coverage/gap/review/regression evaluation
+- bundle assembly/export/verification
 - Treat architecture as enforceable code boundaries, not doc-only intent.
 - Prefer thin orchestration and focused packages for parsing, persistence, reporting, and policy logic.
 - Make side effects explicit in names/signatures and avoid ambiguous `plan` vs `apply` or `read` vs `read+validate` semantics.
@@ -95,10 +101,9 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - help/usage tests
 - `--json` stability tests
 - exit-code contract tests
-- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Gate/policy/fail-closed changes:
-- deterministic allow/block/require_approval fixtures
+- deterministic `covered`/`partial`/`gap` fixtures
 - fail-closed undecidable-path tests
 - reason-code stability checks
 - For stories that clean/reset output paths, require `non-empty + non-managed => fail` tests
@@ -111,7 +116,7 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - `make test-contracts` when applicable
 
 5. Job runtime/state/concurrency changes:
-- lifecycle tests
+- workflow lifecycle tests for multi-stage collect/map/gap/bundle/verify paths when applicable
 - crash-safe/atomic-write tests
 - contention/concurrency tests
 - chaos suites when applicable
@@ -120,17 +125,14 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 6. SDK/adapter boundary changes:
 - wrapper error-mapping tests
 - adapter parity/conformance tests
-- structured machine-readable error envelope tests for library/SDK consumers
-- extension-point compatibility tests when enterprise integration seams are introduced
 
-7. Voice/context-proof changes:
+7. Scenario/context changes:
 - relevant scenario acceptance suites as applicable
 
 8. Docs/examples changes:
 - docs consistency checks
 - storyline/smoke checks when user flow changes
 - README/quickstart/integration coverage checks when public docs change
-- install/version discoverability checks when onboarding changes
 - docs source-of-truth sync tasks for `README.md`, `docs/`, `docs-site/public/llms.txt`, and `docs-site/public/llm/*.md`
 - OSS trust-baseline updates when public launch/support expectations change
 
