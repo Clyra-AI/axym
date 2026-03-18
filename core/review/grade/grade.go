@@ -23,7 +23,7 @@ func Derive(report coverage.Report) Result {
 	gaps := report.Summary.GapCount
 
 	score := (float64(covered)*1 + float64(partial)*0.5) / float64(total)
-	letter := "F"
+	var letter string
 	switch {
 	case gaps == 0 && covered == total:
 		letter = "A"

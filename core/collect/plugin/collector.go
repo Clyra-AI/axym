@@ -84,6 +84,7 @@ func (c Collector) Collect(ctx context.Context, req collector.Request) (collecto
 		return collector.Result{}, collectorerr.New(ReasonExecFailed, "marshal plugin config", err)
 	}
 
+	// #nosec G204 -- plugin command is an explicit user-supplied integration hook.
 	cmd := exec.CommandContext(collectCtx, commandParts[0], commandParts[1:]...)
 	cmd.Stdin = bytes.NewReader(cfgRaw)
 	if len(c.Env) > 0 {

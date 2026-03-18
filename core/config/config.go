@@ -96,7 +96,7 @@ func WriteDefault(path string, overwrite bool) (Policy, bool, error) {
 		return Policy{}, false, fmt.Errorf("stat policy file: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil && filepath.Dir(target) != "." {
+	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil && filepath.Dir(target) != "." {
 		return Policy{}, false, fmt.Errorf("create policy directory: %w", err)
 	}
 	content := defaultPolicyYAML()

@@ -1,10 +1,14 @@
 SHELL := /bin/bash
 
-.PHONY: lint-fast test-fast test-contracts test-scenarios test-hardening test-chaos test-perf test-adapter-parity test-docs-consistency test-docs-storyline prepush codeql release-local release-go-nogo-local prepush-full
+.PHONY: lint-fast lint-go test-fast test-contracts test-scenarios test-hardening test-chaos test-perf test-security test-adapter-parity test-docs-consistency test-docs-storyline test-docs-links prepush codeql release-local release-go-nogo-local prepush-full
 
 lint-fast:
 	@test -z "$$(gofmt -l .)" || (echo "gofmt required"; gofmt -l .; exit 1)
 	@go vet ./...
+
+lint-go:
+	@command -v golangci-lint >/dev/null || (echo "golangci-lint is required"; exit 7)
+	@golangci-lint run ./...
 
 test-fast:
 	@go test ./... -count=1
@@ -24,6 +28,10 @@ test-chaos:
 test-perf:
 	@go test ./... -count=1 -run TestPerf
 
+test-security:
+	@command -v gosec >/dev/null || (echo "gosec is required"; exit 7)
+	@gosec ./...
+
 test-adapter-parity:
 	@go test ./... -count=1 -run TestAdapterParity
 
@@ -32,6 +40,9 @@ test-docs-consistency:
 
 test-docs-storyline:
 	@./scripts/check_docs_storyline.sh
+
+test-docs-links:
+	@./scripts/check_docs_links.sh
 
 prepush: lint-fast test-fast test-contracts
 
@@ -57,4 +68,4 @@ release-local:
 release-go-nogo-local:
 	@./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
 
-prepush-full: prepush codeql test-scenarios test-docs-consistency test-docs-storyline release-local release-go-nogo-local
+prepush-full: prepush lint-go test-security codeql test-scenarios test-docs-consistency test-docs-storyline test-docs-links release-local release-go-nogo-local

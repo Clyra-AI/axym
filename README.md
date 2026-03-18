@@ -30,6 +30,11 @@ Release binary:
 
 Requires Go `1.26.1` for source builds.
 
+## Project docs
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): contribution flow, scope expectations, and local validation.
+- [SECURITY.md](SECURITY.md): private reporting guidance and security boundary expectations.
+
 ## First value
 
 ```bash
@@ -66,6 +71,43 @@ Requires Go `1.26.1` for source builds.
 ./axym verify --bundle ./axym-evidence --json
 ```
 
+## Context engineering evidence
+
+Axym can capture governance-relevant context engineering events without storing raw prompt bodies by default. The supported additive event types are:
+
+- `instruction_rewrite`
+- `context_reset`
+- `knowledge_import`
+
+Example:
+
+```bash
+./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl
+```
+
+These events are intended to carry digest-first fields such as `previous_hash`, `current_hash`, `artifact_digest`, `artifact_kind`, `source_uri`, and `reason_code`.
+
+## Contributor gate model
+
+Local-fast checks:
+
+```bash
+make lint-fast
+make test-fast
+make test-contracts
+```
+
+Local-extended checks:
+
+```bash
+make lint-go
+make test-security
+make test-docs-links
+make prepush-full
+```
+
+Hosted CI remains authoritative for pull-request workflow enforcement and CodeQL analysis through GitHub Actions.
+
 `collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin/governance payloads out of the proof chain.
 
 `ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip/extracted/explicit-path packs and translates `trace`, `approval_token`, and `delegation_token` native records to proof records while preserving relationship envelopes.
@@ -91,6 +133,12 @@ Requires Go `1.26.1` for source builds.
 `bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
 
 `verify --bundle` reports cryptographic integrity plus deterministic Axym compliance-completeness checks (required record classes, field-coverage state, grade recomputation, and OSCAL schema validation).
+
+Release verification uses:
+
+```bash
+./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+```
 
 ## Exit codes
 

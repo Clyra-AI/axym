@@ -228,6 +228,7 @@ func readRecords(path string) ([]*proof.Record, []string, error) {
 }
 
 func readJSONLRecords(path string) ([]*proof.Record, []string, error) {
+	// #nosec G304 -- Wrkr ingest reads the explicit user-provided input path.
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, err
@@ -266,6 +267,7 @@ func readJSONLRecords(path string) ([]*proof.Record, []string, error) {
 }
 
 func readJSONRecords(path string) ([]*proof.Record, []string, error) {
+	// #nosec G304 -- Wrkr ingest reads the explicit user-provided input path.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, err

@@ -86,10 +86,7 @@ func readZip(path string) (Result, error) {
 	defer func() { _ = reader.Close() }()
 
 	result := Result{}
-	entries := make([]*zip.File, 0, len(reader.File))
-	for _, file := range reader.File {
-		entries = append(entries, file)
-	}
+	entries := append(make([]*zip.File, 0, len(reader.File)), reader.File...)
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Name < entries[j].Name
 	})
@@ -127,6 +124,7 @@ func readZip(path string) (Result, error) {
 }
 
 func parseProofJSONLFile(path string) ([]*proof.Record, error) {
+	// #nosec G304 -- Gait ingest reads the explicit user-provided pack entry path.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read proof_records.jsonl: %w", err)
@@ -135,6 +133,7 @@ func parseProofJSONLFile(path string) ([]*proof.Record, error) {
 }
 
 func parseNativeJSONLFile(path string) ([]translate.NativeRecord, error) {
+	// #nosec G304 -- Gait ingest reads the explicit user-provided pack entry path.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read native records: %w", err)

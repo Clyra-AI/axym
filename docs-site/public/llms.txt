@@ -1,5 +1,7 @@
 Axym local docs index
 
+- CONTRIBUTING.md
+- SECURITY.md
 - README.md
 - docs/commands/axym.md
 - docs-site/public/llm/axym.md

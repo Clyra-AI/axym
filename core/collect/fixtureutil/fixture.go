@@ -24,6 +24,7 @@ func LoadEvents(dir string, fileName string) ([]Event, error) {
 		return nil, nil
 	}
 	path := filepath.Join(dir, fileName)
+	// #nosec G304 -- fixture path is derived from the explicit fixture directory contract.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

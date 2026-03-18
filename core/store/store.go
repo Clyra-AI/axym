@@ -182,6 +182,7 @@ func (s *Store) LoadChain() (*proof.Chain, error) {
 
 func (s *Store) loadChain() (*proof.Chain, error) {
 	path := s.ChainPath()
+	// #nosec G304 -- chain path is derived from the managed local store root.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -210,6 +211,7 @@ func (s *Store) persistChain(chain *proof.Chain) error {
 func (s *Store) loadDedupeIndex() (*dedupe.Index, error) {
 	path := filepath.Join(s.cfg.RootDir, defaultDedupeFile)
 	idx := dedupe.New(s.cfg.DedupeTTL, s.cfg.DedupeMaxSize)
+	// #nosec G304 -- dedupe index path is derived from the managed local store root.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -269,6 +271,7 @@ func (s *Store) ensureSigningKey() error {
 }
 
 func (s *Store) loadSigningKey() (proof.SigningKey, error) {
+	// #nosec G304 -- signing key path is derived from the managed local store root.
 	raw, err := os.ReadFile(s.keyPath())
 	if err != nil {
 		return proof.SigningKey{}, err

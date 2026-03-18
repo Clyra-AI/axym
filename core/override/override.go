@@ -162,6 +162,7 @@ func appendLine(path string, payload []byte) error {
 	if err := ensureRegularFile(path); err != nil {
 		return err
 	}
+	// #nosec G304 -- override artifact path is derived from the managed store root and regular-file checked.
 	fh, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
