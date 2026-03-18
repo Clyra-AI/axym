@@ -1,0 +1,16 @@
+{
+  "workflows": {
+    "collect": {
+      "median_ms": 50,
+      "p95_ms": 100
+    },
+    "map_gaps": {
+      "median_ms": 25,
+      "p95_ms": 50
+    },
+    "bundle_verify": {
+      "median_ms": 75,
+      "p95_ms": 150
+    }
+  }
+}

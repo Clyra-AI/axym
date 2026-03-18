@@ -1,0 +1,190 @@
+{
+  "ac01_install_collect_map": {
+    "collect": {
+      "appended": 7,
+      "captured": 7,
+      "sources": {
+        "dbt": "ok",
+        "githubactions": "ok",
+        "gitmeta": "ok",
+        "governanceevent": "empty",
+        "llmapi": "ok",
+        "mcp": "ok",
+        "snowflake": "ok",
+        "webhook": "ok"
+      }
+    },
+    "map": {
+      "covered_count": 1,
+      "framework_count": 2,
+      "gap_count": 5
+    },
+    "policy_created": true,
+    "policy_path": "axym-policy.yaml"
+  },
+  "ac02_bundle_board_summary": {
+    "bundle_files": 9,
+    "pdf_contains": [
+      "Axym Executive Summary (Q3-2026)",
+      "Frameworks: eu-ai-act, soc2",
+      "AI systems in scope: 2",
+      "Proof records collected: 7",
+      "Coverage eu-ai-act: 33.33%",
+      "Coverage soc2: 0.00%",
+      "Top gap 1: eu-ai-act/article-14"
+    ],
+    "pdf_valid": true
+  },
+  "ac03_auditor_handoff_bundle_verify": {
+    "axym_compliance_verified": true,
+    "axym_oscal_valid": true,
+    "bundle_signed": true,
+    "proof_ok": true
+  },
+  "ac04_chain_integrity_breakpoint": {
+    "break_index": 0,
+    "exit_code": 2,
+    "reason": "chain_tamper_detected"
+  },
+  "ac05_gap_alert_ranking": {
+    "gap_count": 5,
+    "highest_priority": 32,
+    "top_gap_control": "article-14",
+    "top_gap_effort": "high",
+    "top_gap_fix": "Collect evidence types [approval,compiled_action,human_oversight]",
+    "top_gap_framework": "eu-ai-act"
+  },
+  "ac06_builtin_collector_capture": {
+    "appended": 7,
+    "captured": 7,
+    "captured_by_source": {
+      "dbt": 1,
+      "githubactions": 1,
+      "gitmeta": 1,
+      "llmapi": 1,
+      "mcp": 1,
+      "snowflake": 1,
+      "webhook": 1
+    }
+  },
+  "ac07_nonblocking_collection_failure": {
+    "appended": 1,
+    "captured": 1,
+    "exit_code": 0,
+    "failures": 1,
+    "reason_codes": [
+      "SNOWFLAKE_FIXTURE_ERROR"
+    ]
+  },
+  "ac08_offline_fixture_run": {
+    "captured": 7,
+    "map_gap_count": 5,
+    "proxy_blocked": true
+  },
+  "ac09_mixed_source_chain_parity": {
+    "axym_count": 2,
+    "gait_appended": 1,
+    "head_hash_matches": true,
+    "proof_records": 2,
+    "wrkr_appended": 1
+  },
+  "ac10_datapipeline_semantics_and_replay": {
+    "dbt": {
+      "pass": false,
+      "reason_codes": [
+        "FREEZE_WINDOW",
+        "SOD_REQUESTOR_DEPLOYER"
+      ]
+    },
+    "replay": {
+      "reason_codes": [
+        "REPLAY_CERTIFIED"
+      ],
+      "status": "certified",
+      "tier": "A"
+    },
+    "snowflake": {
+      "pass": true,
+      "query_tag": "CHANGE-1234",
+      "reason_codes": []
+    }
+  },
+  "ac11_sink_unavailable_fail_closed": {
+    "exit_code": 1,
+    "reason": "SINK_UNAVAILABLE"
+  },
+  "ac12_oscal_bundle_validation": {
+    "compliance_verified": true,
+    "cryptographic": true,
+    "oscal_valid": true
+  },
+  "ac13_regression_exit5": {
+    "drift_detected": true,
+    "exit_code": 5,
+    "reason": "regression_drift",
+    "regressed_control": {
+      "baseline_status": "covered",
+      "control_id": "R1",
+      "current_status": "gap",
+      "framework_id": "regress-minimal",
+      "reason": "coverage_drift_detected"
+    }
+  },
+  "ac14_daily_review_pack": {
+    "attach_sla": {
+      "breached_sla": 0,
+      "unknown": 0,
+      "within_sla": 1
+    },
+    "attach_status": {
+      "attached": 1,
+      "dlq": 0,
+      "failed": 0,
+      "retry": 0,
+      "unknown": 0
+    },
+    "degradation_flags": [],
+    "exceptions": {
+      "approvals": 0,
+      "attach": 1,
+      "chain-session-gap": 0,
+      "enrichment": 1,
+      "freeze": 1,
+      "replay": 0,
+      "sod": 1
+    },
+    "record_count": 4,
+    "replay_tiers": {
+      "A": 1,
+      "B": 0,
+      "C": 0,
+      "unknown": 0
+    }
+  },
+  "ac15_ticket_retry_dlq_sla": {
+    "attempts": 3,
+    "dlq_entries": 1,
+    "reason_codes": [
+      "TICKET_DLQ",
+      "TICKET_RATE_LIMITED"
+    ],
+    "sla_within": false,
+    "status": "dlq"
+  },
+  "ac16_override_artifact_visible_in_bundle": {
+    "bundle_verifies": true,
+    "override_artifact_bundled": true,
+    "override_lines": 1,
+    "raw_record_types": [
+      "approval"
+    ]
+  },
+  "ac17_third_party_collector_schema_rejection": {
+    "appended": 7,
+    "exit_code": 0,
+    "failures": 1,
+    "reason_codes": [
+      "PLUGIN_MALFORMED_JSONL"
+    ]
+  }
+}

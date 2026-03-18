@@ -1,0 +1,14 @@
+# Default owner for all paths.
+* @davidahmann @ryshman
+
+# Core CLI, policy, and artifact enforcement paths.
+/cmd/axym/** @davidahmann @ryshman
+/core/** @davidahmann @ryshman
+/schemas/** @davidahmann @ryshman
+
+# Scenario fixtures are contract artifacts and require explicit owner review.
+# Changes under /scenarios/ should be reviewed for expected behavior drift.
+/scenarios/** @davidahmann @ryshman
+
+# CI and release gate changes require owner review.
+/.github/workflows/** @davidahmann @ryshman

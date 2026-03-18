@@ -16,7 +16,13 @@ func TestCIWorkflowFilesExist(t *testing.T) {
 		".github/workflows/nightly.yml",
 		".github/workflows/release.yml",
 		".goreleaser.yaml",
+		"docs/commands/axym.md",
+		"perf/bench_baseline.json",
+		"perf/runtime_slo_budgets.json",
+		"perf/resource_budgets.json",
 		"scripts/check_branch_protection_contract.sh",
+		"scripts/release_go_nogo.sh",
+		"scripts/validate_scenarios.sh",
 	}
 
 	for _, path := range required {

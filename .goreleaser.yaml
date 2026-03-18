@@ -26,3 +26,11 @@ checksum:
 sboms:
   - artifacts: archive
 
+brews:
+  - repository:
+      owner: Clyra-AI
+      name: tap
+    homepage: https://github.com/Clyra-AI/axym
+    description: Deterministic AI governance evidence CLI
+    test: |
+      system "#{bin}/axym", "version", "--json"

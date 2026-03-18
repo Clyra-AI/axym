@@ -17,18 +17,26 @@ jobs:
         with:
           go-version-file: go.mod
       - run: make prepush
+      - run: make test-scenarios
+      - run: make test-docs-consistency
+      - run: make test-docs-storyline
       - name: Build
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> v2"
+          version: v2.14.1
           args: release --clean --skip publish
       - name: Verify checksums
         run: sha256sum -c dist/checksums.txt
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          artifact-name: axym-sbom.spdx.json
+          artifact-name: axym.spdx.json
           path: dist
+      - name: Normalize SBOM path
+        run: |
+          sbom_path="$(find . -maxdepth 2 -name '*.spdx.json' | head -n 1)"
+          test -n "${sbom_path}"
+          cp "${sbom_path}" dist/axym.spdx.json
       - name: Build scanner target
         run: mkdir -p .tmp && go build -o .tmp/axym ./cmd/axym
       - name: Vulnerability scan
@@ -36,13 +44,18 @@ jobs:
       - name: Sign
         uses: sigstore/cosign-installer@v3
       - name: Sign checksums
-        run: cosign sign-blob --yes --bundle dist/checksums.bundle.json dist/checksums.txt
+        run: cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
       - name: Provenance
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: "dist/**"
+      - name: Record provenance receipt
+        run: |
+          printf '{"builder":"github-actions","tag":"%s","subject":"dist/**"}\n' "${GITHUB_REF_NAME}" > dist/github-attestation.provenance.json
+      - name: Build release smoke binary
+        run: go build -o dist/axym ./cmd/axym
       - name: Verify release integrity
-        run: sha256sum -c dist/checksums.txt
+        run: ./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
       - name: Publish verified artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
