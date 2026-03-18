@@ -23,7 +23,7 @@ jobs:
       - name: Go lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.0.1
+          version: v2.11.3
       - run: go install github.com/securego/gosec/v2/cmd/gosec@v2.24.7
       - run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Security scan
