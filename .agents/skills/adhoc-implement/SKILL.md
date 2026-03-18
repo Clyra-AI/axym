@@ -10,7 +10,7 @@ Execute this workflow for: "implement this plan file", "run plan from <path>", o
 
 ## Scope
 
-- Repository: `/Users/tr/axym`
+- Repository: `.`
 - Mandatory input argument: `plan_path`
 - `plan_path` must point to a specific plan document provided by the user
 - No default fallback to `product/PLAN_NEXT.md`
@@ -44,7 +44,11 @@ Run in order before implementation:
 4. `git checkout -b codex/adhoc-<plan-scope>`
 
 Rules:
-- If worktree is dirty before step 1, stop and report blocker
+- If worktree is dirty before step 1:
+- Allow only the plan-handoff case where all modified files are planning outputs and include `plan_path`.
+- Planning-output allowlist: `./product/PLAN_NEXT.md`, `./product/PLAN_v1.0.md`, and selected `plan_path`.
+- In the allowlist case, require current branch is already `main`, run step 1, skip steps 2-3, and create the branch from fetched `origin/main` with `git checkout -b codex/adhoc-<plan-scope> origin/main` to preserve plan edits on an up-to-date base.
+- Otherwise stop and report blocker.
 - If unexpected unrelated changes appear during execution, stop immediately and ask how to proceed
 - Do not auto-commit or auto-push unless explicitly requested by the user
 
@@ -150,10 +154,10 @@ No story is complete if any required lane is skipped or failing.
 ## Surgical Docs Sync Rule
 
 - If a story changes user-visible behavior, update only impacted docs in the same story:
-- `/Users/tr/axym/README.md`
-- `/Users/tr/axym/docs/`
-- `/Users/tr/axym/docs-site/public/llms.txt`
-- `/Users/tr/axym/docs-site/public/llm/*.md`
+- `./README.md`
+- `./docs/`
+- `./docs-site/public/llms.txt`
+- `./docs-site/public/llm/*.md`
 
 If internal-only behavior with no user-visible impact, avoid unnecessary doc churn.
 

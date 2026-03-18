@@ -10,9 +10,9 @@ Execute this workflow when the user asks to turn recommended items into a concre
 
 ## Scope
 
-- Repository root: `/Users/tr/axym`
+- Repository root: `.`
 - Recommendation source: user-provided recommended items for this run
-- No dependency on `/Users/tr/axym/product/ideas.md`
+- No dependency on `./product/ideas.md`
 - Planning-only skill. Do not implement code in this workflow.
 
 ## Input Contract (Mandatory)
@@ -133,7 +133,7 @@ Use `axym` commands with `--json` whenever the plan needs machine-readable evide
 - docs consistency checks
 - storyline/smoke checks when user flow changes
 - README/quickstart/integration coverage checks when public docs change
-- docs source-of-truth sync tasks for `/Users/tr/axym/README.md`, `/Users/tr/axym/docs/`, `/Users/tr/axym/docs-site/public/llms.txt`, and `/Users/tr/axym/docs-site/public/llm/*.md`
+- docs source-of-truth sync tasks for `README.md`, `docs/`, `docs-site/public/llms.txt`, and `docs-site/public/llm/*.md`
 - OSS trust-baseline updates when public launch/support expectations change
 
 ## Test Matrix Wiring Contract (Plan-Level)
