@@ -89,6 +89,7 @@ func ensureRegularFilePath(path string) error {
 }
 
 func ReadAll(path string) ([]Entry, error) {
+	// #nosec G304 -- DLQ path is the explicit queue file path managed by the caller.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

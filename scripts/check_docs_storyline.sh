@@ -13,6 +13,10 @@ for doc in "${docs[@]}"; do
   grep -Fq "brew install Clyra-AI/tap/axym" "$doc"
   grep -Fq "go build ./cmd/axym" "$doc"
   grep -Fq "./axym version --json" "$doc"
+  grep -Fq "make lint-go" "$doc"
+  grep -Fq "make test-security" "$doc"
+  grep -Fq "make test-docs-links" "$doc"
+  grep -Fq "./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl" "$doc"
 done
 
 line_number() {

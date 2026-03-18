@@ -20,6 +20,8 @@ func TestRequiredPlanningArtifactsExist(t *testing.T) {
 	t.Parallel()
 
 	required := []string{
+		"CONTRIBUTING.md",
+		"SECURITY.md",
 		"product/PLAN_v1.0.md",
 	}
 

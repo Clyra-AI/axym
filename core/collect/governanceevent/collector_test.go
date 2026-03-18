@@ -51,3 +51,34 @@ func TestGovernanceEventRejectsMalformedSchema(t *testing.T) {
 		t.Fatalf("reason mismatch: err=%v", err)
 	}
 }
+
+func TestGovernanceEventPromotion_ContextEngineering(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "events.jsonl")
+	content := []byte(`{"event_type":"knowledge_import","source":"agent-fw","timestamp":"2026-03-18T12:00:00Z","actor":{"id":"agent-ctx","type":"agent"},"action":"import","target":{"kind":"knowledge_artifact","id":"kb:policy-pack"},"context":{"artifact_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","artifact_kind":"knowledge_artifact","source_uri":"repo://policy/pack","reason_code":"KNOWLEDGE_SYNC","approval_ref":"chg-42"}}` + "\n")
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	result, err := Collector{}.Collect(context.Background(), collector.Request{GovernanceEventFiles: []string{path}})
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if len(result.Candidates) != 1 {
+		t.Fatalf("candidate count mismatch: %+v", result)
+	}
+	candidate := result.Candidates[0]
+	if candidate.RecordType != "decision" {
+		t.Fatalf("record type mismatch: %+v", candidate)
+	}
+	if candidate.Event["context_event_class"] != "context_engineering" {
+		t.Fatalf("missing context event class: %+v", candidate.Event)
+	}
+	if candidate.Event["context_artifact_digest"] != "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" {
+		t.Fatalf("missing artifact digest: %+v", candidate.Event)
+	}
+	if candidate.Event["context_reason_code"] != "KNOWLEDGE_SYNC" {
+		t.Fatalf("missing reason code: %+v", candidate.Event)
+	}
+}

@@ -84,6 +84,7 @@ func (m *WrkrManager) WithLockedState(fn func(*WrkrState) error) error {
 }
 
 func (m *WrkrManager) acquireLock(lockPath string) (*os.File, error) {
+	// #nosec G304 -- lock path is derived from the managed Wrkr state root.
 	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err == nil {
 		return lockFile, nil
@@ -102,6 +103,7 @@ func (m *WrkrManager) acquireLock(lockPath string) (*os.File, error) {
 	if err := os.Remove(lockPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("remove stale wrkr state lock: %w", err)
 	}
+	// #nosec G304 -- lock path is derived from the managed Wrkr state root.
 	lockFile, err = os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
@@ -164,6 +166,7 @@ func (m *WrkrManager) refreshLock(lockPath string, stop <-chan struct{}, done ch
 }
 
 func (m *WrkrManager) load() (*WrkrState, error) {
+	// #nosec G304 -- state path is derived from the managed Wrkr state root.
 	raw, err := os.ReadFile(m.StatePath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

@@ -72,7 +72,7 @@ func newMapCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.C
 			if global.Explain && !global.Quiet {
 				for _, frameworkResult := range run.matchResult.Frameworks {
 					for _, control := range frameworkResult.Controls {
-						_, _ = fmt.Fprintln(stdout, fmt.Sprintf("%s/%s: %s", frameworkResult.ID, control.ControlID, control.Rationale))
+						_, _ = fmt.Fprintf(stdout, "%s/%s: %s\n", frameworkResult.ID, control.ControlID, control.Rationale)
 					}
 				}
 			}

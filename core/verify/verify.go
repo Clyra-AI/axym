@@ -64,6 +64,7 @@ type BundleResult struct {
 
 func VerifyChainFromStoreDir(storeDir string) (ChainResult, error) {
 	chainPath := filepath.Join(storeDir, "chain.json")
+	// #nosec G304 -- chain path is derived from the explicit store directory contract.
 	raw, err := os.ReadFile(chainPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

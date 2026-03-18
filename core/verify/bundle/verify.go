@@ -89,6 +89,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	}
 
 	summaryPath := filepath.Join(path, "executive-summary.json")
+	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 	summaryRaw, err := os.ReadFile(summaryPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -114,6 +115,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "load frameworks", ExitCode: 6, Err: err}
 	}
 
+	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 	chainRaw, err := os.ReadFile(filepath.Join(path, "chain.json"))
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read chain artifact", ExitCode: 6, Err: err}
@@ -137,6 +139,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleCompleteness, Message: "executive summary compliance does not match recomputed output", ExitCode: 2}
 	}
 
+	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 	gradeArtifactRaw, err := os.ReadFile(filepath.Join(path, "auditability-grade.yaml"))
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read grade artifact", ExitCode: 6, Err: err}
@@ -151,6 +154,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleCompleteness, Message: "grade artifact does not match recomputed grade", ExitCode: 2}
 	}
 
+	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 	oscalRaw, err := os.ReadFile(filepath.Join(path, "oscal-v1.1", "component-definition.json"))
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read oscal export", ExitCode: 6, Err: err}

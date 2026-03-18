@@ -26,6 +26,7 @@ Axym is a deterministic AI governance CLI for platform, security, and GRC engine
 - `axym record add --input <record.json> --json`: appends a JSON proof record payload to the local chain with deterministic dedupe behavior.
 - `axym collect --json --plugin "<cmd>"`: runs third-party collector protocol (`stdin` config, `stdout` JSONL).
 - `axym collect --json --governance-event-file <file.jsonl>`: ingests governance events and promotes valid events to proof records.
+- `./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`: captures digest-first context engineering events for instruction rewrites, context resets, and knowledge imports.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls and emits explainable match rationale.
 - `axym gaps --frameworks eu-ai-act,soc2 --json`: computes deterministic `covered`/`partial`/`gap` ranking, remediation guidance, and auditability grade.
 - `axym map --policy-config ./axym-policy.yaml --json`: applies schema-validated policy defaults and threshold constraints; invalid policy input exits `6`.
@@ -40,6 +41,16 @@ Axym is a deterministic AI governance CLI for platform, security, and GRC engine
 - `axym map --frameworks eu-ai-act --min-coverage 0.80 --json`: enforces threshold policy and exits non-zero when coverage is below threshold.
 - `axym verify --chain --json`: verifies local append-only chain integrity.
 - `axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks.
+
+## Contributor gates
+
+- Fast local: `make lint-fast`, `make test-fast`, `make test-contracts`
+- Extended local: `make lint-go`, `make test-security`, `make test-docs-links`, `make prepush-full`
+- Hosted CI remains authoritative for required PR checks and GitHub-hosted CodeQL
+
+## Release verification
+
+- `./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym`
 
 ## Exit codes
 

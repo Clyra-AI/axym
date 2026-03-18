@@ -49,6 +49,7 @@ func WriteJSONAtomic(path string, data []byte, fsync bool) error {
 }
 
 func syncDir(path string) error {
+	// #nosec G304 -- directory sync targets the managed parent directory of an atomic write.
 	dir, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("open directory for sync: %w", err)

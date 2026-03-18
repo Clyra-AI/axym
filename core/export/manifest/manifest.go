@@ -24,6 +24,7 @@ func Build(root string, relPaths []string) (proof.BundleManifest, error) {
 	files := make([]proof.BundleManifestEntry, 0, len(normalized))
 	for _, rel := range normalized {
 		abs := filepath.Join(root, filepath.FromSlash(rel))
+		// #nosec G304 -- manifest paths are built from bundle-root plus normalized manifest entries.
 		data, err := os.ReadFile(abs)
 		if err != nil {
 			return proof.BundleManifest{}, fmt.Errorf("read bundle file %q: %w", rel, err)

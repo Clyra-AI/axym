@@ -43,6 +43,7 @@ Release binary:
 - `axym collect --json`: runs built-in collectors and appends signed proof records.
 - `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and rejects malformed JSONL deterministically.
 - `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records.
+- `./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`: captures digest-first context engineering events for `instruction_rewrite`, `context_reset`, and `knowledge_import`.
 - `axym record add --input ./fixtures/records/decision.json --json`: appends a user-supplied proof record payload.
 - `axym ingest --source wrkr --json --input ./fixtures/ingest/wrkr/proof_records.jsonl`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --source gait --json --input ./fixtures/ingest/gait`: ingests Gait native/proof pack artifacts with translation.
@@ -56,6 +57,33 @@ Release binary:
 - `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, OSCAL, and portable raw records.
 - `axym verify --chain --json`: verifies append-only chain integrity.
 - `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness.
+
+## Contributor checks
+
+Fast local checks:
+
+```bash
+make lint-fast
+make test-fast
+make test-contracts
+```
+
+Extended local checks:
+
+```bash
+make lint-go
+make test-security
+make test-docs-links
+make prepush-full
+```
+
+Hosted CI remains authoritative for pull-request required checks and GitHub-hosted CodeQL analysis.
+
+## Release verification
+
+```bash
+./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+```
 
 ## Exit codes
 

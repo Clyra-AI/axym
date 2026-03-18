@@ -4,6 +4,49 @@
   "title": "Axym Governance Event",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "contextChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "previous_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "current_hash": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "artifact_kind": {
+          "type": "string",
+          "enum": [
+            "instruction_set",
+            "context_window",
+            "knowledge_artifact",
+            "knowledge_pack",
+            "knowledge_document"
+          ]
+        },
+        "source_uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
   "required": [
     "event_type",
     "source",
@@ -47,8 +90,118 @@
         "id": {"type": "string", "minLength": 1}
       }
     },
+    "context": {
+      "$ref": "#/$defs/contextChange"
+    },
     "metadata": {
-      "type": "object"
+      "type": "object",
+      "not": {
+        "anyOf": [
+          {
+            "required": ["instruction_text"]
+          },
+          {
+            "required": ["prompt"]
+          },
+          {
+            "required": ["knowledge_body"]
+          },
+          {
+            "required": ["context_snapshot"]
+          }
+        ]
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "instruction_rewrite"
+          }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["context"],
+        "properties": {
+          "target": {
+            "properties": {
+              "kind": {
+                "const": "instruction_set"
+              }
+            }
+          },
+          "context": {
+            "required": [
+              "previous_hash",
+              "current_hash",
+              "artifact_kind",
+              "reason_code"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "context_reset"
+          }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["context"],
+        "properties": {
+          "target": {
+            "properties": {
+              "kind": {
+                "const": "context_window"
+              }
+            }
+          },
+          "context": {
+            "required": [
+              "previous_hash",
+              "current_hash",
+              "reason_code"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "knowledge_import"
+          }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["context"],
+        "properties": {
+          "target": {
+            "properties": {
+              "kind": {
+                "const": "knowledge_artifact"
+              }
+            }
+          },
+          "context": {
+            "required": [
+              "artifact_digest",
+              "artifact_kind",
+              "source_uri",
+              "reason_code"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

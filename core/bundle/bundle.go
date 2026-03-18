@@ -249,7 +249,7 @@ func Build(req BuildRequest) (Result, error) {
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load signing key", ExitCode: 1, Err: err}
 	}
-	signedManifest, err := proof.SignBundle(req.OutputDir, signingKey)
+	signedManifest, err := proof.SignBundleFile(req.OutputDir, signingKey)
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "sign bundle", ExitCode: 2, Err: err}
 	}
@@ -404,6 +404,7 @@ func writeArtifact(root string, rel string, payload []byte) error {
 
 func loadOptionalStoreArtifact(storeDir string, rel string) ([]byte, error) {
 	path := filepath.Join(storeDir, filepath.FromSlash(rel))
+	// #nosec G304 -- optional artifact path is derived from the managed local store root.
 	payload, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -450,6 +451,7 @@ type signingKeyFile struct {
 }
 
 func loadSigningKey(path string) (proof.SigningKey, error) {
+	// #nosec G304 -- signing key path is derived from the managed local store root.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return proof.SigningKey{}, err

@@ -84,6 +84,32 @@ func TestCollectWriteJSONWithoutInputsDoesNotSynthesizeEvidence(t *testing.T) {
 	}
 }
 
+func TestCollectGovernanceContextEngineeringJSONAppendsRecords(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{
+		"collect",
+		"--governance-event-file", governanceFixturePath(t),
+		"--store-dir", storeDir,
+		"--json",
+	}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	if appended, _ := data["appended"].(float64); appended != 3 {
+		t.Fatalf("expected 3 appended governance records, payload=%s", stdout.String())
+	}
+}
+
 func fixtureDir(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -91,4 +117,13 @@ func fixtureDir(t *testing.T) string {
 		t.Fatal("runtime.Caller failed")
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "fixtures", "collectors"))
+}
+
+func governanceFixturePath(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "fixtures", "governance", "context_engineering.jsonl"))
 }

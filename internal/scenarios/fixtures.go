@@ -45,6 +45,7 @@ func LoadFixtures() ([]Fixture, error) {
 }
 
 func LoadFixturesFromRoot(repoRoot string) ([]Fixture, error) {
+	// #nosec G304 -- fixture path is built from a resolved repo root plus a fixed relative constant.
 	raw, err := os.ReadFile(filepath.Join(repoRoot, FixtureManifestRelPath))
 	if err != nil {
 		return nil, err
@@ -73,6 +74,7 @@ func LoadGoldenResults() (map[string]json.RawMessage, error) {
 }
 
 func LoadGoldenResultsFromRoot(repoRoot string) (map[string]json.RawMessage, error) {
+	// #nosec G304 -- golden path is built from a resolved repo root plus a fixed relative constant.
 	raw, err := os.ReadFile(filepath.Join(repoRoot, GoldenResultsRelPath))
 	if err != nil {
 		return nil, err

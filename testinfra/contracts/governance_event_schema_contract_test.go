@@ -29,3 +29,42 @@ func TestGovernanceEventSchemaContract(t *testing.T) {
 		t.Fatal("invalid event accepted")
 	}
 }
+
+func TestGovernanceEventSchemaContract_ContextEngineering(t *testing.T) {
+	t.Parallel()
+
+	valid := []byte(`{
+		"event_type":"instruction_rewrite",
+		"source":"agent-fw",
+		"timestamp":"2026-03-18T12:00:00Z",
+		"actor":{"id":"agent-1","type":"agent"},
+		"action":"rewrite",
+		"target":{"kind":"instruction_set","id":"system-prompt"},
+		"context":{
+			"previous_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"current_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"artifact_kind":"instruction_set",
+			"reason_code":"POLICY_REFRESH"
+		}
+	}`)
+	if err := governanceeventschema.Validate(valid); err != nil {
+		t.Fatalf("valid context event rejected: %v", err)
+	}
+
+	invalid := []byte(`{
+		"event_type":"knowledge_import",
+		"source":"agent-fw",
+		"timestamp":"2026-03-18T12:00:00Z",
+		"actor":{"id":"agent-1","type":"agent"},
+		"action":"import",
+		"target":{"kind":"knowledge_artifact","id":"kb:policy-pack"},
+		"context":{
+			"artifact_kind":"knowledge_artifact",
+			"source_uri":"repo://policy/pack"
+		},
+		"metadata":{"knowledge_body":"raw content should be rejected"}
+	}`)
+	if err := governanceeventschema.Validate(invalid); err == nil {
+		t.Fatal("invalid context event accepted")
+	}
+}
