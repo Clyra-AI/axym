@@ -1,0 +1,69 @@
+scenarios:
+  - id: ac01_install_collect_map
+    title: Install, init, collect, and map produce a real framework view
+    acceptance_criteria: [AC1]
+    pass_command: axym init --store-dir ./store --json && axym collect --fixture-dir ./fixtures/collectors --store-dir ./store --json && axym map --frameworks eu-ai-act,soc2 --store-dir ./store --json
+  - id: ac02_bundle_board_summary
+    title: Bundle includes a board-ready executive summary PDF
+    acceptance_criteria: [AC2]
+    pass_command: axym collect --fixture-dir ./fixtures/collectors --store-dir ./store --json && axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --store-dir ./store --output ./bundle --json
+  - id: ac03_auditor_handoff_bundle_verify
+    title: Auditor can verify the bundle without Axym installed
+    acceptance_criteria: [AC3]
+    pass_command: axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --store-dir ./store --output ./bundle --json && proof verify --bundle ./bundle --json
+  - id: ac04_chain_integrity_breakpoint
+    title: Chain tamper detection identifies the exact break point
+    acceptance_criteria: [AC4]
+    pass_command: axym verify --chain --store-dir ./store --json
+  - id: ac05_gap_alert_ranking
+    title: Gap ranking identifies affected controls and remediation effort
+    acceptance_criteria: [AC5]
+    pass_command: axym gaps --frameworks eu-ai-act,soc2 --store-dir ./store --json
+  - id: ac06_builtin_collector_capture
+    title: Built-in collector fixtures capture deterministic evidence
+    acceptance_criteria: [AC6]
+    pass_command: axym collect --fixture-dir ./fixtures/collectors --store-dir ./store --json
+  - id: ac07_nonblocking_collection_failure
+    title: Collection keeps running with explicit failure surfaces
+    acceptance_criteria: [AC7]
+    pass_command: axym collect --fixture-dir ./scenario-fixtures/nonblocking --store-dir ./store --json
+  - id: ac08_offline_fixture_run
+    title: Offline fixture run succeeds without egress
+    acceptance_criteria: [AC8]
+    pass_command: HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 axym collect --fixture-dir ./fixtures/collectors --store-dir ./store --json && axym map --frameworks eu-ai-act,soc2 --store-dir ./store --json
+  - id: ac09_mixed_source_chain_parity
+    title: Mixed Wrkr, Gait, and Axym chains verify in both runtimes
+    acceptance_criteria: [AC9]
+    pass_command: axym ingest --source wrkr --input ./fixtures/ingest/wrkr/proof_records.jsonl --store-dir ./store --json && axym ingest --source gait --input ./fixtures/ingest/gait --store-dir ./store --json && axym verify --chain --store-dir ./store --json && proof verify --chain ./store/chain.json --json
+  - id: ac10_datapipeline_semantics_and_replay
+    title: Data pipeline evidence preserves SoD, freeze, query-tag, and replay semantics
+    acceptance_criteria: [AC10]
+    pass_command: axym collect --fixture-dir ./scenario-fixtures/datapipeline --store-dir ./store --json && axym replay --model payments-agent --tier A --store-dir ./store --json
+  - id: ac11_sink_unavailable_fail_closed
+    title: Compliance mode fails closed on sink unavailability
+    acceptance_criteria: [AC11]
+    pass_command: axym collect --fixture-dir ./fixtures/collectors --store-dir ./store --json
+  - id: ac12_oscal_bundle_validation
+    title: OSCAL export verifies as part of bundle integrity checks
+    acceptance_criteria: [AC12]
+    pass_command: axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --store-dir ./store --output ./bundle --json && axym verify --bundle ./bundle --json
+  - id: ac13_regression_exit5
+    title: Regression drift exits 5 with deterministic control output
+    acceptance_criteria: [AC13]
+    pass_command: axym regress run --baseline ./baseline.json --frameworks ./fixtures/frameworks/regress-minimal.yaml --store-dir ./current-store --json
+  - id: ac14_daily_review_pack
+    title: Daily review pack includes exception classes and distributions
+    acceptance_criteria: [AC14]
+    pass_command: axym review --date 2026-09-15 --store-dir ./store --json
+  - id: ac15_ticket_retry_dlq_sla
+    title: Ticket attachment retries, DLQ, and SLA accounting stay deterministic
+    acceptance_criteria: [AC15]
+    pass_command: axym review --date 2026-09-15 --store-dir ./store --json
+  - id: ac16_override_artifact_visible_in_bundle
+    title: Override artifacts stay append-only and travel with the bundle
+    acceptance_criteria: [AC16]
+    pass_command: axym override create --bundle Q3-2026 --reason fixture --signer ops-key --store-dir ./store --json && axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --store-dir ./store --output ./bundle --json
+  - id: ac17_third_party_collector_schema_rejection
+    title: Third-party collector protocol rejects malformed plugin output
+    acceptance_criteria: [AC17]
+    pass_command: axym collect --fixture-dir ./fixtures/collectors --plugin "go run ./scenario-fixtures/bad_plugin.go" --store-dir ./store --json

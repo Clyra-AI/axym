@@ -211,6 +211,11 @@ func Build(req BuildRequest) (Result, error) {
 	artifacts["retention-matrix.json"] = retentionRaw
 
 	artifacts["boundary-contract.md"] = []byte(buildBoundaryContract(req.AuditName, req.FrameworkIDs))
+	if overrideArtifact, err := loadOptionalStoreArtifact(req.StoreDir, filepath.Join("overrides", "overrides.jsonl")); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load override artifact", ExitCode: 1, Err: err}
+	} else if len(overrideArtifact) > 0 {
+		artifacts[filepath.ToSlash(filepath.Join("overrides", "overrides.jsonl"))] = overrideArtifact
+	}
 
 	oscalDoc := oscal.Build(req.AuditName, coverageReport)
 	oscalRaw, err := oscal.Marshal(oscalDoc)
@@ -397,6 +402,18 @@ func writeArtifact(root string, rel string, payload []byte) error {
 	return store.WriteJSONAtomic(path, payload, true)
 }
 
+func loadOptionalStoreArtifact(storeDir string, rel string) ([]byte, error) {
+	path := filepath.Join(storeDir, filepath.FromSlash(rel))
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return payload, nil
+}
+
 func buildBoundaryContract(audit string, frameworks []string) string {
 	lines := []string{
 		"# Axym Boundary Contract",
@@ -418,6 +435,7 @@ func defaultRetentionMatrix() map[string]any {
 		"entries": []map[string]string{
 			{"artifact": "chain.json", "retention": "7y", "rationale": "chain integrity audit trail"},
 			{"artifact": "raw-records.jsonl", "retention": "7y", "rationale": "portable evidence replay"},
+			{"artifact": "overrides/overrides.jsonl", "retention": "7y", "rationale": "signed manual approvals and exceptions"},
 			{"artifact": "executive-summary.json", "retention": "3y", "rationale": "audit handoff summary"},
 			{"artifact": "executive-summary.pdf", "retention": "3y", "rationale": "board-ready summary"},
 			{"artifact": "oscal-v1.1/component-definition.json", "retention": "3y", "rationale": "framework interchange"},

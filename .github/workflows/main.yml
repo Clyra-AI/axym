@@ -20,4 +20,6 @@ jobs:
       - run: make lint-fast
       - run: make test-fast
       - run: make test-contracts
-
+      - run: make test-scenarios
+      - run: make test-docs-consistency
+      - run: make test-docs-storyline

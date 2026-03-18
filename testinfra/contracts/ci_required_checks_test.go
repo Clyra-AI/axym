@@ -42,6 +42,9 @@ func TestReleaseWorkflowContainsIntegrityGates(t *testing.T) {
 
 	release := readRepoFile(t, ".github/workflows/release.yml")
 	requiredSteps := []string{
+		"make test-scenarios",
+		"make test-docs-consistency",
+		"make test-docs-storyline",
 		"Verify checksums",
 		"Generate SBOM",
 		"Vulnerability scan",
@@ -52,6 +55,39 @@ func TestReleaseWorkflowContainsIntegrityGates(t *testing.T) {
 	for _, step := range requiredSteps {
 		if !strings.Contains(release, step) {
 			t.Fatalf("release workflow missing integrity gate: %s", step)
+		}
+	}
+}
+
+func TestMainWorkflowContainsScenarioAndDocsParityLanes(t *testing.T) {
+	t.Parallel()
+
+	main := readRepoFile(t, ".github/workflows/main.yml")
+	required := []string{
+		"make test-scenarios",
+		"make test-docs-consistency",
+		"make test-docs-storyline",
+	}
+	for _, lane := range required {
+		if !strings.Contains(main, lane) {
+			t.Fatalf("main workflow missing lane: %s", lane)
+		}
+	}
+}
+
+func TestNightlyWorkflowContainsRiskLanes(t *testing.T) {
+	t.Parallel()
+
+	nightly := readRepoFile(t, ".github/workflows/nightly.yml")
+	required := []string{
+		"make test-scenarios",
+		"make test-hardening",
+		"make test-chaos",
+		"make test-perf",
+	}
+	for _, lane := range required {
+		if !strings.Contains(nightly, lane) {
+			t.Fatalf("nightly workflow missing lane: %s", lane)
 		}
 	}
 }

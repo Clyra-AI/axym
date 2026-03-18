@@ -1,5 +1,23 @@
 # Axym
 
+Axym is a deterministic AI governance CLI for platform, security, and GRC engineers who need local evidence collection, compliance mapping, and audit-ready bundles.
+
+## Install
+
+- Homebrew: `brew install Clyra-AI/tap/axym` then `axym version --json`
+- Source: `go build ./cmd/axym` then `./axym version --json`
+- Release binary: `./axym version --json`
+
+## First value
+
+- `axym init --json`
+- `axym collect --dry-run --json`
+- `axym collect --json`
+- `axym map --frameworks eu-ai-act,soc2 --json`
+- `axym gaps --frameworks eu-ai-act,soc2 --json`
+- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`
+- `axym verify --chain --json`
+
 ## Commands
 
 - `axym collect --dry-run --json`: validates deterministic would-capture output with no writes.

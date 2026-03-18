@@ -2,14 +2,45 @@
 
 Axym is an open-source Go CLI for deterministic AI governance evidence collection, proof record emission, compliance mapping, and audit-ready bundle generation.
 
-## Local bootstrap
+## Who it's for
+
+Axym is built for platform, security, and GRC engineers who need to prove how AI systems behave without shipping evidence to a hosted service by default.
+
+## Install
+
+Homebrew:
+
+```bash
+brew install Clyra-AI/tap/axym
+axym version --json
+```
+
+Source:
 
 ```bash
 go build ./cmd/axym
-go test ./...
+./axym version --json
 ```
 
-Requires Go `1.26.1`.
+Release binary:
+
+```bash
+./axym version --json
+```
+
+Requires Go `1.26.1` for source builds.
+
+## First value
+
+```bash
+./axym init --json
+./axym collect --dry-run --json
+./axym collect --json
+./axym map --frameworks eu-ai-act,soc2 --json
+./axym gaps --frameworks eu-ai-act,soc2 --json
+./axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json
+./axym verify --chain --json
+```
 
 ## Collect command surface
 
