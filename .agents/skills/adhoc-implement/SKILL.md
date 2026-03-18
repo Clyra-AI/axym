@@ -10,11 +10,11 @@ Execute this workflow for: "implement this plan file", "run plan from <path>", o
 
 ## Scope
 
-- Repository: `.`
+- Repository: `/Users/tr/axym`
 - Mandatory input argument: `plan_path`
 - `plan_path` must point to a specific plan document provided by the user
 - No default fallback to `product/PLAN_NEXT.md`
-- Planning input only; this skill performs implementation work in repo
+- Plan input only; this skill performs implementation work in repo
 
 ## Input Contract (Mandatory)
 
@@ -44,17 +44,14 @@ Run in order before implementation:
 4. `git checkout -b codex/adhoc-<plan-scope>`
 
 Rules:
-- If worktree is dirty before step 1:
-- Allow only the plan-handoff case where all modified files are planning outputs and include `plan_path`.
-- Planning-output allowlist: `./product/PLAN_NEXT.md`, `./product/PLAN_v1.0.md`, and selected `plan_path`.
-- In the allowlist case, require current branch is already `main`, run step 1, skip steps 2-3, and create the branch from fetched `origin/main` with `git checkout -b codex/adhoc-<plan-scope> origin/main` to preserve plan edits on an up-to-date base.
-- Otherwise stop and report blocker.
+- If worktree is dirty before step 1, stop and report blocker
 - If unexpected unrelated changes appear during execution, stop immediately and ask how to proceed
 - Do not auto-commit or auto-push unless explicitly requested by the user
 
 ## Workflow
 
 1. Parse plan and build execution queue by dependency and priority (`P0 -> P1 -> P2`).
+   - Respect any explicit `Wave 1` before `Wave 2` sequencing in the plan.
 2. Run baseline before first edit:
 - `make lint-fast`
 - `make test-fast`
@@ -62,7 +59,8 @@ Rules:
 3. Implement one story at a time (no parallel story execution).
 4. For each story:
 - implement scoped code/docs/tests only
-- keep orchestration thin; move parsing/persistence/reporting/policy logic into focused packages when boundary stories are in scope
+- keep orchestration thin when architecture is touched; move parsing, persistence, reporting, or policy logic into focused packages instead of coordinator layers
+- make side effects explicit in API names/signatures and preserve symmetric semantics unless the distinction is intentionally named
 - run story `Run commands`
 - run story `Test requirements`
 - run story `Matrix wiring` lanes
@@ -78,19 +76,21 @@ Rules:
 - plan Exit Criteria
 - Output `met/not met` with command evidence for each item.
 
-## Execution Waves (Mandatory)
-
-- Execute in two waves to keep blast radius controlled:
-- Wave 1: contract/runtime correctness and architecture boundaries.
-- Wave 2: docs, OSS hygiene, and distribution UX.
-- Do not start Wave 2 work for a touched surface before Wave 1 acceptance criteria are met for that surface.
-
 ## Command Contract (JSON Required)
 
 When collecting evidence or emitting machine-readable status, use `axym` commands with `--json`, for example:
 
 - `axym collect --dry-run --json`
 - `axym regress run --baseline <baseline-path> --frameworks eu-ai-act,soc2 --json`
+
+## Contract Discipline Rules
+
+- If a story changes public CLI/SDK/schema surfaces, update stable/internal/deprecated surface notes in the same change.
+- If versioning or schema compatibility behavior changes, document what is breaking vs additive and the migration expectation in the same story.
+- If errors cross CLI or SDK boundaries, preserve structured machine-readable errors and stable mappings.
+- If a story touches long-running workflows, verify cancellation and timeout propagation end-to-end.
+- If enterprise customization pressure appears in scope, prefer explicit extension points over fork-only designs when feasible.
+- For user-facing docs, explain integration hooks before internals and keep `README.md`, repo docs, and generated/public docs in sync.
 
 ## Test Requirements by Work Type (Mandatory)
 
@@ -104,16 +104,11 @@ When collecting evidence or emitting machine-readable status, use `axym` command
 - `cmd/axym/*_test.go` command coverage
 - `--json` stability checks
 - exit-code contract checks
-- `axym version` discoverability and minimal dependency install-path checks when install/version surfaces are touched
 
 3. Gate/policy/fail-closed changes:
-- deterministic allow/block/require_approval and `decision.pass` fixtures
+- deterministic `covered`/`partial`/`gap` and fail-closed threshold fixtures
 - fail-closed undecidable-path tests
 - reason-code stability checks
-- regression input-boundary tests (`invalid_record`/`schema_error`/`mapping_error` must not be treated as valid evidence)
-- chain/dedup preservation tests (re-ingest must not duplicate or reorder records; previous-hash linkage must remain stable)
-- filesystem boundary tests for user-supplied output paths (`non-empty + non-managed => fail`)
-- ownership marker trust tests (`marker must be regular file`; reject symlink/directory)
 
 4. Determinism/hash/sign/pack changes:
 - byte-stability repeat-run tests
@@ -122,28 +117,23 @@ When collecting evidence or emitting machine-readable status, use `axym` command
 - `make test-contracts` when applicable
 
 5. Job runtime/state/concurrency changes:
-- lifecycle tests (submit/checkpoint/pause/resume/cancel)
+- workflow lifecycle tests for multi-stage collect/map/gap/bundle/verify paths when applicable
 - atomic write/crash safety tests
 - contention/concurrency tests
 - chaos lanes when scoped
-- end-to-end cancellation/timeout propagation tests across CLI -> orchestration -> adapters
+- end-to-end cancellation/timeout propagation tests across CLI -> orchestration -> adapters when long-running flows are touched
 
 6. SDK/adapter boundary changes:
 - wrapper behavior/error-mapping tests
 - adapter conformance/parity tests
 - `make test-adapter-parity` when applicable
-- structured machine-readable error envelope tests for SDK/library paths
-- extension-point compatibility tests when new enterprise integration seams are introduced
 
-7. Voice/context changes:
-- `relevant scenario acceptance suites` as applicable
+7. Scenario/context changes:
+- relevant scenario acceptance suites as applicable
 
 8. Docs/examples changes:
 - `make test-docs-consistency`
 - `make test-docs-storyline` when flow changes
-- README first-screen checks (what it is, who it is for, integration path, first value)
-- source-of-truth checks between repo docs and generated/public docs
-- problem -> solution framing and integration-before-internals checks for touched docs
 
 ## Test Matrix Wiring (Enforcement)
 
@@ -151,7 +141,7 @@ Every story must map to and run required lanes:
 
 - Fast lane: `make lint-fast`, `make test-fast`
 - Core lane: targeted unit/integration suites
-- Acceptance lane: relevant `make test-*-acceptance` targets
+- Acceptance lane: relevant `make test-scenarios` and acceptance targets
 - Cross-platform lane: preserve Linux/macOS/Windows behavior on touched surfaces
 - Risk lane: determinism/safety/security/perf suites as required
 
@@ -160,25 +150,17 @@ No story is complete if any required lane is skipped or failing.
 ## Surgical Docs Sync Rule
 
 - If a story changes user-visible behavior, update only impacted docs in the same story:
-- `./README.md`
-- `./docs/`
-- `./docs-site/public/llms.txt`
-- `./docs-site/public/llm/*.md`
-
-Doc updates must preserve:
-- first-screen README clarity for value and integration path
-- integration guidance before internal architecture detail
-- one canonical file/state lifecycle path model (diagram + path narrative) for touched workflows
-- source-of-truth linkage between repo docs and generated/public docs
+- `/Users/tr/axym/README.md`
+- `/Users/tr/axym/docs/`
+- `/Users/tr/axym/docs-site/public/llms.txt`
+- `/Users/tr/axym/docs-site/public/llm/*.md`
 
 If internal-only behavior with no user-visible impact, avoid unnecessary doc churn.
 
 ## Safety Rules
 
 - Preserve determinism, offline-first defaults, fail-closed enforcement, schema stability, and exit-code stability.
-- Keep side effects explicit in API names/signatures and preserve symmetrical API semantics.
-- Never weaken unapproved posture => regression failure behavior.
-- Do not allow recursive cleanup on user-supplied paths without explicit ownership validation tests.
+- Never weaken invalid or ambiguous evidence => excluded-or-fail-closed behavior.
 - No destructive git operations unless explicitly requested.
 - No silent skips of required tests/checks.
 - Keep changes tightly scoped to active story.
@@ -189,7 +171,6 @@ If internal-only behavior with no user-visible impact, avoid unnecessary doc chu
 - Do not claim tests ran if they were not run.
 - Tests must use temp dirs for generated artifacts; do not leak test outputs into tracked source paths.
 - If docs/CLI drift occurs due to user-visible changes, patch docs in same story.
-- For touched contracts, ensure public/internal/shim/deprecated API classification and schema version/migration notes are updated.
 
 ## Blocker Handling
 
@@ -215,5 +196,4 @@ Implementation is complete only when all are true:
 - Change log: key files per story
 - Validation log: commands and pass/fail
 - Revalidation report: acceptance criteria + DoD + exit criteria (`met/not met` with evidence)
-- Wave status: Wave 1 vs Wave 2 completion for touched surfaces
 - Residual risk: remaining gaps and next required actions
