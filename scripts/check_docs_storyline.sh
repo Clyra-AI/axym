@@ -18,7 +18,11 @@ done
 line_number() {
   local needle="$1"
   local file="$2"
-  rg -n -F "$needle" "$file" | head -n 1 | cut -d: -f1
+  if command -v rg >/dev/null 2>&1; then
+    rg -n -F "$needle" "$file" | head -n 1 | cut -d: -f1
+    return
+  fi
+  grep -n -F "$needle" "$file" | head -n 1 | cut -d: -f1
 }
 
 for doc in "${docs[@]}"; do
