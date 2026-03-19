@@ -12,6 +12,8 @@ docs = [
     repo_root / "docs/commands/axym.md",
     repo_root / "docs-site/public/llm/axym.md",
     repo_root / "docs-site/public/llms.txt",
+    repo_root / "docs/operator/quickstart.md",
+    repo_root / "docs/operator/integration-model.md",
 ]
 
 for doc in docs:
@@ -45,6 +47,9 @@ for required in [
     "README.md",
     "docs/commands/axym.md",
     "docs-site/public/llm/axym.md",
+    "docs/operator/quickstart.md",
+    "docs/operator/integration-model.md",
+    "docs/operator/integration-boundary.mmd",
 ]:
     if required not in llms_index:
         failures.append(f"docs-site/public/llms.txt missing {required}")

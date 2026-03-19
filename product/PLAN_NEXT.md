@@ -1,436 +1,433 @@
-# PLAN Next: Launch Gate Closure and Context Engineering Evidence
+# PLAN Launch-Ready OSS: Truthful First Value and Public Trust Baseline
 
-Date: 2026-03-18
-Source of truth: user-provided recommended items from 2026-03-18, `product/axym.md`, `product/dev_guides.md`, `product/architecture_guides.md`, `AGENTS.md`
-Scope: Axym OSS CLI only. Plan the remaining work needed to close CI/release contract gaps, migrate GitHub Actions runtime assumptions ahead of the June 2, 2026 Node.js 24 cutover, add governance-relevant proof capture for context engineering events, and complete OSS trust-baseline docs.
+
+Date: 2026-03-19
+Source of truth: user-provided 2026-03-19 audit findings, `product/axym.md`, `product/dev_guides.md`, `product/architecture_guides.md`, `README.md`, `docs/commands/axym.md`, `docs-site/public/llms.txt`, `AGENTS.md`
+Scope: Axym OSS CLI only. Plan the minimum backlog required to convert the current no-go public-launch audit into a truthful, launch-ready OSS release without weakening determinism, offline-first defaults, fail-closed behavior, schema stability, or exit-code stability.
+
 
 ---
+
 
 ## Global Decisions (Locked)
 
-- Preserve Axym determinism, offline-first defaults, fail-closed behavior, schema stability, and exit-code stability.
-- Treat GitHub Actions workflow behavior as a user-visible delivery contract. Required checks, release integrity gates, and install verification remain part of the product surface.
-- Prefer official/pinned GitHub Actions and scanners over floating or ad hoc CI wiring.
-- Context engineering evidence capture must stay digest-first and local-first: no raw prompt, instruction, or knowledge-body exfiltration by default.
-- Context engineering events must enter Axym through existing architecture boundaries: schema validation -> collector promotion -> normalization -> proof emission -> chain/bundle/reporting.
-- Existing governance-event producers must remain backward-compatible unless explicitly versioned.
-- Public docs are source-of-truth surfaces for install, verify, collect, and OSS support expectations; docs drift is a contract failure, not a polish issue.
-- Contract/runtime waves complete before OSS trust-baseline and docs/onboarding waves.
+
+- Choose a truth-aligned public launch over widening built-in collector scope in this backlog. This plan does not add new first-party approval, guardrail, permission-check, incident, or risk-register collectors just to satisfy launch messaging.
+- Preserve Axym's contract surfaces: deterministic outputs, offline-first defaults, local evidence handling, stable `--json` envelopes, and stable exit codes.
+- Treat the first-value path as a release contract. The installed-binary operator path must produce non-empty evidence locally without requiring repo-only fixtures or a hosted service.
+- Split public user journeys into three explicit modes: `smoke test`, `sample proof path`, and `real integration path`.
+- Keep architecture boundaries intact: onboarding/sample assets may assist adoption, but they must not collapse collection, normalization, proof emission, mapping, or verification boundaries.
+- Keep CLI orchestration thin. Any onboarding/sample-pack behavior must live behind explicit names and side effects rather than implicit downloads or hidden network fetches.
+- Public docs must distinguish built-in Axym collection, plugin collection, manual record append, and sibling ingest. Do not describe those as a single default behavior.
+- `README.md`, `docs/commands/axym.md`, `docs-site/public/llms.txt`, and `docs-site/public/llm/axym.md` are one launch-facing docs contract and must be updated together.
+- OSS trust baseline is part of launch scope: `LICENSE` is release-blocking, and `CHANGELOG`, `CODE_OF_CONDUCT`, issue templates, PR template, and maintainer/support expectations must exist before broad external adoption.
+- No dashboard-first scope, hosted demo path, or remote sample fetch flow is allowed in this backlog.
+
 
 ---
+
 
 ## Current Baseline (Observed)
 
-- The repository already contains a buildable Go CLI, broad runtime coverage, acceptance scenarios, release scripts, and signed local release smoke paths.
-- `go test ./... -count=1` passed locally on 2026-03-18.
-- `make prepush-full` passed locally on 2026-03-18, including local CodeQL, scenarios, docs checks, release-local, checksum/signature/SBOM/provenance, and release go/no-go validation.
-- GitHub-hosted workflows exist in `.github/workflows/pr.yml`, `.github/workflows/main.yml`, `.github/workflows/nightly.yml`, and `.github/workflows/release.yml`.
-- Current workflows still pin `actions/checkout@v4` and `actions/setup-go@v5`, which the recommendation set flags as part of the Node.js 20 deprecation window ahead of June 2, 2026.
-- GitHub-hosted workflow coverage is still narrower than the v1.0 plan target: no GitHub Actions execution path currently enforces `golangci-lint`, `gosec`, docs-link checks, or CodeQL through workflow YAML.
-- Local `make codeql` exists, but CodeQL is not yet wired into GitHub Actions as an authoritative hosted lane.
-- `CONTRIBUTING.md` and `SECURITY.md` are absent.
-- Repo hygiene tests currently enforce the presence of `product/PLAN_v1.0.md` and prohibit a small set of tracked secret artifacts, but they do not yet enforce the OSS trust-baseline docs.
-- Governance-event collection already exists behind `axym collect --json --governance-event-file ...`, with schema validation and collector promotion for generic governance events.
-- Current governance-event coverage is generic. It does not yet define a typed context-engineering taxonomy for agent instruction rewrites, context resets, or knowledge imports, and current tests only cover broader governance-event promotion/rejection paths.
+
+- `go build ./cmd/axym` passed locally during the 2026-03-19 audit.
+- `make prepush` passed locally during the 2026-03-19 audit, including package, E2E, integration, acceptance, and contract test lanes.
+- The clean quickstart path (`init -> collect --dry-run -> collect -> map -> gaps -> bundle -> verify`) succeeds mechanically on a fresh directory but returns `captured: 0`, `coverage: 0`, grade `F`, and an empty verified chain.
+- The built-in collector registry currently exposes `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, `governanceevent`, and optional plugins. That shipped surface is materially narrower than the broader product narrative.
+- A fixture-backed flow can append evidence and verify successfully, but the audited run still produced only `1` covered control out of `6`, grade `E`, and `incomplete_controls: 5`.
+- `README.md`, `docs/commands/axym.md`, and `docs-site/public/llm/axym.md` currently present the empty clean-room path as "First value" / "First 15 minutes".
+- `CONTRIBUTING.md` and `SECURITY.md` exist in the repo today.
+- `LICENSE`, `CHANGELOG*`, `CODE_OF_CONDUCT*`, `.github/ISSUE_TEMPLATE/**`, and `.github/pull_request_template*` are currently absent.
+- `docs-site/public/llms.txt` already exists and must remain in sync with the public docs surface.
+
 
 ---
+
 
 ## Exit Criteria
 
-1. All tracked GitHub Actions workflows use Node.js 24-compatible pinned JavaScript actions or an explicit verified Node 24 execution contract, with no dependency on insecure fallback runner settings.
-2. GitHub-hosted CI enforces `golangci-lint`, `gosec`, CodeQL, and docs-link checks in the correct PR/main/nightly/release lanes, with contract tests covering their presence.
-3. Required PR checks remain emitted by PR-triggered workflows only, and branch-protection/status-name contracts remain deterministic.
-4. Governance-event schema and collector flow accept digest-first context-engineering events for instruction rewrite, context reset, and knowledge import, and reject malformed or overexposing payloads deterministically.
-5. `axym collect --json --governance-event-file ...` can ingest context-engineering event JSONL into proof records without changing offline/local-only defaults.
-6. Context-engineering records survive chain append, bundle assembly, and verify flows with deterministic, byte-stable artifacts where applicable.
-7. `CONTRIBUTING.md` and `SECURITY.md` exist, are linked from the README, and are enforced by repo hygiene/docs parity checks.
-8. README, command guide, and docs-site sources stay synchronized for CI expectations, release verification, and context-engineering event capture.
-9. `go test ./... -count=1` and `make prepush-full` remain green after the work lands.
+
+1. An installed Axym binary can produce a supported local sample proof path with no network dependency and no repo fixture dependency.
+2. The documented first-value journey ends in non-empty evidence and a non-empty compliance result, with explicit expected outcomes stated in docs and acceptance tests.
+3. Public docs no longer imply that clean `collect --json` on a fresh environment will capture meaningful default evidence without inputs.
+4. Public docs clearly distinguish `smoke test`, `sample proof path`, and `real integration path`.
+5. Public docs accurately distinguish built-in collectors from plugin/manual/ingest paths and do not market unshipped built-in coverage.
+6. `LICENSE` exists at repo root and is discoverable from public-facing docs.
+7. `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, issue templates, PR template, and maintainer/support expectations exist and are linked from the public docs surface.
+8. Docs source-of-truth checks fail when README, command docs, docs-site summaries, or operator docs drift on install, first value, supported surfaces, or verification behavior.
+9. All touched stories preserve stable CLI help, `--json`, install/version discoverability, and exit-code contracts.
+10. The repo can credibly move from "no-go" to "go" for public OSS launch without claiming unimplemented coverage breadth.
+
 
 ---
+
 
 ## Recommendation Traceability
 
+
 | Recommendation | Why | Strategic direction | Expected moat/benefit | Planned stories |
 |---|---|---|---|---|
-| Close the Story 0.3 CI gap by adding GitHub-hosted `golangci-lint`, `gosec`, CodeQL, and docs-link checks | Merge/release gates are not fully enforced by hosted CI today | Make delivery and release integrity part of the product contract | Stronger launch credibility and less hidden local-only validation | `W1-S1`, `W1-S2` |
-| Remove dependency on Node.js 20-era workflow assumptions before the June 2, 2026 GitHub Actions cutover | Current workflow action pins may age into breakage or warning-driven drift | Future-proof delivery infrastructure with pinned, tested runtime assumptions | Lower release interruption risk and cleaner branch-protection behavior | `W1-S1` |
-| Capture context engineering events as governance-relevant proof records | Self-modifying agent behavior is material governance evidence not fully modeled today | Expand Axym evidence breadth to modern agent operation boundaries | Differentiated governance coverage beyond tool-call-only evidence | `W2-S1`, `W2-S2` |
-| Close missing OSS trust-baseline docs (`CONTRIBUTING.md`, `SECURITY.md`) and enforce them | OSS launch/support expectations are not fully expressed or tested | Raise adopter and contributor trust with explicit support/disclosure contracts | Better OSS readiness and reduced adoption friction | `W3-S1`, `W3-S2` |
+| Repair the first-run path so clean-room users get real value | Current quickstart yields `captured: 0`, `coverage: 0`, and grade `F` in a clean environment | Add a supported offline sample proof path and test it as a public contract | Converts install curiosity into a believable product aha without hosted dependencies | `W1-S1`, `W1-S2` |
+| Align public claims with shipped collector surfaces and observed demo coverage | Launch-facing messaging currently outruns built-in collection breadth | Narrow public claims to shipped behavior and distinguish built-in vs plugin/manual/ingest paths | Preserves trust and prevents reputational damage from expectation mismatch | `W1-S2` |
+| Split operator quickstart from contributor setup and document a non-empty sample path | Install friction is low, but operator first value is hidden behind repo fixtures and implicit context | Publish separate smoke-test and sample-proof journeys | Improves adoption without conflating contributor and operator concerns | `W1-S1`, `W1-S2`, `W2-S2` |
+| Add a top-level license file | Repo is described as open-source but currently has no `LICENSE` | Add legal distribution baseline before public launch | Removes a hard launch blocker and clarifies reuse terms | `W1-S3` |
+| Add CHANGELOG, CODE_OF_CONDUCT, issue templates, and PR template | Public project governance baseline is incomplete | Add OSS trust assets and enforce their presence | Makes Axym safer to adopt and contribute to publicly | `W2-S1` |
+| Add maintainer/support expectations, operator docs links, and an integration-boundary diagram | Users currently have weak guidance on ownership, support path, and runtime placement | Publish explicit operator docs and governance expectations | Sharpens the wedge and reduces support ambiguity | `W2-S1`, `W2-S2` |
+
 
 ---
+
 
 ## Test Matrix Wiring
 
-Tier model used in this plan:
-
-- Tier 1 Unit: isolated schema, parser, helper-script, and contract-unit coverage.
-- Tier 2 Integration: deterministic cross-package behavior for collector promotion, normalization, and artifact generation.
-- Tier 3 E2E CLI: command invocation, `--json`, help, and exit-code assertions.
-- Tier 4 Acceptance: operator workflows and scenario/golden validation.
-- Tier 5 Hardening: workflow contract, timeout/cancellation, and lifecycle edge conditions where applicable.
-- Tier 9 Contract: workflow/status/schema/docs/output compatibility checks.
-- Tier 10 UAT: release/install/release-binary smoke and publish-gate verification.
-- Tier 11 Scenario: black-box scenario fixtures and golden outputs.
 
 Lane definitions:
 
-- Fast lane: focused unit, contract, docs, and helper-script checks suitable for rapid PR feedback.
-- Core CI lane: mandatory PR/main coverage for touched codepaths, CLI behavior, and contract tests.
-- Acceptance lane: scenario and end-to-end operator flows proving the new behavior from user entrypoint to artifacts.
-- Cross-platform lane: Linux/macOS/Windows coverage for public CLI/docs/install surfaces when touched.
-- Risk lane: security scanners, CodeQL, release-integrity gates, bundle determinism, and workflow runtime/state risks.
+
+- Fast lane: targeted unit, contract, docs-consistency, and repo-hygiene checks that must pass on every PR.
+- Core CI lane: primary Linux CI coverage for touched CLI, contract, docs, and workflow tests.
+- Acceptance lane: end-to-end operator-path checks for documented first-value and launch-facing workflows.
+- Cross-platform lane: macOS and Windows validation for any story that changes public command surfaces, path behavior, or install-facing output.
+- Risk lane: release-blocking checks for runtime/onboarding contract changes, deterministic sample-pack behavior, docs source-of-truth drift, and launch-surface regressions.
+
 
 Story-to-lane map:
 
+
 | Story | Fast | Core CI | Acceptance | Cross-platform | Risk |
 |---|---|---|---|---|---|
-| W1-S1 | Yes | Yes | No | Yes | Yes |
-| W1-S2 | Yes | Yes | No | No | Yes |
-| W2-S1 | Yes | Yes | No | Yes | No |
-| W2-S2 | Yes | Yes | Yes | Yes | Yes |
-| W3-S1 | Yes | Yes | No | No | No |
-| W3-S2 | Yes | Yes | Yes | Yes | No |
+| W1-S1 | Yes | Yes | Yes | Yes | Yes |
+| W1-S2 | Yes | Yes | Yes | No | Yes |
+| W1-S3 | Yes | Yes | No | No | No |
+| W2-S1 | Yes | Yes | No | No | No |
+| W2-S2 | Yes | Yes | Yes | No | No |
+
 
 Merge/release gating rule:
 
-- A story is not complete until every lane marked `Yes` above is green for that story’s changed surfaces.
-- PR merge blocks on required Fast and Core CI failures, plus any story-specific required Cross-platform lane.
-- Release blocks on Risk-lane failures, release/install smoke failures, or docs/source-of-truth drift for public install and verification surfaces.
+
+- PR merge blocks on every touched story's Fast and Core CI lanes.
+- Any story marked `Acceptance: Yes` is incomplete until the documented operator path passes end-to-end in CI.
+- Any story marked `Cross-platform: Yes` is incomplete until Linux, macOS, and Windows public command-surface checks all pass.
+- Any story marked `Risk: Yes` is release-blocking until its docs/runtime contract checks are green.
+- Public launch is still blocked until all Wave 1 stories and all OSS-baseline Wave 2 stories are complete.
+
 
 ---
 
-## Epic W1: CI Contract Closure and Node24 Readiness
 
-Objective: make hosted CI/release behavior match Axym’s plan-level contract, remove Node20-era workflow assumptions, and preserve required-check determinism.
+## Epic W1: Launch-Blocking First Value and Public Contract Repair
 
-### Story W1-S1: Migrate GitHub Actions runtime assumptions to pinned Node24-compatible actions
+
+Objective: remove the current launch blockers by making Axym's first-value path work after install, making the public surface truthful about what is shipped today, and adding the legal minimum for OSS distribution.
+
+
+### Story W1-S1: Add a supported offline sample proof path for installed-binary first value
 Priority: P0
 Tasks:
-- Audit every JavaScript-based action referenced from `pr`, `main`, `nightly`, and `release` workflows.
-- Upgrade or replace `actions/checkout@v4`, `actions/setup-go@v5`, and any other affected JavaScript actions with Node24-compatible pinned versions after official compatibility verification.
-- Add explicit workflow/runtime contract coverage so Node24 is exercised before the June 2, 2026 default cutover and insecure fallback env vars are forbidden.
-- Preserve current required-check semantics or update branch-protection/status-name contract tests atomically if names must change.
-- Keep workflow concurrency and cancellation guarantees intact where already required.
+- Add an explicit onboarding surface that materializes a deterministic local sample input pack after install, without requiring repo fixtures or a hosted fetch. Preferred direction: an additive `init` option such as `--sample-pack <dir>` or an equivalently explicit setup command.
+- Ensure the sample pack contains only local deterministic assets needed to drive a credible first-value flow, for example governance-event input plus manual proof-record payloads for high-signal coverage types such as approval and risk-assessment evidence.
+- Keep side effects explicit in command naming and JSON output. The generated sample-pack path, created files, and next-step commands must be machine-readable when `--json` is used.
+- Add acceptance coverage proving the documented installed-binary path yields non-empty evidence, meaningful map/gaps output, a successful bundle, and successful verification.
+- Preserve offline-first defaults, stable exit codes, and stable help behavior when the new onboarding option is omitted.
 Repo paths:
-- `.github/workflows/pr.yml`
-- `.github/workflows/main.yml`
-- `.github/workflows/nightly.yml`
-- `.github/workflows/release.yml`
-- `testinfra/contracts/ci_required_checks_test.go`
-- `testinfra/contracts/ci_contract_test.go`
-- `testinfra/contracts/release_gate_contract_test.go`
-- `README.md`
-- `docs/commands/axym.md`
+- `cmd/axym/init.go`
+- `cmd/axym/init_test.go`
+- `core/samplepack/pack.go`
+- `core/samplepack/pack_test.go`
+- `internal/e2e/cli/command_surface_contract_test.go`
+- `testinfra/acceptance/scenario_contract_test.go`
+- `scenarios/axym/first_value_sample/`
 Run commands:
-- `go test ./testinfra/contracts/... -count=1`
-- `make test-contracts`
-- `make prepush-full`
+- `go test ./cmd/axym ./core/samplepack -count=1`
+- `go test ./internal/e2e/cli ./testinfra/acceptance -count=1`
+- `./axym init --sample-pack ./axym-sample --json`
+- `./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl`
+- `./axym record add --input ./axym-sample/records/approval.json --json`
+- `./axym record add --input ./axym-sample/records/risk_assessment.json --json`
+- `./axym map --frameworks eu-ai-act,soc2 --json`
+- `./axym gaps --frameworks eu-ai-act,soc2 --json`
+- `./axym bundle --audit sample --frameworks eu-ai-act,soc2 --json`
+- `./axym verify --chain --json`
 Test requirements:
-- Tier 9: workflow pin/runtime contract tests for Node24-compatible action usage and forbidden insecure fallback env vars.
-- Tier 5: workflow lifecycle contract checks preserving PR-emitted required checks and concurrency behavior.
-- Tier 10: release smoke verifies source build and release-binary smoke still succeed after workflow pin updates.
+- Tier 1: unit tests for sample-pack generation, path validation, and deterministic asset contents.
+- Tier 3: CLI help/usage, `--json`, and exit-code tests for the new onboarding surface.
+- Tier 4: acceptance tests for the documented installed-binary first-value flow.
+- Tier 5: explicit side-effect and atomic-write tests if sample-pack creation adds new filesystem write paths.
+- Tier 9: command contract tests ensuring additive output stays stable and deterministic.
+- Tier 11: scenario fixtures for the published first-value sample journey.
 Matrix wiring:
-- Lanes: Fast, Core CI, Cross-platform, Risk.
-- Pipeline placement: PR (workflow contract subset), Main (full workflow contract matrix), Release (release smoke and integrity contracts).
+- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
 Acceptance criteria:
-- No tracked workflow depends on Node20-only JavaScript action majors.
-- Required PR checks remain emitted by PR-triggered workflows only.
-- Workflow/runtime contract tests fail deterministically if deprecated action majors or insecure fallback env vars reappear.
+- A fresh install can materialize a local sample pack without repo fixture paths or network access.
+- The documented first-value path yields non-empty local evidence and `map` output with `covered_count >= 2` across the documented flow.
+- `gaps` no longer returns grade `F` for the published sample-proof journey.
+- Existing `init --json` behavior remains backward-compatible when the sample-pack option is not used.
 Stable/internal boundary notes:
-- Public: required-check names, install verification path, and release smoke behavior are contract surfaces.
-- Internal: exact action versions and job topology may change if required-check/status contracts remain stable.
+- Public: the onboarding surface and its `--json` output become part of the supported install/first-value contract.
+- Internal: sample assets may be template-backed or embedded, but the user-visible command semantics and deterministic outputs must stay stable.
 Migration expectations:
-- Existing contributor entrypoints remain `make ...` and `go test ...`; no new dashboard or hosted prerequisite is introduced.
-- If required-check names must change, branch-protection contract tests and contributor docs update in the same change.
+- This is additive only. Existing `init` users do not need to change commands unless they want the published sample path.
+- If a new flag or subcommand is introduced, install docs and version-discoverability docs must be updated in the same story.
 Integration hooks:
-- Contributors and release automation consume the same pinned action/runtime contract across PR, main, nightly, and tag pipelines.
+- This sample path is for local evaluation only and must be documented separately from real production integration.
 Dependencies:
 - None.
 Risks:
-- Branch-protection drift if workflow job names change without contract-test updates.
+- A weak sample pack that still ends in trivial coverage would preserve the audit failure in a new wrapper. Gate the result with acceptance thresholds, not prose alone.
 
-### Story W1-S2: Add missing GitHub-hosted scanner and docs-link gates
+
+### Story W1-S2: Reframe and machine-check the public first-value and supported-surface contract
 Priority: P0
 Tasks:
-- Add GitHub-hosted `golangci-lint`, `gosec`, and docs-link validation with pinned versions/actions.
-- Add GitHub-hosted CodeQL analysis through workflow YAML so it is no longer local-only.
-- Add or refine local helper targets/scripts so contributors can reproduce the non-hosted portions of these gates locally.
-- Update PR/main/nightly/release workflow wiring so scanner and docs-link coverage lands in the correct pipelines without unnecessary duplication.
-- Extend CI/release contract tests to enforce the presence and placement of these gates.
+- Rewrite launch-facing docs around an explicit sequence: problem -> who it is for -> where Axym sits in the runtime path -> built-in supported surfaces today -> smoke test -> sample proof path -> real integration path.
+- Remove or clearly qualify claims that imply built-in default capture of approvals, guardrails, permission checks, incidents, risk assessments, or broader coverage than currently shipped.
+- Distinguish customer code, Axym-owned logic, and upstream tool/provider outputs so operators can see what they must connect themselves.
+- Split contributor setup from operator onboarding; contributor commands stay in contributor sections, while first-value/operator commands live in launch-facing sections.
+- Extend docs consistency/storyline checks so README, command docs, docs-site index, and docs-site LLM page cannot drift on install steps, first-value commands, supported surfaces, or verify behavior.
+- Add a launch-facing annotation in product/docs source-of-truth where needed so current OSS baseline is distinguishable from longer-horizon PRD ambition.
 Repo paths:
-- `Makefile`
-- `.github/workflows/pr.yml`
-- `.github/workflows/main.yml`
-- `.github/workflows/nightly.yml`
-- `.github/workflows/release.yml`
-- `.github/workflows/codeql.yml`
-- `scripts/check_docs_links.sh`
-- `testinfra/contracts/ci_contract_test.go`
-- `testinfra/contracts/ci_required_checks_test.go`
-- `testinfra/contracts/release_gate_contract_test.go`
+- `README.md`
+- `docs/commands/axym.md`
+- `docs-site/public/llms.txt`
+- `docs-site/public/llm/axym.md`
+- `product/axym.md`
+- `scripts/check_docs_consistency.sh`
+- `scripts/check_docs_storyline.sh`
+- `testinfra/contracts/command_docs_parity_contract_test.go`
+- `testinfra/contracts/repo_hygiene_test.go`
 Run commands:
-- `make lint-fast`
-- `make test-contracts`
 - `make test-docs-consistency`
-- `make prepush-full`
+- `make test-docs-storyline`
+- `make test-docs-links`
+- `go test ./testinfra/contracts -count=1`
+- `./axym collect --dry-run --json`
+- `./axym map --frameworks eu-ai-act,soc2 --json`
+- `./axym verify --bundle ./axym-evidence --json`
 Test requirements:
-- Tier 1: helper-script smoke tests for docs-link and local command-lane wiring.
-- Tier 9: workflow contract tests for scanner/docs-link presence, pinned action usage, and release-lane enforcement.
-- Tier 10: release gate contract verifies security and integrity checks remain publish-blocking.
-- Tier 5: workflow lifecycle checks keep heavy scanners in the intended pipelines and preserve timeout/cancellation expectations.
+- Tier 3: public command help/usage contract checks for any onboarding surface updated in docs.
+- Tier 4: storyline/smoke checks proving docs map to a runnable operator flow.
+- Tier 8 docs/examples: docs consistency, storyline checks, README/quickstart/integration coverage checks, and docs-site source-of-truth sync tests.
+- Tier 9: command/docs parity checks for launch-facing command examples and exit semantics.
 Matrix wiring:
-- Lanes: Fast, Core CI, Risk.
-- Pipeline placement: PR (fast scanner/docs contract subset), Main (full core security/docs gates), Nightly (expanded security depth), Release (publish-blocking integrity/security gates).
+- Lanes: Fast, Core CI, Acceptance, Risk.
 Acceptance criteria:
-- GitHub Actions enforces `golangci-lint`, `gosec`, CodeQL, and docs-link checks in the intended hosted lanes.
-- Local contributor commands clearly distinguish reproducible local gates from CI-authoritative hosted analysis.
-- Release gating fails closed when required security or docs-link steps are absent from workflow YAML.
+- Public docs no longer present clean `collect --json` on a fresh environment as a non-empty first-value path.
+- Public docs explicitly distinguish built-in, plugin, manual, and sibling-ingest evidence paths.
+- README, command docs, and docs-site content stay in sync under automated checks.
+- Launch-facing docs describe what the user integrates, what Axym does, and what remains upstream/provider-owned.
 Stable/internal boundary notes:
-- Public: contributor/release verification commands and required check set are part of the repo contract.
-- Internal: workflow split across files/jobs may change if merge/release gates remain enforced and tested.
+- Public: launch-facing docs are part of the OSS contract and must not outpace shipped behavior.
+- Internal: the PRD may remain broader, but shipped-surface annotations must make current OSS scope explicit.
 Migration expectations:
-- Docs clearly state which checks are locally reproducible and which are CI-authoritative.
+- No command removals are allowed in this story.
+- Any new onboarding flag or command introduced by `W1-S1` must be reflected additively and consistently across all docs surfaces.
 Integration hooks:
-- PR, main, nightly, and release workflows all exercise the same declared security/docs gate model with lane-appropriate depth.
+- Operators must be able to see where Axym attaches in CI/runtime and which steps still belong to their pipeline, source tool, or provider.
 Dependencies:
 - `W1-S1`
 Risks:
-- PR latency regression if heavy scanners are placed in the wrong lane or duplicated unnecessarily.
+- Messaging-only updates without automated drift tests will regress quickly as command surfaces evolve.
 
----
 
-## Epic W2: Context Engineering Governance Evidence
-
-Objective: expand Axym evidence coverage so instruction rewrites, context resets, and knowledge imports become first-class, deterministic proof records without weakening privacy or architecture boundaries.
-
-### Story W2-S1: Extend governance-event schema and promotion for context engineering events
+### Story W1-S3: Add the release-blocking OSS license baseline
 Priority: P0
 Tasks:
-- Extend the governance-event schema with a typed context-engineering taxonomy covering `instruction_rewrite`, `context_reset`, and `knowledge_import`.
-- Require digest-first/provenance-first metadata for context-engineering events, including prior/current hashes or artifact digests rather than raw instructions or knowledge bodies.
-- Update governance-event promotion and normalization so context-engineering events map to stable proof record fields and deterministic reason surfaces.
-- Add redaction and validation rules so accidental raw content exposure is rejected or hashed before record creation.
-- Keep backward compatibility for existing non-context governance events.
+- Add a top-level `LICENSE` file using the maintainer-approved OSS license for Axym.
+- Link the license from launch-facing docs so install/evaluation users can discover terms without hunting through the repo.
+- Add or extend repo-hygiene contract tests so future removals or renames fail CI.
+- Confirm release/distribution docs do not describe Axym as open-source without an actual root license file.
 Repo paths:
-- `schemas/v1/governance_event/governance-event.schema.json`
-- `schemas/v1/governance_event/schema.go`
-- `core/collect/governanceevent/collector.go`
-- `core/collect/governanceevent/collector_test.go`
-- `core/normalize/normalize.go`
-- `core/redact/redact.go`
-- `testinfra/contracts/governance_event_schema_contract_test.go`
-- `fixtures/governance/context_engineering.jsonl`
+- `LICENSE`
+- `README.md`
+- `CONTRIBUTING.md`
+- `docs-site/public/llms.txt`
+- `testinfra/contracts/repo_hygiene_test.go`
 Run commands:
-- `axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`
-- `go test ./core/collect/governanceevent/... -count=1`
-- `go test ./testinfra/contracts/... -count=1`
+- `go test ./testinfra/contracts -count=1`
+- `make test-docs-links`
+- `make test-docs-consistency`
 Test requirements:
-- Tier 1: schema validator and promoter unit tests for each context-engineering event class.
-- Tier 2: normalize/promote integration fixtures proving digest-only capture and deterministic field mapping.
-- Tier 3: collect command JSON-envelope tests for governance-event-file inputs carrying context-engineering events.
-- Tier 9: schema compatibility tests, valid/invalid fixture coverage, and reason-code stability checks.
+- Tier 8 docs/examples: OSS trust-baseline checks for public launch assets.
+- Tier 9: repo hygiene tests for required root assets and launch-facing links.
 Matrix wiring:
-- Lanes: Fast, Core CI, Cross-platform.
-- Pipeline placement: PR (schema/collector subset), Main (full schema + collect contract coverage), Cross-platform (public collect surface across OS runners).
+- Lanes: Fast, Core CI.
 Acceptance criteria:
-- Instruction rewrites, context resets, and knowledge imports can be represented as valid governance-event JSONL and promoted to proof records.
-- Raw instruction text, prompts, or knowledge bodies are not required and are not persisted by default.
-- Existing governance-event payloads that do not use the new context-engineering taxonomy remain valid unless explicitly malformed.
+- `LICENSE` exists at repo root and is linked from launch-facing docs.
+- CI fails if the license file is removed or renamed without contract updates.
+- The repo no longer presents itself as open-source while missing a root license.
 Stable/internal boundary notes:
-- Public: governance-event schema fields and `axym collect --json --governance-event-file ...` behavior are versioned contracts.
-- Internal: exact proof record type selection may evolve if schema stability and downstream proof semantics remain intact.
+- Public: the chosen license becomes part of the distribution contract.
+- Internal: any future license change requires explicit governance review and changelog coverage.
 Migration expectations:
-- Existing governance-event producers continue to work unchanged.
-- Producers that want richer context-engineering coverage can add the new typed fields without adopting any hosted service.
+- No CLI/runtime behavior changes.
 Integration hooks:
-- Agent runtimes write local JSONL during instruction rewrite, context clear, or knowledge-import phases and hand that file to Axym via the existing collect flag.
+- External users and downstream packagers can evaluate reuse terms directly from the repo root.
 Dependencies:
 - None.
 Risks:
-- Overfitting the schema or allowing metadata fields that accidentally reintroduce evidence exfiltration.
+- Leaving license choice implicit during implementation creates a false sense of launch readiness; pick and lock it in this wave.
 
-### Story W2-S2: Add end-to-end contract and scenario coverage for context engineering record flows
-Priority: P1
-Tasks:
-- Add fixtures and scenarios that collect context-engineering governance events, append them to the local chain, and carry them into bundle artifacts.
-- Extend collect/bundle/verify contract tests to assert deterministic presence of context-engineering record digests and provenance fields.
-- Add golden outputs for operator workflows showing local JSONL -> collect -> chain -> bundle behavior.
-- Keep compliance mapping, gap grading, and regression semantics unchanged in this wave unless a later plan explicitly introduces policy interpretation for these new records.
-Repo paths:
-- `cmd/axym/collect_test.go`
-- `internal/integration/record/normalize_validate_test.go`
-- `internal/integration/bundle/byte_stability_test.go`
-- `scenarios/axym/fixtures.yaml`
-- `scenarios/axym/golden/results.json`
-- `internal/scenarios/helpers_test.go`
-- `testinfra/acceptance/scenario_contract_test.go`
-- `fixtures/governance/context_engineering.jsonl`
-Run commands:
-- `axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`
-- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`
-- `make test-scenarios`
-- `go test ./... -count=1`
-Test requirements:
-- Tier 3: CLI collect/bundle JSON stability tests with context-engineering inputs.
-- Tier 4: acceptance flows proving local JSONL -> chain -> bundle behavior.
-- Tier 9: raw-record and bundle contract tests for deterministic artifact presence.
-- Tier 11: scenario/golden coverage for the new operator workflow.
-- Determinism/hash/signing: byte-stability repeat-run checks where bundle raw-record content changes.
-Matrix wiring:
-- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
-- Pipeline placement: PR (contract subset), Main (full CLI + scenario coverage), Nightly (bundle determinism/regression depth), Cross-platform (public CLI surface).
-Acceptance criteria:
-- The same context-engineering input corpus yields deterministic collect output and deterministic bundle artifact presence across repeated runs.
-- `axym verify --chain --json` and `axym verify --bundle ... --json` continue to succeed on mixed standard and context-engineering evidence sets.
-- Scenario goldens fail deterministically if context-engineering record shape, provenance fields, or artifact presence drift.
-Stable/internal boundary notes:
-- Public: operator integration pattern and JSON/bundle surfaces are stable.
-- Internal: compliance scoring remains unchanged in this wave.
-Migration expectations:
-- Users who do not emit context-engineering events do not need to change configs, frameworks, or pipelines.
-Integration hooks:
-- Agent frameworks can adopt this evidence path incrementally by writing JSONL locally and reusing existing Axym commands.
-Dependencies:
-- `W2-S1`
-Risks:
-- Scenario flakiness if hashes, timestamps, or bundle ordering are not canonicalized.
 
 ---
 
-## Epic W3: OSS Trust Baseline and Public Docs Closure
 
-Objective: close the remaining OSS launch/readiness gaps by making contribution, security, CI, and context-engineering integration guidance explicit and test-enforced.
+## Epic W2: OSS Governance and Operator Docs Baseline
 
-### Story W3-S1: Add OSS trust-baseline docs and enforce their presence
+
+Objective: complete the public-project trust baseline and publish operator-facing docs that explain support expectations, contribution paths, and Axym's runtime boundary model without requiring internal context.
+
+
+### Story W2-S1: Add OSS governance assets and maintainer-support expectations
 Priority: P1
 Tasks:
-- Author `CONTRIBUTING.md` with contribution flow, reproducible bug report expectations, local validation commands, and scope boundaries.
-- Author `SECURITY.md` with disclosure path, supported release verification expectations, and security-support boundaries.
-- Update the README to link both docs and to surface release-verification and support/disclosure expectations.
-- Strengthen repo hygiene contract tests so the trust-baseline docs are required and key generated/secrets artifacts remain prohibited.
+- Add `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/feature_request.yml`, and `.github/pull_request_template.md`.
+- Expand `CONTRIBUTING.md` with maintainer/support expectations, supported reporting paths, response-boundary notes, and explicit distinctions between bug reports, feature requests, and security issues.
+- Link governance assets from `README.md` and docs-site index surfaces so external users can discover them from the first screen.
+- Add repo-hygiene coverage so required OSS launch assets remain enforced in CI.
 Repo paths:
+- `CHANGELOG.md`
+- `CODE_OF_CONDUCT.md`
+- `.github/ISSUE_TEMPLATE/bug_report.yml`
+- `.github/ISSUE_TEMPLATE/feature_request.yml`
+- `.github/pull_request_template.md`
 - `CONTRIBUTING.md`
-- `SECURITY.md`
 - `README.md`
+- `docs-site/public/llms.txt`
 - `testinfra/contracts/repo_hygiene_test.go`
-- `testinfra/contracts/command_docs_parity_contract_test.go`
 Run commands:
-- `make test-contracts`
+- `go test ./testinfra/contracts -count=1`
+- `make test-docs-links`
 - `make test-docs-consistency`
-- `make test-docs-storyline`
 Test requirements:
-- Tier 9: repo-hygiene and docs-parity contract checks for trust-baseline doc presence and README references.
-- Docs/examples: README/quickstart/support coverage checks for the new trust-baseline surfaces.
+- Tier 8 docs/examples: OSS trust-baseline and public-link coverage checks.
+- Tier 9: repo hygiene tests for required governance and contribution assets.
 Matrix wiring:
 - Lanes: Fast, Core CI.
-- Pipeline placement: PR (contract/doc subset), Main (full docs parity), Fast lane (repo hygiene and README references).
 Acceptance criteria:
-- `CONTRIBUTING.md` and `SECURITY.md` exist and are linked from the README.
-- Repo hygiene tests fail deterministically when either trust-baseline doc is removed.
-- Public OSS contribution and disclosure expectations are versioned repo contracts rather than tribal knowledge.
+- OSS governance baseline files exist, are linked, and are enforced by tests.
+- `CONTRIBUTING.md` clearly states maintainer/support expectations and how users should route bugs, features, and security issues.
+- Public launch docs do not require users to infer support norms from internal context.
 Stable/internal boundary notes:
-- Public: contribution, support, and disclosure expectations are repo-level contracts.
-- Internal: exact wording can evolve if required topics and link presence remain enforced.
+- Public: support and contribution expectations are part of the project contract.
+- Internal: maintainers may evolve process details, but discovery paths and support boundaries must remain explicit.
 Migration expectations:
-- No CLI behavior changes are introduced by this story.
+- No CLI/runtime changes.
 Integration hooks:
-- Contributors have a single documented path for local validation and security disclosure without needing private coordination.
+- External contributors have a clear path for issues, PRs, and responsible disclosure.
 Dependencies:
-- None, but scheduled after runtime-contract waves by policy.
+- `W1-S3`
 Risks:
-- Incomplete guidance could still leave release verification or disclosure expectations ambiguous.
+- Governance assets without links or CI enforcement will exist on paper but remain invisible to users.
 
-### Story W3-S2: Sync public docs and docs-site sources with CI and context-engineering flows
+
+### Story W2-S2: Publish operator docs and the Axym integration-boundary model
 Priority: P1
 Tasks:
-- Update `README.md`, `docs/commands/axym.md`, `docs-site/public/llm/axym.md`, and `docs-site/public/llms.txt` with Node24-ready workflow expectations, local-vs-hosted security checks, and context-engineering governance-event examples.
-- Add or extend docs checks so the new examples and support references are covered by consistency, storyline, and link validation.
-- Ensure docs examples for context-engineering JSONL use the same file paths and command contracts as acceptance fixtures where possible.
-- Clarify release verification commands and install/version discoverability in public docs after the CI/runtime changes.
+- Add dedicated operator docs that explain where Axym sits in the runtime path, what belongs to customer code vs Axym vs tool/provider, and how sync vs async evidence paths behave.
+- Add an integration-boundary diagram or Mermaid source showing the `smoke test`, `sample proof path`, and `real integration path` relationships.
+- Link the operator docs and diagram from README, command docs, and docs-site surfaces.
+- Extend docs source-of-truth checks so operator docs participate in consistency, storyline, and link validation.
+- Ensure the operator docs call out failure handling and expected outputs for the published first-value path.
 Repo paths:
+- `docs/operator/quickstart.md`
+- `docs/operator/integration-model.md`
+- `docs/operator/integration-boundary.mmd`
 - `README.md`
 - `docs/commands/axym.md`
-- `docs-site/public/llm/axym.md`
 - `docs-site/public/llms.txt`
+- `docs-site/public/llm/axym.md`
 - `scripts/check_docs_consistency.sh`
 - `scripts/check_docs_storyline.sh`
 - `scripts/check_docs_links.sh`
-- `testinfra/contracts/command_docs_parity_contract_test.go`
-- `fixtures/governance/context_engineering.jsonl`
 Run commands:
 - `make test-docs-consistency`
 - `make test-docs-storyline`
-- `make prepush-full`
-- `axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`
+- `make test-docs-links`
+- `go test ./testinfra/contracts -count=1`
+- `./axym init --sample-pack ./axym-sample --json`
+- `./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl`
+- `./axym verify --chain --json`
 Test requirements:
-- Docs/examples changes: docs consistency checks, storyline/smoke checks, README/quickstart/integration coverage checks, and docs source-of-truth sync tasks.
-- Tier 9: docs parity contract tests across README, `docs/`, and docs-site sources.
-- Tier 4: acceptance/docs smoke uses the same example paths as the tested operator flow where feasible.
+- Tier 4: operator-path storyline checks against the published quickstart/operator docs.
+- Tier 8 docs/examples: README/quickstart/integration coverage checks and docs-source-of-truth sync checks across `README.md`, `docs/`, and `docs-site/public/*`.
+- Tier 9: docs parity checks for newly linked operator-doc surfaces.
 Matrix wiring:
-- Lanes: Fast, Core CI, Acceptance, Cross-platform.
-- Pipeline placement: PR (docs contract subset), Main (full docs parity/storyline), Acceptance (example-driven smoke flow), Cross-platform (install/docs public surface).
+- Lanes: Fast, Core CI, Acceptance.
 Acceptance criteria:
-- One documented local operator path exists for emitting context-engineering JSONL and collecting it into Axym.
-- One documented contributor path exists for reproducing CI/security gates locally and understanding which hosted gates remain CI-authoritative.
-- Public docs for install, collect, verify, and release verification stay synchronized across README, command guide, and docs-site files.
+- External users can identify where Axym integrates, what it owns, what upstream systems must provide, and which path to use first.
+- Operator docs explicitly distinguish smoke testing from the sample proof path and from real production integration.
+- The integration-boundary diagram is linked from launch-facing docs and stays validated by docs checks.
 Stable/internal boundary notes:
-- Public: docs become authoritative for install, collect, CI, and security verification flows.
-- Internal: exact example filenames may change if docs and fixture checks stay synchronized.
+- Public: operator docs become the launch-facing source of truth for integration shape and first-run expectations.
+- Internal: ADRs remain engineering decision records, not a substitute for operator onboarding.
 Migration expectations:
-- Existing example commands remain valid or are updated atomically with test fixtures and docs parity checks.
+- No command removals; this story is additive on top of Wave 1 command/docs changes.
 Integration hooks:
-- Agent/platform teams can copy one deterministic JSONL example flow directly from public docs into local or CI automation.
+- Operators must be able to map Axym to CI pipelines, runtime evidence sources, and sibling-ingest workflows without needing internal product context.
 Dependencies:
+- `W1-S1`
 - `W1-S2`
-- `W2-S2`
-- `W3-S1`
+- `W2-S1`
 Risks:
-- Docs drift if example commands or file paths diverge from acceptance fixtures.
+- If the operator docs duplicate README prose without shared checks, the launch contract will drift again.
+
 
 ---
+
 
 ## Minimum-Now Sequence
 
-Wave 1: hosted contract and release-gate closure
 
-- Deliver `W1-S1`, then `W1-S2`.
-- Rationale: workflow/runtime compatibility and scanner gate closure are the highest-risk blockers because they can silently undermine merge/release integrity even when local validation is green.
+Wave order rationale:
 
-Wave 2: context-engineering evidence model and runtime coverage
 
-- Deliver `W2-S1`, then `W2-S2`.
-- Rationale: once CI/release contracts are trustworthy, extend Axym’s runtime evidence model to cover modern agent self-modification behavior without destabilizing existing compliance semantics.
+- Wave 1 lands first because it fixes the launch-blocking contract: first value, shipped-surface truthfulness, and legal OSS distribution baseline.
+- Wave 2 lands after Wave 1 because OSS governance assets and richer operator docs only help once the launch story is truthful and runnable.
 
-Wave 3: OSS trust baseline and public docs synchronization
 
-- Deliver `W3-S1`, then `W3-S2`.
-- Rationale: docs and OSS trust-baseline work should follow the runtime and workflow contract changes so public guidance reflects the final shipped behavior rather than interim states.
+Recommended implementation order:
 
-Recommended cut line for immediate execution:
 
-- Minimum-now is all of Wave 1 plus `W2-S1`.
-- Reason: this closes the highest-risk delivery gap and establishes the schema/runtime contract for the new governance evidence without waiting for later docs polish.
+1. `W1-S1` because every later quickstart/operator doc must describe a real installed-binary first-value path.
+2. `W1-S3` in parallel or immediately after `W1-S1`; it is independent technically but must be complete before any public launch announcement or release tag.
+3. `W1-S2` after `W1-S1`, so docs and contract tests can target the actual supported onboarding surface and shipped coverage floor.
+4. `W2-S1` once the public launch surface is stable enough to link governance assets and support expectations.
+5. `W2-S2` last, so operator docs and the integration-boundary diagram reflect the finalized Wave 1 contract and the finalized governance/support links.
+
+
+Minimum-now release gate:
+
+
+- Do not announce or tag a public OSS launch until every Wave 1 story is complete.
+- Treat Wave 2 as mandatory before broad external adoption or contributor outreach, even if a narrow soft launch follows Wave 1 internally.
+
 
 ---
+
 
 ## Explicit Non-Goals
 
-- No dashboard-first or hosted service scope.
-- No LLM-based compliance inference in collect/map/gaps/verify defaults.
-- No raw prompt, instruction, or knowledge-body capture by default for context-engineering events.
-- No changes to compliance scoring, threshold policy, or regression semantics solely because context-engineering records now exist.
-- No rearchitecture of Axym’s collector -> normalize -> proof emit -> bundle pipeline.
-- No enterprise-only fork paths for GitHub Actions or evidence capture.
+
+- No new first-party production collectors for approvals, guardrails, permission checks, incidents, or enterprise risk systems in this backlog.
+- No hosted demo service, telemetry-backed onboarding, or remote fixture download flow.
+- No dashboard/UI work.
+- No changes to proof-chain integrity, bundle verification semantics, or exit-code contracts beyond additive onboarding/public-doc behavior required by this plan.
+- No broad rewrite of the PRD into current-state-only language; only launch-facing scope calibration required to keep public claims truthful.
+
 
 ---
 
+
 ## Definition of Done
 
-- Every recommendation above maps to at least one completed story and all mapped stories are green in their required lanes.
-- Hosted GitHub Actions coverage matches the declared scanner/runtime/release gate contract and is enforced by tests.
-- Node24-ready workflow pins and runtime assumptions are explicit, pinned, and contract-tested.
-- Context-engineering governance events are schema-validated, digest-first, locally collectible, and covered by deterministic CLI/integration/scenario tests.
-- Public docs and docs-site sources remain synchronized for install, collect, verify, CI, and release verification flows.
-- OSS trust-baseline docs are present, linked, and enforced by repo hygiene/tests.
-- `go test ./... -count=1` and `make prepush-full` remain green after the work sequence completes.
+
+- Every recommendation in this plan maps to at least one completed story with green required lanes.
+- Wave 1 yields a truthful, tested, installable first-value path and removes the legal launch blocker.
+- Wave 2 yields a credible OSS trust baseline and operator documentation set with automated source-of-truth coverage.
+- Public-facing docs, docs-site summaries, and command docs stay aligned under automated checks.
+- Public/internal boundaries, side effects, and integration ownership are explicit wherever user-facing behavior is touched.
+- The resulting repo can credibly be re-audited as `go` for public OSS launch without inventing coverage that Axym does not yet ship.
+
+
+

@@ -1,7 +1,16 @@
 Axym local docs index
 
+- LICENSE
+- CHANGELOG.md
+- CODE_OF_CONDUCT.md
 - CONTRIBUTING.md
 - SECURITY.md
-- README.md
-- docs/commands/axym.md
-- docs-site/public/llm/axym.md
+- README.md — install, smoke test, sample proof path, real integration path
+- docs/commands/axym.md — command guide and supported surfaces
+- docs-site/public/llm/axym.md — launch-facing summary for LLM and search consumers
+- docs/operator/quickstart.md — operator walkthrough for smoke, sample, and real integration paths
+- docs/operator/integration-model.md — runtime ownership model and sync/async evidence flow
+- docs/operator/integration-boundary.mmd — Mermaid source for the integration-boundary diagram
+- .github/ISSUE_TEMPLATE/bug_report.yml
+- .github/ISSUE_TEMPLATE/feature_request.yml
+- .github/pull_request_template.md

@@ -1,6 +1,12 @@
 package acceptance
 
 import (
+	"encoding/json"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	internalscenarios "github.com/Clyra-AI/axym/internal/scenarios"
@@ -93,6 +99,65 @@ func TestAuditorHandoffScenarioUsesProofBundleVerification(t *testing.T) {
 	}
 }
 
+func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := testRepoRoot(t)
+	contractPath := filepath.Join(repoRoot, "scenarios", "axym", "first_value_sample", "contract.json")
+	rawContract, err := os.ReadFile(contractPath)
+	if err != nil {
+		t.Fatalf("ReadFile(contract): %v", err)
+	}
+	var contract struct {
+		Frameworks          string `json:"frameworks"`
+		MinimumCoveredCount int    `json:"minimum_covered_count"`
+		ForbiddenGrade      string `json:"forbidden_grade"`
+		SamplePackPath      string `json:"sample_pack_path"`
+	}
+	if err := json.Unmarshal(rawContract, &contract); err != nil {
+		t.Fatalf("Unmarshal(contract): %v", err)
+	}
+
+	binaryPath := buildAxymAcceptanceBinary(t, repoRoot)
+	workdir := t.TempDir()
+	samplePackPath := contract.SamplePackPath
+	if samplePackPath == "" {
+		samplePackPath = "./axym-sample"
+	}
+
+	initPayload := runAcceptanceJSON(t, binaryPath, workdir, "init", "--sample-pack", samplePackPath, "--json")
+	initData, _ := initPayload["data"].(map[string]any)
+	if _, ok := initData["sample_pack"].(map[string]any); !ok {
+		t.Fatalf("expected sample_pack data output=%v", initPayload)
+	}
+
+	runAcceptanceJSON(t, binaryPath, workdir, "collect", "--json", "--governance-event-file", filepath.Join(samplePackPath, "governance", "context_engineering.jsonl"))
+	runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "approval.json"), "--json")
+	runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "risk_assessment.json"), "--json")
+
+	mapPayload := runAcceptanceJSON(t, binaryPath, workdir, "map", "--frameworks", contract.Frameworks, "--json")
+	mapData, _ := mapPayload["data"].(map[string]any)
+	mapSummary, _ := mapData["summary"].(map[string]any)
+	if got := int(mapSummary["covered_count"].(float64)); got < contract.MinimumCoveredCount {
+		t.Fatalf("covered_count mismatch: got %d want >= %d output=%v", got, contract.MinimumCoveredCount, mapPayload)
+	}
+
+	gapsPayload := runAcceptanceJSON(t, binaryPath, workdir, "gaps", "--frameworks", contract.Frameworks, "--json")
+	gapsData, _ := gapsPayload["data"].(map[string]any)
+	grade, _ := gapsData["grade"].(map[string]any)
+	if letter := grade["letter"]; letter == contract.ForbiddenGrade {
+		t.Fatalf("unexpected grade %v output=%v", letter, gapsPayload)
+	}
+
+	runAcceptanceJSON(t, binaryPath, workdir, "bundle", "--audit", "sample", "--frameworks", contract.Frameworks, "--json")
+	verifyPayload := runAcceptanceJSON(t, binaryPath, workdir, "verify", "--chain", "--json")
+	verifyData, _ := verifyPayload["data"].(map[string]any)
+	verification, _ := verifyData["verification"].(map[string]any)
+	if verification["intact"] != true {
+		t.Fatalf("expected intact chain output=%v", verifyPayload)
+	}
+}
+
 func contains(value string, needle string) bool {
 	return len(value) >= len(needle) && stringIndex(value, needle) >= 0
 }
@@ -111,4 +176,51 @@ func itoa(value int) string {
 		return string(rune('0' + value))
 	}
 	return "1" + string(rune('0'+(value%10)))
+}
+
+func testRepoRoot(t *testing.T) string {
+	t.Helper()
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
+}
+
+func buildAxymAcceptanceBinary(t *testing.T, repoRoot string) string {
+	t.Helper()
+
+	binaryName := "axym"
+	if runtime.GOOS == "windows" {
+		binaryName = "axym.exe"
+	}
+	binaryPath := filepath.Join(t.TempDir(), binaryName)
+	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/axym")
+	build.Dir = repoRoot
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build axym: %v output=%s", err, string(out))
+	}
+	return binaryPath
+}
+
+func runAcceptanceJSON(t *testing.T, binaryPath string, workdir string, args ...string) map[string]any {
+	t.Helper()
+
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Dir = workdir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			t.Fatalf("run %v exit=%d output=%s", args, exitErr.ExitCode(), string(out))
+		}
+		t.Fatalf("run %v: %v output=%s", args, err, string(out))
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatalf("decode output for %v: %v output=%s", args, err, string(out))
+	}
+	return payload
 }

@@ -1,0 +1,30 @@
+flowchart TD
+    A[Operator chooses path] --> B[Smoke test]
+    A --> C[Sample proof path]
+    A --> D[Real integration path]
+
+    B --> B1[./axym init --json]
+    B --> B2[./axym collect --dry-run --json]
+
+    C --> C1[./axym init --sample-pack ./axym-sample --json]
+    C --> C2[Local sample assets]
+    C --> C3[collect + record add]
+    C --> C4[map + gaps + bundle + verify]
+
+    D --> D1[Built-in collectors]
+    D --> D2[Plugin collectors]
+    D --> D3[Manual record append]
+    D --> D4[Sibling ingest]
+
+    D1 --> E[Axym proof chain]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    C4 --> E
+
+    E --> F[Compliance map]
+    E --> G[Gap ranking]
+    E --> H[Audit bundle]
+
+    I[Customer code, CI, providers, sibling systems] --> D
+    J[Axym owns normalization, mapping, bundle, verify] --> E

@@ -1,0 +1,6 @@
+{
+  "frameworks": "eu-ai-act,soc2",
+  "minimum_covered_count": 2,
+  "forbidden_grade": "F",
+  "sample_pack_path": "./axym-sample"
+}

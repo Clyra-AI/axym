@@ -11,6 +11,8 @@
 
 ## Executive Summary
 
+> Launch-surface note (2026-03-19): this PRD describes the broader Axym product direction. The current OSS launch contract is narrower and must stay truthful in public docs. Built-in collection today is limited to `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`, plus explicit plugin/manual/sibling-ingest paths. Clean-room `collect --json` is a smoke test, not the supported first-value path. The supported install-time first-value journey is the local offline sample proof path introduced by `init --sample-pack <dir>`.
+
 Axym is an open-source Go CLI that captures structured proof of AI system behavior and produces audit-ready compliance packages mapped to EU AI Act, SOC 2, SOX, PCI-DSS, and state AI regulations. It intercepts AI agent activity at the integration layer — CI/CD pipelines, MCP server calls, API gateways, and tool invocations — and produces signed, tamper-evident proof records that are automatically mapped to specific regulatory controls.
 
 **Primary audiences:** The primary buyer is the **Head of GRC or Chief Compliance Officer** who must produce AI governance evidence for regulators and auditors. The primary user is the **GRC analyst or compliance engineer** who assembles audit packages. The champion is the **security or platform engineer** who integrates Axym into the pipeline.
