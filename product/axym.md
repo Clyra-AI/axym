@@ -13,13 +13,15 @@
 
 > Launch-surface note (2026-03-19): this PRD describes the broader Axym product direction. The current OSS launch contract is narrower and must stay truthful in public docs. Built-in collection today is limited to `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`, plus explicit plugin/manual/sibling-ingest paths. Clean-room `collect --json` is a smoke test, not the supported first-value path. The supported install-time first-value journey is the local offline sample proof path introduced by `init --sample-pack <dir>`.
 
-Axym is an open-source Go CLI that captures structured proof of AI system behavior and produces audit-ready compliance packages mapped to EU AI Act, SOC 2, SOX, PCI-DSS, and state AI regulations. It intercepts AI agent activity at the integration layer — CI/CD pipelines, MCP server calls, API gateways, and tool invocations — and produces signed, tamper-evident proof records that are automatically mapped to specific regulatory controls.
+Axym is an open-source Go CLI that captures portable proof of identity-governed action in software delivery and produces audit-ready compliance packages mapped to EU AI Act, SOC 2, SOX, PCI-DSS, and state AI regulations. It proves which non-human identity acted, through which delegated chain, against which target, under which policy and approval, by intercepting AI agent activity at the integration layer — CI/CD pipelines, MCP server calls, API gateways, and tool invocations — and emitting signed, tamper-evident proof records that are automatically mapped to specific regulatory controls.
 
 **Primary audiences:** The primary buyer is the **Head of GRC or Chief Compliance Officer** who must produce AI governance evidence for regulators and auditors. The primary user is the **GRC analyst or compliance engineer** who assembles audit packages. The champion is the **security or platform engineer** who integrates Axym into the pipeline.
 
 **Why this exists:** Regulatory deadlines have converged — EU AI Act broad enforcement (August 2026), Colorado AI Act (effective February 1, 2026), Texas TRAIGA (effective September 1, 2025) — and all require technical evidence of AI system governance. The evidence doesn't exist in any structured form today. AI agent actions are scattered across logs, LLM API responses, git diffs, and ephemeral tool outputs. Axym transforms these operational signals into compliance artifacts.
 
-**Differentiation:** GRC platforms (Vanta, Drata) manage compliance workflows but cannot generate technical evidence that AI systems are governed. LLM observability tools (LangSmith, Arize) capture operational telemetry but are not structured for compliance. Axym produces the evidence; GRC platforms and observability tools are complementary, not competitive.
+**Differentiation:** GRC platforms (Vanta, Drata) manage compliance workflows but cannot generate portable technical evidence of identity-governed action. LLM observability tools (LangSmith, Arize) capture operational telemetry but are not structured for compliance. Axym produces the evidence; GRC platforms and observability tools are complementary, not competitive.
+
+**Boundary note:** Axym is not an IAM, PAM, or IGA replacement. Upstream identity systems remain authoritative for identity lifecycle, credential issuance, entitlement management, and interactive access control. Axym proves the governed action that flowed through those systems inside software delivery.
 
 **Positioning within Clyra AI:** Axym is the "Prove" step in See (Wrkr) -> Prove (Axym) -> Control (Gait). Axym is the product; the primitive underneath is `Clyra-AI/proof`. Axym imports Proof and adds compliance opinions on top: collection, framework mapping, gap detection, and bundle generation. Wrkr scan findings and Gait enforcement decisions flow into Axym as native proof records for unified compliance mapping. The products are independently useful but form a closed loop together.
 
@@ -37,7 +39,7 @@ Axym is an open-source Go CLI that captures structured proof of AI system behavi
 
 ### The job to be done (JTBD):
 
-**When** I'm responsible for AI compliance at an organization deploying AI agents and AI-assisted development tools in production, **I want to** automatically capture structured evidence of AI system behavior, decisions, and controls, and map that evidence to specific regulatory requirements, **so that** I can prove compliance when audited, identify governance gaps before the regulator does, and reduce audit preparation from weeks to hours.
+**When** I'm responsible for AI compliance at an organization deploying AI agents and AI-assisted development tools in production, **I want to** automatically capture structured evidence of which non-human identity initiated and executed a governed action, which owner or approver was responsible, which delegated chain and policy digest applied, and which approval token bound the action, and map that evidence to specific regulatory requirements, **so that** I can prove compliance when audited, identify governance gaps before the regulator does, and reduce audit preparation from weeks to hours.
 
 ### Why this wins (mapping to historical pattern):
 
@@ -72,7 +74,7 @@ These aren't theoretical. Audit firms (Big 4, SOC 2 auditors) have updated their
 
 ### One-liner:
 
-**Axym is an open-source Go CLI that captures structured proof of AI system behavior and produces audit-ready compliance packages mapped to EU AI Act, SOC 2, SOX, PCI-DSS, and state AI regulations.**
+**Axym is an open-source Go CLI that captures portable proof of identity-governed action in software delivery and produces audit-ready compliance packages mapped to EU AI Act, SOC 2, SOX, PCI-DSS, and state AI regulations.**
 
 ### Core loop (the "15-minute time-to-value"):
 
@@ -86,16 +88,27 @@ Install → Connect → Collect → Map → Gaps → Bundle
 
 ### What Axym captures (the "evidence surface"):
 
+Every first-class evidence surface is evaluated against one additive identity-governance view:
+
+- `actor_identity`: who initiated the governed action
+- `downstream_identity`: which non-human identity actually executed it
+- `owner_identity`: which owner or approver was accountable
+- `delegation_chain`: which delegated chain applied
+- `policy_digest`: which policy digest governed the action
+- `approval_token_ref`: which approval token bound the action when applicable
+- target identity: which tool, resource, pipeline, or environment was touched
+- privilege drift: whether the effective identity or permissions changed between runs without linked approval
+
 **Layer 1: Agent Runtime Evidence (primary — this is the moat)**
 
 | Signal | Source | What Axym Captures |
 |---|---|---|
-| Agent tool invocations | MCP server logs, tool call records | What tools the agent called, with what parameters, what was returned, timestamps |
-| Agent decisions | LLM API responses (structured extraction) | Decision points, selected actions, reasoning artifacts (if available) |
-| Agent permissions at execution time | Agent config files, runtime permission checks | What the agent was allowed to do vs. what it attempted |
+| Agent tool invocations | MCP server logs, tool call records | What tools the agent called, with what parameters, what was returned, timestamps, and which non-human identity executed the call |
+| Agent decisions | LLM API responses (structured extraction) | Decision points, selected actions, reasoning artifacts (if available), and which delegated identity chain produced the action |
+| Agent permissions at execution time | Agent config files, runtime permission checks | What the agent was allowed to do vs. what it attempted, plus the governing policy digest |
 | Guardrail activations | Guardrail frameworks (NeMo, Guardrails AI, custom) | When guardrails triggered, what they blocked, what they allowed |
-| Human oversight events | Approval workflows, review records | Who approved what, when, and what they reviewed before approving |
-| Agent boundary violations | Runtime monitoring, error logs | Attempts to exceed permissions, blocked actions, escalation events |
+| Human oversight events | Approval workflows, review records | Who approved what, when, what they reviewed before approving, and the approval token or owner reference that bound the action |
+| Agent boundary violations | Runtime monitoring, error logs | Attempts to exceed permissions, blocked actions, escalation events, and the missing identity/policy linkage that caused weak evidence |
 | Agent compiled actions | PTC-style compiled scripts, multi-step plans | Compound action hash, tool list, composite risk classification, execution plan structure. As model providers ship compiled/programmatic tool calling (LLM emits executable scripts instead of individual tool calls), the governance unit shifts from per-tool-call to per-script. Axym captures the plan (compiled action) and links it to the execution traces that follow |
 
 **Layer 2: Development Lifecycle Evidence (secondary — enrichment)**
@@ -105,13 +118,13 @@ Install → Connect → Collect → Map → Gaps → Bundle
 | AI code authorship | Git metadata, AI tool config | Which code was AI-generated vs. human-written, review status |
 | Model version and config | Deployment manifests, API configs | Which model version was running, what system prompts were active |
 | Testing and evaluation records | CI/CD pipelines, eval frameworks | Test results, evaluation scores, benchmark data for AI components |
-| Change management | Git history, deployment logs | Who deployed what AI system changes, when, with what approvals |
+| Change management | Git history, deployment logs | Who deployed what AI system changes, when, with what approvals, and which owner identity remained accountable |
 
 **Layer 3: Data Pipeline Evidence (from Clyra DNA — SOX/PCI-DSS)**
 
 | Signal | Source | What Axym Captures |
 |---|---|---|
-| Data pipeline runs | dbt logs, orchestrator events | Git SHA, models executed, tables touched, Separation of Duties (SoD) roles |
+| Data pipeline runs | dbt logs, orchestrator events | Git SHA, models executed, tables touched, Separation of Duties (SoD) roles, and requestor/deployer/approver identity linkage |
 | Query execution | Snowflake query history (digests only) | Query hashes (not queries), target tables, duration, row counts |
 | Pipeline approvals | Change management integrations | Who approved the pipeline change, when, review evidence |
 | Replay certification | Axym's replay engine | Replay tier (A/B/C), pass/fail, blast radius classification |
@@ -123,6 +136,8 @@ Install → Connect → Collect → Map → Gaps → Bundle
 | Eval / benchmark results | Braintrust, Arize, LangSmith, custom eval harnesses | Evaluation scores, benchmark pass/fail, dataset version, model version under test |
 | Model lifecycle events | MLflow, Hugging Face Hub, Weights & Biases, deployment pipelines | Model registration, version promotion, fine-tuning runs, checkpoint approvals, weight hash |
 | Adversarial / red team results | Giskard, NVIDIA NeMo Red Team, custom red team tooling | Attack vectors tested, failure modes discovered, severity, affected model/agent, remediation status |
+
+> Truth-in-scope note: the OSS product ships the identity-governed action seam today through Axym-native collection, `collect --governance-event-file`, `record add`, Wrkr ingest, Gait ingest, and bundle/export/verify surfaces. This PRD also describes longer-horizon expansion of collectors and evidence types. Public launch docs must stay aligned to the shipped surfaces, not the full ambition of this document.
 
 These surfaces are ingested through Axym's collector plugin architecture (FR12). Each collector reads existing outputs from the external tool — Axym never requires modifications to the source system. The records produced are standard proof records (`test_result`, `model_change`, `deployment`, `risk_assessment`) that flow into the same compliance mapping and evidence chain as all other Axym evidence. Eval results map to EU AI Act Article 15 (accuracy/robustness). Model provenance maps to Article 12 (record-keeping) and Article 13 (transparency). Red team results map to Article 9 (risk management) and Article 15.
 
@@ -154,6 +169,18 @@ record_type: "tool_invocation"
 event:
   tool: "postgres_query"
   action: "SELECT"
+  actor_identity: "agent://planner/requester"
+  downstream_identity: "agent://payments-service/executor"
+  owner_identity: "owner://payments-platform"
+  approval_token_ref: "approval://chg-2048"
+  policy_digest: "sha256:policy-abc123..."
+  target_kind: "table"
+  target_id: "payments.transactions"
+  delegation_chain:
+    - identity: "agent://planner/requester"
+      role: "requester"
+    - identity: "agent://payments-service/executor"
+      role: "delegate"
   parameters:
     query_hash: "sha256:abc123..."  # query hash, not the query itself
     target: "payments.transactions"
@@ -184,6 +211,20 @@ metadata:
   # Compliance tagging is applied by axym when mapping records to frameworks.
   environment: "production"
   deployment_version: "v2.3.1"
+
+relationship:
+  parent_ref:
+    kind: "session"
+    id: "session://payments-change-window"
+  policy_ref:
+    policy_id: "payments-read-only"
+    policy_version: "2026-09-01"
+    policy_digest: "sha256:policy-abc123..."
+  entity_refs:
+    - kind: "owner"
+      id: "owner://payments-platform"
+    - kind: "resource"
+      id: "table://payments.transactions"
 
 integrity:
   record_hash: "sha256:def456..."
@@ -243,7 +284,7 @@ Top Gaps:
 
 **4. Audit Bundle (the deliverable)**
 
-A portable, signed directory that a GRC analyst hands directly to the auditor. The bundle contains proof records verifiable with the standalone `proof verify` CLI — the auditor does not need Axym installed.
+A portable, signed directory that a GRC analyst hands directly to the auditor. The bundle contains proof records verifiable with the standalone `proof verify` CLI, plus dedicated identity-governance artifacts that explain the acting identity, delegated chain, owner or approver, policy binding, privilege drift, and the Axym-vs-IAM/PAM/IGA boundary. The auditor does not need Axym installed.
 
 ```
 axym-evidence/
@@ -251,6 +292,10 @@ axym-evidence/
 ├── chain-verification.yaml        # Hash chain integrity verification
 ├── auditability-grade.yaml        # Overall grade (A-F) with per-section breakdown
 ├── boundary-contract.md           # Plain-language: what Axym proves vs. customer responsibility
+├── identity-chain-summary.json    # Normalized actor/downstream/target/policy chain view
+├── ownership-register.json        # Owner and approver accountability register
+├── privilege-drift-report.json    # Linked and unlinked privilege drift findings
+├── delegated-chain-exceptions.json # Weak or incomplete delegation-chain findings
 ├── summary/
 │   ├── executive-summary.pdf      # One-page for the board
 │   ├── compliance-map.yaml        # Framework coverage overview
@@ -412,6 +457,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - Capture agent decision records from structured LLM API responses (action selected, alternatives considered if available)
 - Capture guardrail activation records (what triggered, what was blocked/allowed)
 - Capture permission enforcement records (what was attempted vs. what was allowed)
+- Normalize acting identity, downstream execution identity, owner identity, delegation chain, policy digest, approval-token binding, and target touched across runtime evidence
 - Support collection from: MCP server logs (required), LLM API middleware (required), custom webhook (required), CI/CD pipeline events (required)
 - Collection is non-blocking — never interferes with agent operation
 - All collected events are written as proof records via `proof.NewRecord()` with deterministic schemas
@@ -460,6 +506,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - Broken chains are detected and flagged with the exact break point
 - Records are immutable once written (append-only evidence store)
 - Proof records are signed with Ed25519 (default) or cosign (Sigstore)
+- The additive normalized identity-governance view is exposed through named fields such as `actor_identity`, `downstream_identity`, `delegation_chain`, `policy_digest`, `approval_token_ref`, and `owner_identity`, placed inside existing `event`, `metadata`, and `relationship` extension points rather than a second Axym-only record format
 
 ### FR5: Compliance Framework Mapping
 
@@ -470,6 +517,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - **Controls as linkable references (H0 data architecture for H3 PolicyGraph).** Framework control identifiers are stored as structured references (`framework_id` + `control_id` + `version`), not flat string labels. "EU AI Act Article 14" becomes a traversable reference (`{framework: "eu-ai-act", control: "art-14", version: "2024"}`) that can connect to every proof record mapped to that control. This makes compliance mappings graph-queryable when PolicyGraph ships — "show me every proof record across every agent that maps to Article 14" becomes a reference lookup, not a string search
 - Produce coverage report: which controls have evidence, which have gaps, what percentage is covered
 - Gap analysis includes: what's missing, what record type is needed, remediation steps
+- Controls that depend on identity-governed action evidence treat missing actor linkage, owner linkage, delegation lineage, policy digest binding, approval binding, or unexplained privilege drift as weak evidence rather than full coverage
 - **OSCAL v1.1 export:** generate OSCAL component-definition JSON mapping proof records to control objectives (SOX CM/CC, PCI-DSS Req-10, EU AI Act articles). Shipped with every audit bundle. Human-readable snippet alongside machine-readable JSON. OSCAL mappings are derived from `Clyra-AI/proof/frameworks/*.yaml` definitions
 - **Auditability grade (A–F):** each proof record and each bundle receives a deterministic auditability grade based on evidence completeness. Grade is reproducible — same inputs always produce same grade. Surfaced in compliance map, bundle summary, and Daily Review. Derivation rules (per record):
   - **A (Exemplary):** all criteria met — signature present and valid, chain link intact, all required fields populated, enrichment complete (no `ENRICHMENT_LAG`), SoD validated where applicable, replay Tier A where applicable
@@ -510,6 +558,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - Bundle includes: executive summary (PDF), compliance map, proof records linked to controls, gap analysis, raw records, hash chain verification, methodology description, OSCAL v1.1 component-definition JSON, auditability grade summary
 - Bundle includes `manifest.json` listing all files with SHA-256 hashes, schema versions, and anchor references; `proof verify` validates the manifest offline
 - Bundle includes `boundary-contract.md` — plain-language statement clarifying what Axym proves vs. customer responsibility
+- Bundle includes identity-governance artifacts: identity-chain summary, ownership/approver register, privilege-drift report, and delegated-chain exceptions
 - Bundle is cryptographically signed as a unit (Ed25519, tamper-evident)
 - Bundle is versioned — can generate bundles for different time ranges and framework combinations
 - Bundle includes `retention-matrix.json` — retention policy per environment (dev/test/prod) documenting how long evidence is stored and when it can be purged
@@ -758,10 +807,11 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 1. **15-minute time-to-first-value.** From `brew install Clyra-AI/tap/axym` to seeing a compliance coverage map with real proof records from your AI systems.
 2. **Become the evidence format auditors trust.** Axym evidence bundles contain proof records verifiable by the standalone `proof` CLI. Auditors learn one verification tool that works across all Clyra AI products and any third-party tool that emits proof records.
 3. **Close the translation gap.** Engineering produces technical signals. GRC needs compliance evidence. Axym is the translator — it speaks both languages.
-4. **Compliance as continuous, not annual.** Evidence is captured continuously, not assembled in a panic before the audit. The audit bundle is always ready.
-5. **Bottom-up adoption through engineering trust.** Open source, local-only, non-blocking. Engineers integrate it because it's low-friction. GRC teams fund it because it solves their evidence problem.
-6. **Feed the shared primitive.** Axym is the heaviest producer of proof records. Every Axym installation generates records in the shared `Clyra-AI/proof` format. As Axym adoption grows, the volume of proof records in the ecosystem grows, and the format earns standard status through ubiquity.
-7. **Continuous engagement, not audit-time panic.** The Daily Review Pack (FR7) creates a recurring daily touchpoint — exceptions, grade changes, and replay results demand attention whether or not an audit is imminent. Compliance regression in CI (FR13) fails builds when evidence coverage drops, creating immediate engineering work. Gap alerts trigger ticket creation. The audit bundle is the deliverable, but the daily cadence is the retention: Axym produces work every day, not just at audit time. The pattern: Wrkr creates weekly PR work, Axym creates daily review work, Gait creates per-action enforcement work — three cadences that keep the governance loop active.
+4. **Prove accountable non-human action, not just activity.** Axym's wedge is governed software-delivery action: who initiated, who executed, who approved, what policy applied, and what target was touched.
+5. **Compliance as continuous, not annual.** Evidence is captured continuously, not assembled in a panic before the audit. The audit bundle is always ready.
+6. **Bottom-up adoption through engineering trust.** Open source, local-only, non-blocking. Engineers integrate it because it's low-friction. GRC teams fund it because it solves their evidence problem.
+7. **Feed the shared primitive.** Axym is the heaviest producer of proof records. Every Axym installation generates records in the shared `Clyra-AI/proof` format. As Axym adoption grows, the volume of proof records in the ecosystem grows, and the format earns standard status through ubiquity.
+8. **Continuous engagement, not audit-time panic.** The Daily Review Pack (FR7) creates a recurring daily touchpoint — exceptions, grade changes, and replay results demand attention whether or not an audit is imminent. Compliance regression in CI (FR13) fails builds when evidence coverage drops, creating immediate engineering work. Gap alerts trigger ticket creation. The audit bundle is the deliverable, but the daily cadence is the retention: Axym produces work every day, not just at audit time. The pattern: Wrkr creates weekly PR work, Axym creates daily review work, Gait creates per-action enforcement work — three cadences that keep the governance loop active.
 
 ## Non-Goals (v1)
 
@@ -774,6 +824,8 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 7. **Not a SaaS product (v1).** The open-source CLI is the product. CLI `axym collect` runs one-shot or as a CI post-step (self-hosted). This PRD covers OSS scope only. Clyra Platform and Enterprise tiers are defined in the roadmap and risk register sections but their FRs, NFRs, ACs, and DoD are out of scope for this document.
 8. **Not cross-platform on day one.** GitHub Actions is the primary CI integration. Jenkins, GitLab CI, and CircleCI follow in v1.1+.
 9. **Not a primitive.** The proof record format, hash chain, and signing protocol live in `Clyra-AI/proof`. Axym is the reference consumer and the heaviest producer, but it does not own the format. The primitive is independent of any single product.
+10. **Not an IAM, PAM, or IGA replacement.** Axym proves portable software-delivery action-governance evidence around those systems; it does not own identity lifecycle, credential issuance, entitlement management, or interactive access control.
+11. **Not wider than software delivery.** This wedge is governed action in software delivery. Do not position Axym as a general-purpose identity product.
 
 -----
 

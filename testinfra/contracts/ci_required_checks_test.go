@@ -24,7 +24,7 @@ func TestRequiredChecksMapToPRTriggeredWorkflow(t *testing.T) {
 		t.Fatal("required checks must be emitted by pull_request workflows")
 	}
 
-	requiredJobs := []string{"lint-fast:", "test-fast:", "test-contracts:", "golangci-lint:", "gosec:", "docs-links:"}
+	requiredJobs := []string{"lint-fast:", "test-fast:", "test-contracts:", "test-acceptance:", "golangci-lint:", "gosec:", "docs-links:"}
 	for _, job := range requiredJobs {
 		if !strings.Contains(pr, job) {
 			t.Fatalf("pr workflow missing required check job: %s", job)
@@ -67,6 +67,7 @@ func TestMainWorkflowContainsScenarioAndDocsParityLanes(t *testing.T) {
 
 	main := readRepoFile(t, ".github/workflows/main.yml")
 	required := []string{
+		"make test-acceptance",
 		"make test-scenarios",
 		"make test-docs-consistency",
 		"make test-docs-storyline",
@@ -86,6 +87,7 @@ func TestNightlyWorkflowContainsRiskLanes(t *testing.T) {
 	required := []string{
 		"golangci-lint",
 		"make test-security",
+		"make test-acceptance",
 		"make test-scenarios",
 		"make test-hardening",
 		"make test-chaos",

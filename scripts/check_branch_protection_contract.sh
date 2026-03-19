@@ -8,6 +8,7 @@ required_jobs=(
   "lint-fast:"
   "test-fast:"
   "test-contracts:"
+  "test-acceptance:"
 )
 
 for job in "${required_jobs[@]}"; do
@@ -21,4 +22,3 @@ grep -q "pull_request:" "$workflow" || {
   echo "required checks must map to pull_request workflow outputs" >&2
   exit 1
 }
-

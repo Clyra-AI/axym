@@ -16,7 +16,7 @@ flowchart TD
     D --> D3[Manual record append]
     D --> D4[Sibling ingest]
 
-    D1 --> E[Axym proof chain]
+    D1 --> E[Axym identity-governed proof chain]
     D2 --> E
     D3 --> E
     D4 --> E
@@ -24,7 +24,9 @@ flowchart TD
 
     E --> F[Compliance map]
     E --> G[Gap ranking]
-    E --> H[Audit bundle]
+    E --> H[Audit bundle + identity artifacts]
 
     I[Customer code, CI, providers, sibling systems] --> D
-    J[Axym owns normalization, mapping, bundle, verify] --> E
+    J[Axym owns normalization, mapping, bundle, verify]
+    K[Upstream IAM/PAM/IGA stays authoritative for identity lifecycle and access control]
+    J --> E

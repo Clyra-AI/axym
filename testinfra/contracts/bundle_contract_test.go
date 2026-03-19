@@ -66,6 +66,10 @@ func TestBundleAndVerifyBundleJSONEnvelopeContract(t *testing.T) {
 	if verification["compliance_verified"] != true {
 		t.Fatalf("expected compliance_verified=true: %s", verifyOut)
 	}
+	compliance, _ := verification["compliance"].(map[string]any)
+	if _, ok := compliance["identity_governance"].(map[string]any); !ok {
+		t.Fatalf("expected identity_governance envelope: %s", verifyOut)
+	}
 }
 
 func TestVerifyBundleInvalidOSCALContractExit(t *testing.T) {

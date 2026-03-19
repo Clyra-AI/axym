@@ -74,7 +74,14 @@ func TestRelationshipEnvelopePreservedDuringGaitTranslation(t *testing.T) {
 	if relationship.ParentRef == nil || relationship.ParentRef.ID != "parent-1" {
 		t.Fatalf("parent ref mismatch: %+v", relationship)
 	}
-	if len(relationship.EntityRefs) != 1 || relationship.EntityRefs[0].ID != "resource-1" {
-		t.Fatalf("entity refs mismatch: %+v", relationship.EntityRefs)
+	foundResource := false
+	for _, ref := range relationship.EntityRefs {
+		if ref.ID == "resource-1" {
+			foundResource = true
+			break
+		}
+	}
+	if !foundResource {
+		t.Fatalf("expected resource relationship ref to be preserved: %+v", relationship.EntityRefs)
 	}
 }

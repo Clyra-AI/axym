@@ -24,6 +24,12 @@ func NormalizeAndBuild(in normalize.Input, cfg redact.Config) (*proof.Record, er
 }
 
 func Build(in BuildInput) (*proof.Record, error) {
+	view := normalize.DeriveIdentityView(in.Normalized.AgentID, in.Normalized.Event, in.Normalized.Metadata, in.Normalized.Relationship)
+	eventWithIdentity, metadataWithIdentity, relationship := normalize.ApplyIdentityView(in.Normalized.Event, in.Normalized.Metadata, in.Normalized.Relationship, view)
+	in.Normalized.Event = eventWithIdentity
+	in.Normalized.Metadata = metadataWithIdentity
+	in.Normalized.Relationship = relationship
+
 	event, metadata, err := redact.Apply(in.Normalized.Event, in.Normalized.Metadata, in.Redaction)
 	if err != nil {
 		return nil, NewInvalidInputError(ReasonMappingError, "redaction failed", err)
@@ -45,6 +51,9 @@ func Build(in BuildInput) (*proof.Record, error) {
 	if metadata != nil {
 		payload["metadata"] = metadata
 	}
+	if in.Normalized.Relationship != nil {
+		payload["relationship"] = in.Normalized.Relationship
+	}
 	payloadRaw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, NewInvalidInputError(ReasonInvalidRecord, "marshal normalized payload", err)
@@ -62,6 +71,7 @@ func Build(in BuildInput) (*proof.Record, error) {
 		Timestamp:     in.Normalized.Timestamp,
 		Event:         event,
 		Metadata:      metadata,
+		Relationship:  in.Normalized.Relationship,
 		Controls: proof.Controls{
 			PermissionsEnforced: in.Normalized.Controls.PermissionsEnforced,
 			ApprovedScope:       in.Normalized.Controls.ApprovedScope,

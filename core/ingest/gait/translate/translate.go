@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -97,6 +98,8 @@ func Translate(native NativeRecord) (*proof.Record, error) {
 	if source == "" {
 		source = "gait"
 	}
+	view := normalize.DeriveIdentityView(strings.TrimSpace(native.AgentID), event, metadata, native.Relationship)
+	event, metadata, relationship := normalize.ApplyIdentityView(event, metadata, native.Relationship, view)
 	record, err := proof.NewRecord(proof.RecordOpts{
 		Timestamp:     timestamp,
 		Source:        source,
@@ -105,7 +108,7 @@ func Translate(native NativeRecord) (*proof.Record, error) {
 		Type:          recordType,
 		Event:         event,
 		Metadata:      metadata,
-		Relationship:  native.Relationship,
+		Relationship:  relationship,
 		Controls: proof.Controls{
 			PermissionsEnforced: true,
 			ApprovedScope:       "gait-pack",

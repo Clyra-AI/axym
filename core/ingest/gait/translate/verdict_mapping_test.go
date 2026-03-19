@@ -3,6 +3,7 @@ package translate
 import (
 	"testing"
 
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -65,6 +66,46 @@ func TestTranslatePreservesRelationshipEnvelope(t *testing.T) {
 	}
 	if record.Relationship.ParentRef == nil || record.Relationship.ParentRef.ID != "parent-1" {
 		t.Fatalf("parent relationship mismatch: %+v", record.Relationship)
+	}
+	view := normalize.IdentityViewFromRecord(record)
+	if view.TargetKind != "tool" || view.TargetID != "planner" {
+		t.Fatalf("identity view target mismatch: %+v", view)
+	}
+}
+
+func TestTranslateSynthesizesNormalizedIdentityView(t *testing.T) {
+	t.Parallel()
+
+	record, err := Translate(NativeRecord{
+		Type:      NativeTypeTrace,
+		Timestamp: "2026-02-28T20:00:00Z",
+		AgentID:   "agent://executor",
+		Event: map[string]any{
+			"tool_name":          "planner",
+			"actor_identity":     "agent://requester",
+			"owner_identity":     "owner://payments",
+			"policy_digest":      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"approval_token_ref": "approval://chg-123",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+	view := normalize.IdentityViewFromRecord(record)
+	if view.ActorIdentity != "agent://requester" {
+		t.Fatalf("actor identity mismatch: %+v", view)
+	}
+	if view.DownstreamIdentity != "agent://executor" {
+		t.Fatalf("downstream identity mismatch: %+v", view)
+	}
+	if view.OwnerIdentity != "owner://payments" {
+		t.Fatalf("owner identity mismatch: %+v", view)
+	}
+	if view.TargetKind != "tool" || view.TargetID != "planner" {
+		t.Fatalf("target mismatch: %+v", view)
+	}
+	if record.Relationship == nil || record.Relationship.PolicyRef == nil || record.Relationship.PolicyRef.PolicyDigest == "" {
+		t.Fatalf("expected policy digest relationship synthesis: %+v", record.Relationship)
 	}
 }
 

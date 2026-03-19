@@ -53,8 +53,9 @@ var sampleAssets = []asset{
 		Kind:    "governance_events",
 		Contents: strings.TrimSpace(`
 {"event_type":"instruction_rewrite","source":"agent-fw","timestamp":"2026-03-18T12:00:00Z","actor":{"id":"agent-1","type":"agent"},"action":"rewrite","target":{"kind":"instruction_set","id":"system-prompt"},"context":{"previous_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","artifact_kind":"instruction_set","reason_code":"POLICY_REFRESH"}}
-{"event_type":"context_reset","source":"agent-fw","timestamp":"2026-03-18T12:05:00Z","actor":{"id":"agent-1","type":"agent"},"action":"reset","target":{"kind":"context_window","id":"conversation-memory"},"context":{"previous_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","current_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reason_code":"SESSION_BOUNDARY"}}
-{"event_type":"knowledge_import","source":"agent-fw","timestamp":"2026-03-18T12:10:00Z","actor":{"id":"agent-1","type":"agent"},"action":"import","target":{"kind":"knowledge_artifact","id":"kb:policy-pack"},"context":{"artifact_digest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","artifact_kind":"knowledge_artifact","source_uri":"repo://policy/pack","reason_code":"KNOWLEDGE_SYNC","approval_ref":"chg-42"}}
+{"event_type":"instruction_rewrite","source":"agent-fw","timestamp":"2026-03-18T12:00:00Z","actor":{"id":"agent-1","type":"agent"},"downstream_identity":"agent://context-engineer","owner_identity":"owner://platform-governance","policy_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","delegation_chain":[{"identity":"agent://planner","role":"requester"},{"identity":"agent://context-engineer","role":"delegate"}],"action":"rewrite","target":{"kind":"instruction_set","id":"system-prompt"},"context":{"previous_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_hash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","artifact_kind":"instruction_set","reason_code":"POLICY_REFRESH"}}
+{"event_type":"context_reset","source":"agent-fw","timestamp":"2026-03-18T12:05:00Z","actor":{"id":"agent-1","type":"agent"},"downstream_identity":"agent://context-engineer","owner_identity":"owner://platform-governance","policy_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","action":"reset","target":{"kind":"context_window","id":"conversation-memory"},"context":{"previous_hash":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","current_hash":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","reason_code":"SESSION_BOUNDARY"}}
+{"event_type":"knowledge_import","source":"agent-fw","timestamp":"2026-03-18T12:10:00Z","actor":{"id":"agent-1","type":"agent"},"downstream_identity":"agent://context-engineer","owner_identity":"owner://platform-governance","policy_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","approval_token_ref":"approval://chg-42","action":"import","target":{"kind":"knowledge_artifact","id":"kb:policy-pack"},"context":{"artifact_digest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","artifact_kind":"knowledge_artifact","source_uri":"repo://policy/pack","reason_code":"KNOWLEDGE_SYNC","approval_ref":"chg-42"}}
 `) + "\n",
 	},
 	{
@@ -72,7 +73,24 @@ var sampleAssets = []asset{
   "event": {
     "decision": "allow",
     "approver": "ops-reviewer",
-    "scope": "context-pack-change"
+    "scope": "context-pack-change",
+    "actor_identity": "agent://requester",
+    "downstream_identity": "agent://context-engineer",
+    "owner_identity": "owner://platform-governance",
+    "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "approval_token_ref": "approval://sample-approval-001",
+    "target_kind": "knowledge_artifact",
+    "target_id": "kb:policy-pack",
+    "delegation_chain": [
+      {
+        "identity": "agent://requester",
+        "role": "requester"
+      },
+      {
+        "identity": "agent://context-engineer",
+        "role": "delegate"
+      }
+    ]
   },
   "metadata": {
     "reason_code": "HUMAN_APPROVED"
@@ -99,7 +117,23 @@ var sampleAssets = []asset{
   "event": {
     "risk_id": "risk-sample-001",
     "severity": "medium",
-    "summary": "Context change requires documented evaluation"
+    "summary": "Context change requires documented evaluation",
+    "actor_identity": "agent://requester",
+    "downstream_identity": "agent://context-engineer",
+    "owner_identity": "owner://platform-governance",
+    "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "target_kind": "knowledge_artifact",
+    "target_id": "kb:policy-pack",
+    "delegation_chain": [
+      {
+        "identity": "agent://requester",
+        "role": "requester"
+      },
+      {
+        "identity": "agent://context-engineer",
+        "role": "delegate"
+      }
+    ]
   },
   "metadata": {
     "reason_code": "RISK_REVIEWED"

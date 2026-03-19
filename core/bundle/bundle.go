@@ -18,6 +18,7 @@ import (
 	"github.com/Clyra-AI/axym/core/export/oscal"
 	"github.com/Clyra-AI/axym/core/export/safety"
 	"github.com/Clyra-AI/axym/core/gaps"
+	"github.com/Clyra-AI/axym/core/identitygovernance"
 	"github.com/Clyra-AI/axym/core/review/grade"
 	"github.com/Clyra-AI/axym/core/store"
 	coreverify "github.com/Clyra-AI/axym/core/verify"
@@ -61,13 +62,14 @@ type verifyResult struct {
 }
 
 type Compliance struct {
-	RequiredRecordTypes []string     `json:"required_record_types"`
-	ObservedRecordTypes []string     `json:"observed_record_types"`
-	MissingRecordTypes  []string     `json:"missing_record_types"`
-	IncompleteControls  int          `json:"incomplete_controls"`
-	ControlsMissing     int          `json:"controls_missing_fields"`
-	Complete            bool         `json:"complete"`
-	Grade               grade.Result `json:"grade"`
+	RequiredRecordTypes []string                  `json:"required_record_types"`
+	ObservedRecordTypes []string                  `json:"observed_record_types"`
+	MissingRecordTypes  []string                  `json:"missing_record_types"`
+	IncompleteControls  int                       `json:"incomplete_controls"`
+	ControlsMissing     int                       `json:"controls_missing_fields"`
+	Complete            bool                      `json:"complete"`
+	Grade               grade.Result              `json:"grade"`
+	IdentityGovernance  identitygovernance.Digest `json:"identity_governance"`
 }
 
 type Error struct {
@@ -129,6 +131,7 @@ func Build(req BuildRequest) (Result, error) {
 	coverageReport := coverage.Build(matchResult)
 	gapReport := gaps.Build(coverageReport)
 	compliance := buildCompliance(definitions, coverageReport, recordSnapshot, gapReport.Grade)
+	identityArtifacts := identitygovernance.Build(recordSnapshot)
 
 	artifacts := map[string][]byte{}
 	rawChain, err := json.MarshalIndent(chainSnapshot, "", "  ")
@@ -178,6 +181,30 @@ func Build(req BuildRequest) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal grade artifact", ExitCode: 1, Err: err}
 	}
 	artifacts["auditability-grade.yaml"] = gradeYAML
+
+	identityChainRaw, err := identitygovernance.MarshalIndent(identityArtifacts.ChainSummary)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal identity-chain summary", ExitCode: 1, Err: err}
+	}
+	artifacts["identity-chain-summary.json"] = identityChainRaw
+
+	ownershipRaw, err := identitygovernance.MarshalIndent(identityArtifacts.OwnershipRegister)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal ownership register", ExitCode: 1, Err: err}
+	}
+	artifacts["ownership-register.json"] = ownershipRaw
+
+	privilegeRaw, err := identitygovernance.MarshalIndent(identityArtifacts.PrivilegeDriftReport)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal privilege drift report", ExitCode: 1, Err: err}
+	}
+	artifacts["privilege-drift-report.json"] = privilegeRaw
+
+	delegatedRaw, err := identitygovernance.MarshalIndent(identityArtifacts.DelegatedChainExceptions)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal delegated-chain exceptions", ExitCode: 1, Err: err}
+	}
+	artifacts["delegated-chain-exceptions.json"] = delegatedRaw
 
 	executiveSummary := struct {
 		Version        string     `json:"version"`
@@ -356,6 +383,7 @@ func buildCompliance(definitions []framework.Definition, report coverage.Report,
 			}
 		}
 	}
+	identityArtifacts := identitygovernance.Build(records)
 
 	return Compliance{
 		RequiredRecordTypes: requiredTypes,
@@ -365,6 +393,7 @@ func buildCompliance(definitions []framework.Definition, report coverage.Report,
 		ControlsMissing:     missingFields,
 		Complete:            len(missing) == 0 && incomplete == 0 && missingFields == 0,
 		Grade:               gradeResult,
+		IdentityGovernance:  identityArtifacts.Digest,
 	}
 }
 
@@ -424,6 +453,9 @@ func buildBoundaryContract(audit string, frameworks []string) string {
 		"- Frameworks: " + strings.Join(frameworks, ","),
 		"- Fixed timestamp strategy: " + FixedTimestampRFC3339,
 		"- Proof owns cryptographic verification; Axym layers deterministic compliance interpretation.",
+		"- Axym proves identity-governed action in software delivery; it does not replace IAM, PAM, or IGA systems.",
+		"- Upstream identity systems remain authoritative for identity lifecycle, credential issuance, entitlements, and interactive access control.",
+		"- Bundle identity artifacts summarize actor, downstream identity, owner or approver, delegation chain, policy binding, and privilege-drift exceptions.",
 		"- Output safety contract: non-empty unmanaged output paths fail with exit 8.",
 		"- Raw records are included as `raw-records.jsonl` and chain material as `chain.json`.",
 	}

@@ -11,6 +11,7 @@ import (
 
 	ingestgait "github.com/Clyra-AI/axym/core/ingest/gait"
 	ingestwrkr "github.com/Clyra-AI/axym/core/ingest/wrkr"
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/axym/core/store"
 	coreverify "github.com/Clyra-AI/axym/core/verify"
 	"github.com/Clyra-AI/proof"
@@ -40,7 +41,7 @@ func TestMixedSourceChainVerifiesWithAxymAndProof(t *testing.T) {
 	if err := os.MkdirAll(gaitPackDir, 0o700); err != nil {
 		t.Fatalf("mkdir gait pack: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(gaitPackDir, "native_records.jsonl"), []byte(`{"type":"trace","timestamp":"2026-02-28T23:31:00Z","event":{"tool_name":"planner"},"metadata":{"session_id":"mixed-session"}}`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(gaitPackDir, "native_records.jsonl"), []byte(`{"type":"trace","timestamp":"2026-02-28T23:31:00Z","agent_id":"agent://executor","event":{"tool_name":"planner","actor_identity":"agent://requester"},"metadata":{"session_id":"mixed-session"}}`+"\n"), 0o600); err != nil {
 		t.Fatalf("write gait native file: %v", err)
 	}
 	if _, err := ingestgait.Ingest(context.Background(), ingestgait.Request{
@@ -68,6 +69,12 @@ func TestMixedSourceChainVerifiesWithAxymAndProof(t *testing.T) {
 	}
 	if !proofVerify.Intact || proofVerify.Count != 2 {
 		t.Fatalf("proof verify mismatch: %+v", proofVerify)
+	}
+
+	firstView := normalize.IdentityViewFromRecord(&chain.Records[0])
+	secondView := normalize.IdentityViewFromRecord(&chain.Records[1])
+	if firstView.ActorIdentity == "" || secondView.ActorIdentity == "" {
+		t.Fatalf("expected normalized identities across mixed source chain: first=%+v second=%+v", firstView, secondView)
 	}
 }
 

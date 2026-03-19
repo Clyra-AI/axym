@@ -35,6 +35,7 @@ func TestContextWeightingDeterministicRationale(t *testing.T) {
 			Source:        "mcp",
 			SourceProduct: "axym",
 			Type:          "tool_invocation",
+			AgentID:       "agent-mcp",
 			Event:         map[string]any{"tool_name": "filesystem.write"},
 			Metadata: map[string]any{
 				"data_class":       "restricted",
@@ -48,6 +49,7 @@ func TestContextWeightingDeterministicRationale(t *testing.T) {
 			Source:        "mcp",
 			SourceProduct: "axym",
 			Type:          "tool_invocation",
+			AgentID:       "agent-mcp",
 			Event:         map[string]any{"tool_name": "filesystem.read"},
 			Metadata:      map[string]any{"data_class": "public", "risk_level": "low", "discovery_method": "runtime"},
 			Controls:      proof.Controls{PermissionsEnforced: true},

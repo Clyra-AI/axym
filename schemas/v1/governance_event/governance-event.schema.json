@@ -45,6 +45,21 @@
           "minLength": 1
         }
       }
+    },
+    "delegationHop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity"],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "required": [
@@ -88,6 +103,27 @@
       "properties": {
         "kind": {"type": "string", "minLength": 1},
         "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "downstream_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "approval_token_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "delegation_chain": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/delegationHop"
       }
     },
     "context": {

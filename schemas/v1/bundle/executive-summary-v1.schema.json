@@ -69,6 +69,39 @@
           "type": "integer",
           "minimum": 0
         },
+        "identity_governance": {
+          "type": "object",
+          "required": [
+            "record_count",
+            "weak_record_count",
+            "owner_count",
+            "privilege_drift_finding_count",
+            "delegated_chain_exception_count"
+          ],
+          "properties": {
+            "record_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "weak_record_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "owner_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "privilege_drift_finding_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "delegated_chain_exception_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
         "complete": {
           "type": "boolean"
         },

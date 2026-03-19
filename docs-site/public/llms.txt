@@ -7,7 +7,7 @@ Axym local docs index
 - SECURITY.md
 - README.md — install, smoke test, sample proof path, real integration path
 - docs/commands/axym.md — command guide and supported surfaces
-- docs-site/public/llm/axym.md — launch-facing summary for LLM and search consumers
+- docs-site/public/llm/axym.md — launch-facing identity-governed action summary for LLM and search consumers
 - docs/operator/quickstart.md — operator walkthrough for smoke, sample, and real integration paths
 - docs/operator/integration-model.md — runtime ownership model and sync/async evidence flow
 - docs/operator/integration-boundary.mmd — Mermaid source for the integration-boundary diagram
