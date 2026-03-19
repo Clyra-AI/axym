@@ -61,3 +61,19 @@ func TestRegressBaselineSchemaContract(t *testing.T) {
 		t.Fatalf("validate baseline schema: %v", err)
 	}
 }
+
+func TestRegressRunDoesNotCreateSigningKeyOnFreshStore(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	baselinePath := filepath.Join(root, "baseline.json")
+
+	out, exit := runAxymContract(t, "regress", "run", "--baseline", baselinePath, "--frameworks", "eu-ai-act", "--store-dir", storeDir, "--json")
+	if exit != 6 {
+		t.Fatalf("regress run exit mismatch: got %d want 6 output=%s", exit, out)
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no regress signing key side effect, got err=%v", err)
+	}
+}

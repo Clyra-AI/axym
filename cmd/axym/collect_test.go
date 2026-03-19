@@ -110,6 +110,60 @@ func TestCollectGovernanceContextEngineeringJSONAppendsRecords(t *testing.T) {
 	}
 }
 
+func TestCollectPluginEmptyMetadataRoundTripsVerify(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	pluginPath := filepath.Join(root, "plugin.go")
+	pluginSource := []byte("package main\nimport \"fmt\"\nfunc main(){fmt.Println(`{\"source_type\":\"plugin\",\"source\":\"custom\",\"source_product\":\"axym\",\"record_type\":\"tool_invocation\",\"agent_id\":\"agent-1\",\"timestamp\":\"2026-03-18T00:00:00Z\",\"event\":{\"tool_name\":\"scan\"},\"metadata\":{},\"controls\":{\"permissions_enforced\":true}}`)}\n")
+	if err := os.WriteFile(pluginPath, pluginSource, 0o600); err != nil {
+		t.Fatalf("write plugin source: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{
+		"collect",
+		"--store-dir", storeDir,
+		"--plugin-timeout", "60s",
+		"--plugin", "go run " + pluginPath,
+		"--json",
+	}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("collect exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	var collectPayload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &collectPayload); err != nil {
+		t.Fatalf("decode collect json: %v", err)
+	}
+	data, _ := collectPayload["data"].(map[string]any)
+	if appended, _ := data["appended"].(float64); appended != 1 {
+		t.Fatalf("expected one appended plugin record, output=%s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"verify", "--chain", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("verify exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	var verifyPayload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &verifyPayload); err != nil {
+		t.Fatalf("decode verify json: %v", err)
+	}
+	verifyData, _ := verifyPayload["data"].(map[string]any)
+	verification, _ := verifyData["verification"].(map[string]any)
+	if intact, _ := verification["intact"].(bool); !intact {
+		t.Fatalf("expected intact chain, output=%s", stdout.String())
+	}
+	if count, _ := verification["count"].(float64); count != 1 {
+		t.Fatalf("expected verified record count=1, output=%s", stdout.String())
+	}
+}
+
 func fixtureDir(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

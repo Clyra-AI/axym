@@ -24,7 +24,7 @@ func runCompliance(frameworkIDs []string, storeDir string, policy threshold.Poli
 	if err != nil {
 		return complianceRun{}, err
 	}
-	st, err := store.New(store.Config{RootDir: storeDir})
+	st, err := store.OpenReadOnly(store.Config{RootDir: storeDir})
 	if err != nil {
 		return complianceRun{}, fmt.Errorf("initialize local store: %w", err)
 	}

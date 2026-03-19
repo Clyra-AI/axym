@@ -40,7 +40,7 @@ Axym is a deterministic AI governance CLI for platform, security, and GRC engine
 - `axym map --json` and `axym gaps --json`: default to frameworks `eu-ai-act,soc2` when `--frameworks` is omitted.
 - `axym map --frameworks eu-ai-act --min-coverage 0.80 --json`: enforces threshold policy and exits non-zero when coverage is below threshold.
 - `axym verify --chain --json`: verifies local append-only chain integrity.
-- `axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks.
+- `axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks without writing store-managed temp artifacts.
 
 ## Contributor gates
 

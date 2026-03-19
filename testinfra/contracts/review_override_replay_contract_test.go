@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -53,5 +54,18 @@ func TestOverrideAndReplayJSONEnvelopeContract(t *testing.T) {
 	}
 	if replayPayload["command"] != "replay" {
 		t.Fatalf("replay command mismatch: %s", replayOut)
+	}
+}
+
+func TestReviewDoesNotCreateSigningKeyOnFreshStore(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	stdout, exit := runAxymContract(t, "review", "--date", "2026-09-15", "--store-dir", storeDir, "--json")
+	if exit != 0 {
+		t.Fatalf("unexpected exit %d output=%s", exit, stdout)
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no review signing key side effect, got err=%v", err)
 	}
 }

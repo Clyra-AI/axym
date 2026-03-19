@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -76,6 +77,24 @@ func TestRegressRunExit5OnDrift(t *testing.T) {
 	}
 	if payload["ok"] != false {
 		t.Fatalf("expected ok=false output=%s", stdout.String())
+	}
+}
+
+func TestRegressFreshStoreDoesNotCreateSigningKey(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	baselinePath := filepath.Join(root, "baseline.json")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"regress", "run", "--baseline", baselinePath, "--frameworks", "eu-ai-act", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no signing key side effect, got err=%v", err)
 	}
 }
 

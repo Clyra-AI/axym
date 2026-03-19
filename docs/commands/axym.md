@@ -56,7 +56,7 @@ Release binary:
 - `axym replay --model payments-agent --tier A --json`: emits replay-certification evidence with deterministic blast-radius summaries.
 - `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, OSCAL, and portable raw records.
 - `axym verify --chain --json`: verifies append-only chain integrity.
-- `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness.
+- `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness without writing store-managed temp artifacts.
 
 ## Contributor checks
 

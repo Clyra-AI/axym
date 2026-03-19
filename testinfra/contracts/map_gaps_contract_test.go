@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -51,5 +52,28 @@ func TestMapAndGapsJSONEnvelopeContract(t *testing.T) {
 	}
 	if _, ok := gapsData["grade"].(map[string]any); !ok {
 		t.Fatalf("gaps missing grade data: %s", gapsOut)
+	}
+}
+
+func TestMapAndGapsDoNotCreateSigningKeysOnFreshStore(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mapStore := filepath.Join(root, "map-store")
+	mapOut, mapExit := runAxymContract(t, "map", "--store-dir", mapStore, "--json")
+	if mapExit != 0 {
+		t.Fatalf("map exit mismatch: %d output=%s", mapExit, mapOut)
+	}
+	if _, err := os.Stat(filepath.Join(mapStore, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no map signing key side effect, got err=%v", err)
+	}
+
+	gapsStore := filepath.Join(root, "gaps-store")
+	gapsOut, gapsExit := runAxymContract(t, "gaps", "--store-dir", gapsStore, "--json")
+	if gapsExit != 0 {
+		t.Fatalf("gaps exit mismatch: %d output=%s", gapsExit, gapsOut)
+	}
+	if _, err := os.Stat(filepath.Join(gapsStore, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no gaps signing key side effect, got err=%v", err)
 	}
 }
