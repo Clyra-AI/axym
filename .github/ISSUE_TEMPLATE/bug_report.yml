@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible Axym defect or regression.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Axym. Please share a minimal, deterministic repro when possible.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: Include the full `axym` command or workflow that failed.
+      placeholder: ./axym collect --json ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Machine-readable output
+      description: Paste `--json` output and the exit code when available.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Axym version, install path, OS, Go version, and any relevant dependency versions.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Share the smallest repeatable sequence that triggers the bug.
+    validations:
+      required: true
+

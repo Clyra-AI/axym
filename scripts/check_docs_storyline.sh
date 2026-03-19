@@ -4,6 +4,8 @@ set -euo pipefail
 docs=(
   "README.md"
   "docs/commands/axym.md"
+  "docs-site/public/llm/axym.md"
+  "docs/operator/quickstart.md"
 )
 
 for doc in "${docs[@]}"; do
@@ -16,7 +18,10 @@ for doc in "${docs[@]}"; do
   grep -Fq "make lint-go" "$doc"
   grep -Fq "make test-security" "$doc"
   grep -Fq "make test-docs-links" "$doc"
-  grep -Fq "./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl" "$doc"
+  grep -Fq "./axym init --sample-pack ./axym-sample --json" "$doc"
+  grep -Fq "./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl" "$doc"
+  grep -Fq "./axym record add --input ./axym-sample/records/approval.json --json" "$doc"
+  grep -Fq "./axym record add --input ./axym-sample/records/risk_assessment.json --json" "$doc"
 done
 
 line_number() {
@@ -33,18 +38,22 @@ for doc in "${docs[@]}"; do
   install_line="$(line_number "brew install Clyra-AI/tap/axym" "$doc")"
   init_line="$(line_number "./axym init --json" "$doc")"
   dry_run_line="$(line_number "./axym collect --dry-run --json" "$doc")"
-  collect_line="$(line_number "./axym collect --json" "$doc")"
+  sample_init_line="$(line_number "./axym init --sample-pack ./axym-sample --json" "$doc")"
+  sample_collect_line="$(line_number "./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl" "$doc")"
+  sample_record_line="$(line_number "./axym record add --input ./axym-sample/records/approval.json --json" "$doc")"
   map_line="$(line_number "./axym map --frameworks eu-ai-act,soc2 --json" "$doc")"
-  bundle_line="$(line_number "./axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json" "$doc")"
+  bundle_line="$(line_number "./axym bundle --audit sample --frameworks eu-ai-act,soc2 --json" "$doc")"
 
   test -n "$install_line"
   test -n "$init_line"
   test -n "$dry_run_line"
-  test -n "$collect_line"
+  test -n "$sample_init_line"
+  test -n "$sample_collect_line"
+  test -n "$sample_record_line"
   test -n "$map_line"
   test -n "$bundle_line"
 
-  if (( install_line >= init_line || init_line >= dry_run_line || dry_run_line >= collect_line || collect_line >= map_line || map_line >= bundle_line )); then
+  if (( install_line >= init_line || init_line >= dry_run_line || dry_run_line >= sample_init_line || sample_init_line >= sample_collect_line || sample_collect_line >= sample_record_line || sample_record_line >= map_line || map_line >= bundle_line )); then
     echo "storyline order mismatch in $doc" >&2
     exit 1
   fi

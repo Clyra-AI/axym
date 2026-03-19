@@ -2,6 +2,12 @@
 
 Axym is a deterministic AI governance CLI for platform, security, and GRC teams that need local evidence collection, compliance mapping, and audit-ready bundles.
 
+## Runtime boundary
+
+Axym collects or ingests evidence from systems you already operate. Customer code, CI, MCP servers, model providers, and sibling systems stay upstream. Axym turns the resulting structured evidence into local proof records, compliance maps, gaps, and bundles.
+
+Operator walkthroughs live in [../operator/quickstart.md](../operator/quickstart.md) and [../operator/integration-model.md](../operator/integration-model.md).
+
 ## Install paths
 
 Homebrew:
@@ -24,29 +30,64 @@ Release binary:
 ./axym version --json
 ```
 
-## First 15 minutes
+## Smoke test
+
+Use this when you want to confirm the binary and local environment are wired correctly.
 
 ```bash
 ./axym init --json
 ./axym collect --dry-run --json
-./axym collect --json
+```
+
+Expected outcome:
+
+- `init` creates the local store and default policy.
+- `collect --dry-run` shows deterministic would-capture output without writes.
+- A fresh environment may still return `captured: 0` on plain `collect --json`; that validates the smoke path, but it is not the published first-value result.
+
+## Sample proof path
+
+Use this when you want a supported offline demo that ends with non-empty evidence and a non-empty compliance result.
+
+```bash
+./axym init --sample-pack ./axym-sample --json
+./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl
+./axym record add --input ./axym-sample/records/approval.json --json
+./axym record add --input ./axym-sample/records/risk_assessment.json --json
 ./axym map --frameworks eu-ai-act,soc2 --json
 ./axym gaps --frameworks eu-ai-act,soc2 --json
-./axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json
+./axym bundle --audit sample --frameworks eu-ai-act,soc2 --json
 ./axym verify --chain --json
 ```
+
+Expected outcome:
+
+- The sample pack is generated locally with no network fetch and no repo fixture path.
+- The sample flow appends 5 total records to the local chain.
+- `map` reports 5 covered controls out of 6 across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `bundle` and `verify --chain --json` succeed.
+
+## Real integration path
+
+- Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
+- Plugin collectors: `axym collect --json --plugin "<cmd>"`.
+- Manual record append: `axym record add --input <record.json> --json`.
+- Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --source gait --json --input <path>`.
+
+Public docs should not describe approvals, risk assessments, incidents, guardrails, or broader enterprise surfaces as default built-in clean-room capture unless that collector actually ships.
 
 ## Commands
 
 - `axym init --json`: creates local store scaffolding and policy defaults.
+- `axym init --sample-pack ./axym-sample --json`: creates the local store plus a deterministic sample pack with machine-readable created files and next steps.
 - `axym collect --dry-run --json`: validates fixture and environment readiness without writes.
-- `axym collect --json`: runs built-in collectors and appends signed proof records.
+- `axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
 - `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and rejects malformed JSONL deterministically.
 - `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records.
-- `./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl`: captures digest-first context engineering events for `instruction_rewrite`, `context_reset`, and `knowledge_import`.
-- `axym record add --input ./fixtures/records/decision.json --json`: appends a user-supplied proof record payload.
-- `axym ingest --source wrkr --json --input ./fixtures/ingest/wrkr/proof_records.jsonl`: ingests Wrkr evidence with stateful drift tracking.
-- `axym ingest --source gait --json --input ./fixtures/ingest/gait`: ingests Gait native/proof pack artifacts with translation.
+- `axym record add --input <record.json> --json`: appends a user-supplied proof record payload.
+- `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
+- `axym ingest --source gait --json --input <path>`: ingests Gait native/proof pack artifacts with translation.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.
 - `axym gaps --frameworks eu-ai-act,soc2 --json`: ranks `covered`, `partial`, and `gap` outcomes with remediation and effort.
 - `axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: captures deterministic baseline coverage.
