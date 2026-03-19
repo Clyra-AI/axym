@@ -458,7 +458,7 @@ func targetFromRelationship(relationship *proof.Relationship) (string, string) {
 			continue
 		}
 		switch kind {
-		case "identity", "owner", "policy", "approver":
+		case "agent", "identity", "owner", "policy", "approver":
 			continue
 		default:
 			return kind, id

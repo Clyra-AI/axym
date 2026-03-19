@@ -198,8 +198,8 @@ func privilegeDriftFinding(record proof.Record, view normalize.IdentityView) (Pr
 	if privilege == "" {
 		return PrivilegeDriftFinding{}, false
 	}
-	approved, _ := boolFromMap(record.Event, "approved")
-	if !approved {
+	approved, ok := boolFromMap(record.Event, "approved")
+	if !ok {
 		approved, _ = boolFromMap(record.Metadata, "approved")
 	}
 	status := "approved"
