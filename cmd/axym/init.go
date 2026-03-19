@@ -21,19 +21,30 @@ func newInitCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 		Use:   "init",
 		Short: "Initialize deterministic Axym policy and local store",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var preparedSamplePack *samplepack.Prepared
 			if strings.TrimSpace(samplePackDir) != "" {
 				normalized, err := samplepack.ValidateTarget(samplePackDir)
 				if err != nil {
 					return emitInitInvalidInput(fmt.Sprintf("sample-pack initialization failed: %v", err), stdout, stderr, global)
 				}
 				samplePackDir = normalized
+				preparedSamplePack, err = samplepack.Prepare(samplePackDir)
+				if err != nil {
+					return emitInitError(fmt.Errorf("prepare sample pack: %w", err), stdout, stderr, global)
+				}
 			}
 			_, err := store.New(store.Config{RootDir: storeDir})
 			if err != nil {
+				if preparedSamplePack != nil {
+					_ = preparedSamplePack.Cleanup()
+				}
 				return emitInitError(fmt.Errorf("initialize store: %w", err), stdout, stderr, global)
 			}
 			policy, created, err := config.WriteDefault(policyPath, force)
 			if err != nil {
+				if preparedSamplePack != nil {
+					_ = preparedSamplePack.Cleanup()
+				}
 				return emitInitInvalidInput(fmt.Sprintf("policy initialization failed: %v", err), stdout, stderr, global)
 			}
 			data := map[string]any{
@@ -43,7 +54,7 @@ func newInitCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.
 				"version":        policy.Version,
 			}
 			if strings.TrimSpace(samplePackDir) != "" {
-				pack, err := samplepack.Create(samplePackDir)
+				pack, err := preparedSamplePack.Finalize()
 				if err != nil {
 					return emitInitError(fmt.Errorf("create sample pack: %w", err), stdout, stderr, global)
 				}

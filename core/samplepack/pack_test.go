@@ -87,3 +87,21 @@ func TestCreateCleansTempDirWhenFinalizeFails(t *testing.T) {
 		t.Fatalf("expected temp dir cleanup, got err=%v", statErr)
 	}
 }
+
+func TestNextStepsQuotePathsWithSpaces(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	target := filepath.Join(root, "axym sample")
+
+	result, err := Create(target)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	for _, step := range result.NextSteps[:3] {
+		if !strings.Contains(step, "\"") {
+			t.Fatalf("expected quoted path in step %q", step)
+		}
+	}
+}

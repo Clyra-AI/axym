@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,13 @@ type Result struct {
 type File struct {
 	Path string `json:"path"`
 	Kind string `json:"kind"`
+}
+
+type Prepared struct {
+	targetDir string
+	tempDir   string
+	files     []File
+	ops       fileOps
 }
 
 type asset struct {
@@ -109,6 +117,10 @@ func Create(targetDir string) (Result, error) {
 	return createWithOps(targetDir, defaultFileOps())
 }
 
+func Prepare(targetDir string) (*Prepared, error) {
+	return prepareWithOps(targetDir, defaultFileOps())
+}
+
 func ValidateTarget(targetDir string) (string, error) {
 	trimmed := strings.TrimSpace(targetDir)
 	if trimmed == "" {
@@ -126,47 +138,54 @@ func ValidateTarget(targetDir string) (string, error) {
 }
 
 func createWithOps(targetDir string, ops fileOps) (Result, error) {
-	targetDir, err := ValidateTarget(targetDir)
+	prepared, err := prepareWithOps(targetDir, ops)
 	if err != nil {
 		return Result{}, err
 	}
+	return prepared.Finalize()
+}
+
+func prepareWithOps(targetDir string, ops fileOps) (*Prepared, error) {
+	targetDir, err := ValidateTarget(targetDir)
+	if err != nil {
+		return nil, err
+	}
 
 	if _, err := ops.stat(targetDir); err == nil {
-		return Result{}, fmt.Errorf("sample pack target already exists: %s", targetDir)
+		return nil, fmt.Errorf("sample pack target already exists: %s", targetDir)
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return Result{}, fmt.Errorf("stat sample pack target: %w", err)
+		return nil, fmt.Errorf("stat sample pack target: %w", err)
 	}
 
 	parentDir := filepath.Dir(targetDir)
 	if err := ops.mkdirAll(parentDir, defaultDirPerm); err != nil {
-		return Result{}, fmt.Errorf("create sample pack parent: %w", err)
+		return nil, fmt.Errorf("create sample pack parent: %w", err)
 	}
 
 	tempDir, err := ops.mkdtemp(parentDir, ".axym-samplepack-*")
 	if err != nil {
-		return Result{}, fmt.Errorf("create sample pack temp dir: %w", err)
+		return nil, fmt.Errorf("create sample pack temp dir: %w", err)
 	}
-	cleanupTemp := true
+	prepared := &Prepared{
+		targetDir: targetDir,
+		tempDir:   tempDir,
+		ops:       ops,
+	}
 	defer func() {
-		if cleanupTemp {
-			_ = ops.removeAll(tempDir)
+		if prepared != nil {
+			_ = prepared.Cleanup()
 		}
 	}()
 
 	for _, item := range sampleAssets {
 		path := filepath.Join(tempDir, filepath.FromSlash(item.RelPath))
 		if err := ops.mkdirAll(filepath.Dir(path), defaultDirPerm); err != nil {
-			return Result{}, fmt.Errorf("create sample pack dir: %w", err)
+			return nil, fmt.Errorf("create sample pack dir: %w", err)
 		}
 		if err := ops.writeFile(path, []byte(item.Contents), defaultFilePerm); err != nil {
-			return Result{}, fmt.Errorf("write sample pack asset %s: %w", item.RelPath, err)
+			return nil, fmt.Errorf("write sample pack asset %s: %w", item.RelPath, err)
 		}
 	}
-
-	if err := ops.rename(tempDir, targetDir); err != nil {
-		return Result{}, fmt.Errorf("finalize sample pack: %w", err)
-	}
-	cleanupTemp = false
 
 	files := make([]File, 0, len(sampleAssets))
 	for _, item := range sampleAssets {
@@ -175,19 +194,42 @@ func createWithOps(targetDir string, ops fileOps) (Result, error) {
 			Kind: item.Kind,
 		})
 	}
+	prepared.files = files
+	out := prepared
+	prepared = nil
+	return out, nil
+}
 
+func (p *Prepared) Finalize() (Result, error) {
+	if p == nil {
+		return Result{}, fmt.Errorf("prepared sample pack is nil")
+	}
+	if err := p.ops.rename(p.tempDir, p.targetDir); err != nil {
+		_ = p.Cleanup()
+		return Result{}, fmt.Errorf("finalize sample pack: %w", err)
+	}
+	p.tempDir = ""
 	return Result{
-		Path:      targetDir,
-		Files:     files,
-		NextSteps: nextSteps(targetDir),
+		Path:      p.targetDir,
+		Files:     p.files,
+		NextSteps: nextSteps(p.targetDir),
 	}, nil
+}
+
+func (p *Prepared) Cleanup() error {
+	if p == nil || p.tempDir == "" {
+		return nil
+	}
+	err := p.ops.removeAll(p.tempDir)
+	p.tempDir = ""
+	return err
 }
 
 func nextSteps(targetDir string) []string {
 	return []string{
-		fmt.Sprintf("axym collect --json --governance-event-file %s", filepath.Join(targetDir, "governance", "context_engineering.jsonl")),
-		fmt.Sprintf("axym record add --input %s --json", filepath.Join(targetDir, "records", "approval.json")),
-		fmt.Sprintf("axym record add --input %s --json", filepath.Join(targetDir, "records", "risk_assessment.json")),
+		fmt.Sprintf("axym collect --json --governance-event-file %s", shellQuote(filepath.Join(targetDir, "governance", "context_engineering.jsonl"))),
+		fmt.Sprintf("axym record add --input %s --json", shellQuote(filepath.Join(targetDir, "records", "approval.json"))),
+		fmt.Sprintf("axym record add --input %s --json", shellQuote(filepath.Join(targetDir, "records", "risk_assessment.json"))),
 		"axym map --frameworks eu-ai-act,soc2 --json",
 		"axym gaps --frameworks eu-ai-act,soc2 --json",
 		"axym bundle --audit sample --frameworks eu-ai-act,soc2 --json",
@@ -204,6 +246,10 @@ func defaultFileOps() fileOps {
 		removeAll: os.RemoveAll,
 		stat:      os.Stat,
 	}
+}
+
+func shellQuote(path string) string {
+	return strconv.Quote(path)
 }
 
 func isFilesystemRoot(path string) bool {
