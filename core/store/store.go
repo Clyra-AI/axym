@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	axymrecord "github.com/Clyra-AI/axym/core/record"
 	"github.com/Clyra-AI/axym/core/store/dedupe"
 	"github.com/Clyra-AI/proof"
 )
@@ -51,6 +52,7 @@ type Store struct {
 	mu          sync.Mutex
 	now         func() time.Time
 	atomicWrite AtomicWriter
+	readOnly    bool
 }
 
 type keyFile struct {
@@ -64,20 +66,33 @@ type dedupeState struct {
 }
 
 func New(cfg Config, opts ...Option) (*Store, error) {
+	return open(cfg, false, opts...)
+}
+
+func OpenReadOnly(cfg Config, opts ...Option) (*Store, error) {
+	return open(cfg, true, opts...)
+}
+
+func open(cfg Config, readOnly bool, opts ...Option) (*Store, error) {
 	cfg = normalizeConfig(cfg)
-	if err := os.MkdirAll(cfg.RootDir, defaultDirPerm); err != nil {
-		return nil, fmt.Errorf("create store root: %w", err)
+	if !readOnly {
+		if err := os.MkdirAll(cfg.RootDir, defaultDirPerm); err != nil {
+			return nil, fmt.Errorf("create store root: %w", err)
+		}
 	}
 	s := &Store{
 		cfg:         cfg,
 		now:         func() time.Time { return time.Now().UTC().Truncate(time.Second) },
 		atomicWrite: WriteJSONAtomic,
+		readOnly:    readOnly,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
-	if err := s.ensureSigningKey(); err != nil {
-		return nil, err
+	if !s.readOnly {
+		if err := s.ensureSigningKey(); err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
@@ -110,6 +125,9 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 	if record == nil {
 		return AppendResult{}, errors.New("record is nil")
 	}
+	if s.readOnly {
+		return AppendResult{}, errors.New("store is read-only")
+	}
 	if strings.TrimSpace(record.RecordID) == "" {
 		return AppendResult{}, errors.New("record_id is required")
 	}
@@ -139,7 +157,10 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 		}
 	}
 
-	linked := proof.Record(*record)
+	linked := axymrecord.CanonicalizeProofRecord(record)
+	if linked == nil {
+		return AppendResult{}, errors.New("record is nil")
+	}
 	linked.Integrity.PreviousRecordHash = chain.HeadHash
 	linked.Integrity.RecordHash = ""
 	linked.Integrity.Signature = ""
@@ -149,10 +170,10 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 	if err != nil {
 		return AppendResult{}, err
 	}
-	if _, err := proof.Sign(&linked, signingKey); err != nil {
+	if _, err := proof.Sign(linked, signingKey); err != nil {
 		return AppendResult{}, fmt.Errorf("sign record: %w", err)
 	}
-	if err := proof.AppendToChain(chain, &linked); err != nil {
+	if err := proof.AppendToChain(chain, linked); err != nil {
 		return AppendResult{}, fmt.Errorf("append to chain: %w", err)
 	}
 	if dedupeKey != "" {

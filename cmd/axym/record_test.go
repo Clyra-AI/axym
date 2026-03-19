@@ -72,3 +72,58 @@ func TestRecordAddMissingInputExitCode(t *testing.T) {
 		t.Fatalf("exit mismatch: got %d want %d output=%s", exit, exitInvalidInput, stdout.String())
 	}
 }
+
+func TestRecordAddEmptyMetadataRoundTripsVerify(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	recordPath := filepath.Join(root, "record.json")
+	recordPayload := map[string]any{
+		"record_id":      "rec-test-empty-metadata",
+		"source":         "axym",
+		"source_product": "axym",
+		"agent_id":       "agent-1",
+		"record_type":    "approval",
+		"timestamp":      "2026-03-18T00:00:00Z",
+		"event":          map[string]any{"decision": "allow"},
+		"metadata":       map[string]any{},
+		"controls": map[string]any{
+			"permissions_enforced": true,
+		},
+	}
+	raw, err := json.Marshal(recordPayload)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
+		t.Fatalf("write record fixture: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("record add exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exit = execute([]string{"verify", "--chain", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("verify exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode verify json: %v", err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	verification, _ := data["verification"].(map[string]any)
+	if intact, _ := verification["intact"].(bool); !intact {
+		t.Fatalf("expected intact chain output=%s", stdout.String())
+	}
+	if count, _ := verification["count"].(float64); count != 1 {
+		t.Fatalf("expected count=1 output=%s", stdout.String())
+	}
+}

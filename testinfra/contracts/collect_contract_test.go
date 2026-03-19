@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -72,4 +73,46 @@ func TestCollectGovernanceContextEngineeringContract(t *testing.T) {
 		return
 	}
 	t.Fatalf("governanceevent source summary missing: %s", stdout)
+}
+
+func TestCollectPluginEmptyMetadataRoundTripContract(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	pluginPath := filepath.Join(root, "plugin.go")
+	pluginSource := []byte("package main\nimport \"fmt\"\nfunc main(){fmt.Println(`{\"source_type\":\"plugin\",\"source\":\"custom\",\"source_product\":\"axym\",\"record_type\":\"tool_invocation\",\"agent_id\":\"agent-1\",\"timestamp\":\"2026-03-18T00:00:00Z\",\"event\":{\"tool_name\":\"scan\"},\"metadata\":{},\"controls\":{\"permissions_enforced\":true}}`)}\n")
+	if err := os.WriteFile(pluginPath, pluginSource, 0o600); err != nil {
+		t.Fatalf("write plugin source: %v", err)
+	}
+
+	storeDir := filepath.Join(root, "store")
+	stdout, exit := runAxymContract(t, "collect", "--plugin-timeout", "60s", "--plugin", "go run "+pluginPath, "--store-dir", storeDir, "--json")
+	if exit != 0 {
+		t.Fatalf("unexpected collect exit %d output=%s", exit, stdout)
+	}
+	var collectPayload map[string]any
+	if err := json.Unmarshal([]byte(stdout), &collectPayload); err != nil {
+		t.Fatalf("decode collect json: %v", err)
+	}
+	data, _ := collectPayload["data"].(map[string]any)
+	if appended, _ := data["appended"].(float64); appended != 1 {
+		t.Fatalf("expected appended=1 output=%s", stdout)
+	}
+
+	verifyOut, verifyExit := runAxymContract(t, "verify", "--chain", "--store-dir", storeDir, "--json")
+	if verifyExit != 0 {
+		t.Fatalf("unexpected verify exit %d output=%s", verifyExit, verifyOut)
+	}
+	var verifyPayload map[string]any
+	if err := json.Unmarshal([]byte(verifyOut), &verifyPayload); err != nil {
+		t.Fatalf("decode verify json: %v", err)
+	}
+	verifyData, _ := verifyPayload["data"].(map[string]any)
+	verification, _ := verifyData["verification"].(map[string]any)
+	if verification["intact"] != true {
+		t.Fatalf("expected intact=true output=%s", verifyOut)
+	}
+	if verification["count"] != float64(1) {
+		t.Fatalf("expected count=1 output=%s", verifyOut)
+	}
 }

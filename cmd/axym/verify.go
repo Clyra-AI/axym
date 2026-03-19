@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	coreVerify "github.com/Clyra-AI/axym/core/verify"
 	"github.com/spf13/cobra"
@@ -44,12 +43,6 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				return nil
 			}
 
-			if tempDir == "" {
-				tempDir = filepath.Join(storeDir, "tmp", "verify")
-			}
-			if err := coreVerify.EnsureManagedTempDir(tempDir); err != nil {
-				return emitVerifyError(err, stdout, stderr, global)
-			}
 			frameworkIDs := []string(nil)
 			if cmd.Flags().Changed("frameworks") {
 				frameworkIDs = normalizeFrameworkInput(frameworks)
@@ -70,7 +63,7 @@ func newVerifyCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	cmd.Flags().StringVar(&bundlePath, "bundle", "", "Verify bundle directory")
 	cmd.Flags().StringSliceVar(&frameworks, "frameworks", nil, "Framework IDs for compliance completeness checks (comma-separated)")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
-	cmd.Flags().StringVar(&tempDir, "temp-dir", "", "Path for verify temporary artifacts")
+	cmd.Flags().StringVar(&tempDir, "temp-dir", "", "Compatibility no-op; bundle verification does not create temporary artifacts")
 	return cmd
 }
 

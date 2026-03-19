@@ -75,3 +75,25 @@ func TestBuildRejectsSchemaInvalid(t *testing.T) {
 		t.Fatalf("reason mismatch: got %q want %q", ReasonCode(err), ReasonSchemaError)
 	}
 }
+
+func TestBuildCanonicalizesEmptyMetadata(t *testing.T) {
+	t.Parallel()
+
+	normalized := normalize.Record{
+		Source:        "mcp",
+		SourceProduct: "axym",
+		RecordType:    "tool_invocation",
+		Timestamp:     time.Date(2026, 2, 28, 12, 0, 0, 0, time.UTC),
+		Event:         map[string]any{"tool_name": "fetch"},
+		Metadata:      map[string]any{},
+		Controls:      normalize.Controls{PermissionsEnforced: true},
+	}
+
+	record, err := Build(BuildInput{Normalized: normalized})
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if record.Metadata != nil {
+		t.Fatalf("expected empty metadata to canonicalize to nil, got %#v", record.Metadata)
+	}
+}

@@ -104,7 +104,7 @@ func Build(req Request) (Pack, error) {
 		storeDir = ".axym"
 	}
 
-	evidenceStore, err := store.New(store.Config{RootDir: storeDir})
+	evidenceStore, err := store.OpenReadOnly(store.Config{RootDir: storeDir})
 	if err != nil {
 		return Pack{}, &Error{ReasonCode: "REVIEW_STORE_UNAVAILABLE", Message: "initialize local store", Err: err}
 	}

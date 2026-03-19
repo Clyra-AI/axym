@@ -132,7 +132,7 @@ Hosted CI remains authoritative for pull-request workflow enforcement and CodeQL
 
 `bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
 
-`verify --bundle` reports cryptographic integrity plus deterministic Axym compliance-completeness checks (required record classes, field-coverage state, grade recomputation, and OSCAL schema validation).
+`verify --bundle` reports cryptographic integrity plus deterministic Axym compliance-completeness checks (required record classes, field-coverage state, grade recomputation, and OSCAL schema validation) without creating store-managed temp artifacts.
 
 Release verification uses:
 

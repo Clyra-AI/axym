@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func TestVerifyChainTamperExitCodeAndReason(t *testing.T) {
 	}
 }
 
-func TestVerifyRejectsUnsafeTempPath(t *testing.T) {
+func TestVerifyBundleIgnoresTempDirWithoutMutation(t *testing.T) {
 	t.Parallel()
 
 	unsafeDir := filepath.Join(t.TempDir(), "unsafe")
@@ -108,10 +109,37 @@ func TestVerifyRejectsUnsafeTempPath(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	exit := execute([]string{"verify", "--bundle", filepath.Join("fixtures", "bundles", "good"), "--temp-dir", unsafeDir, "--json"}, &stdout, &stderr)
-	if exit != exitUnsafeBlocked {
-		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitUnsafeBlocked, stdout.String(), stderr.String())
+	exit := execute([]string{"verify", "--bundle", bundleFixturePath(t), "--temp-dir", unsafeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitSuccess, stdout.String(), stderr.String())
 	}
+	if _, err := os.Stat(filepath.Join(unsafeDir, ".axym-managed")); !os.IsNotExist(err) {
+		t.Fatalf("expected no managed marker creation, got err=%v", err)
+	}
+}
+
+func TestVerifyBundleFreshStoreDirDoesNotCreateManagedArtifacts(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"verify", "--bundle", bundleFixturePath(t), "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitSuccess, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(storeDir); !os.IsNotExist(err) {
+		t.Fatalf("expected verify --bundle to leave store dir untouched, got err=%v", err)
+	}
+}
+
+func bundleFixturePath(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "fixtures", "bundles", "good"))
 }
 
 func TestVerifyInvalidTargetJSONContract(t *testing.T) {

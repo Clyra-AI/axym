@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -102,6 +103,21 @@ func TestMapRejectsInvalidMinCoverageInput(t *testing.T) {
 	errObj, _ := payload["error"].(map[string]any)
 	if errObj["reason"] != "invalid_input" {
 		t.Fatalf("reason mismatch: %s", stdout.String())
+	}
+}
+
+func TestMapFreshStoreDoesNotCreateSigningKey(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"map", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "signing-key.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no signing key side effect, got err=%v", err)
 	}
 }
 

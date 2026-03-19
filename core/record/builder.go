@@ -28,25 +28,29 @@ func Build(in BuildInput) (*proof.Record, error) {
 	if err != nil {
 		return nil, NewInvalidInputError(ReasonMappingError, "redaction failed", err)
 	}
+	event, metadata = canonicalizeEventAndMetadata(event, metadata)
 
-	payload, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"source":         in.Normalized.Source,
 		"source_product": in.Normalized.SourceProduct,
 		"record_type":    in.Normalized.RecordType,
 		"agent_id":       in.Normalized.AgentID,
 		"timestamp":      in.Normalized.Timestamp.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		"event":          event,
-		"metadata":       metadata,
 		"controls": map[string]any{
 			"permissions_enforced": in.Normalized.Controls.PermissionsEnforced,
 			"approved_scope":       in.Normalized.Controls.ApprovedScope,
 		},
-	})
+	}
+	if metadata != nil {
+		payload["metadata"] = metadata
+	}
+	payloadRaw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, NewInvalidInputError(ReasonInvalidRecord, "marshal normalized payload", err)
 	}
 
-	if err := recordschema.ValidateNormalized(payload); err != nil {
+	if err := recordschema.ValidateNormalized(payloadRaw); err != nil {
 		return nil, NewInvalidInputError(ReasonSchemaError, "normalized payload failed schema validation", err)
 	}
 
