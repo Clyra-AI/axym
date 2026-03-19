@@ -57,7 +57,11 @@ func syncDir(path string) error {
 	defer func() { _ = dir.Close() }()
 	if err := dir.Sync(); err != nil {
 		// Windows runners may deny directory sync on temp paths; writes are still durable to file path.
-		if shouldIgnoreWindowsDirSyncError(runtime.GOOS, path, err) {
+		ignorePath := path
+		if absPath, absErr := filepath.Abs(path); absErr == nil {
+			ignorePath = absPath
+		}
+		if shouldIgnoreWindowsDirSyncError(runtime.GOOS, ignorePath, err) {
 			return nil
 		}
 		return fmt.Errorf("sync directory: %w", err)

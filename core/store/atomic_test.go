@@ -13,8 +13,6 @@ import (
 )
 
 func TestShouldIgnoreWindowsDirSyncError(t *testing.T) {
-	t.Parallel()
-
 	tempChild := filepath.Join(os.TempDir(), "axym-test")
 	outside := filepath.Join(string(os.PathSeparator), "var", "lib", "axym")
 	permErr := &os.PathError{Op: "sync", Path: tempChild, Err: os.ErrPermission}
