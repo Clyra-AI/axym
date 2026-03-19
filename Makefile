@@ -26,7 +26,7 @@ test-chaos:
 	@go test ./... -count=1 -run TestChaos
 
 test-perf:
-	@go test ./... -count=1 -run TestPerf
+	@AXYM_RUN_PERF=1 go test ./... -count=1 -run TestPerf
 
 test-security:
 	@command -v gosec >/dev/null || (echo "gosec is required"; exit 7)

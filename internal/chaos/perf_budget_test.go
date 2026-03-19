@@ -44,8 +44,16 @@ type resourceBudgetFile struct {
 	BundleFileMax      int   `json:"bundle_file_max"`
 }
 
+func requirePerfLane(t *testing.T) {
+	t.Helper()
+	if os.Getenv("AXYM_RUN_PERF") != "1" {
+		t.Skip("perf tests run only in the perf lane")
+	}
+}
+
 func TestPerfBenchBaselineMatchesRuntimeBudgetKeys(t *testing.T) {
 	t.Parallel()
+	requirePerfLane(t)
 
 	repoRoot := repoRoot(t)
 	var baselines benchBaselineFile
@@ -65,6 +73,7 @@ func TestPerfBenchBaselineMatchesRuntimeBudgetKeys(t *testing.T) {
 
 func TestPerfCoreWorkflowBudgets(t *testing.T) {
 	t.Parallel()
+	requirePerfLane(t)
 
 	prev := runtime.GOMAXPROCS(1)
 	defer runtime.GOMAXPROCS(prev)
@@ -97,6 +106,7 @@ func TestPerfCoreWorkflowBudgets(t *testing.T) {
 
 func TestPerfResourceBudgets(t *testing.T) {
 	t.Parallel()
+	requirePerfLane(t)
 
 	repoRoot := repoRoot(t)
 	var budgets resourceBudgetFile
@@ -128,6 +138,7 @@ func TestPerfResourceBudgets(t *testing.T) {
 
 func TestPerfSoakWorkflowStability(t *testing.T) {
 	t.Parallel()
+	requirePerfLane(t)
 
 	repoRoot := repoRoot(t)
 	var last struct {
