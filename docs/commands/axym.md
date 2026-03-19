@@ -1,10 +1,10 @@
 # Axym Command Guide
 
-Axym is a deterministic AI governance CLI for platform, security, and GRC teams that need local evidence collection, compliance mapping, and audit-ready bundles.
+Axym is a deterministic CLI for proving identity-governed action in software delivery for platform, security, and GRC teams that need local evidence collection, compliance mapping, and audit-ready bundles.
 
 ## Runtime boundary
 
-Axym collects or ingests evidence from systems you already operate. Customer code, CI, MCP servers, model providers, and sibling systems stay upstream. Axym turns the resulting structured evidence into local proof records, compliance maps, gaps, and bundles.
+Axym collects or ingests evidence from systems you already operate. Customer code, CI, MCP servers, model providers, sibling systems, and IAM/PAM/IGA systems stay upstream. Axym turns the resulting structured evidence into local proof records, compliance maps, gaps, and bundles that answer who acted, through which chain, against which target, under which policy and approval.
 
 Operator walkthroughs live in [../operator/quickstart.md](../operator/quickstart.md) and [../operator/integration-model.md](../operator/integration-model.md).
 
@@ -66,7 +66,7 @@ Expected outcome:
 - The sample flow appends 5 total records to the local chain.
 - `map` reports 5 covered controls out of 6 across `eu-ai-act,soc2`.
 - `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
-- `bundle` and `verify --chain --json` succeed.
+- `bundle` emits identity-governance artifacts and `verify --chain --json` succeeds.
 
 ## Real integration path
 
@@ -76,6 +76,7 @@ Expected outcome:
 - Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --source gait --json --input <path>`.
 
 Public docs should not describe approvals, risk assessments, incidents, guardrails, or broader enterprise surfaces as default built-in clean-room capture unless that collector actually ships.
+Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen the wedge beyond software delivery.
 
 ## Commands
 
@@ -84,7 +85,7 @@ Public docs should not describe approvals, risk assessments, incidents, guardrai
 - `axym collect --dry-run --json`: validates fixture and environment readiness without writes.
 - `axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
 - `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and rejects malformed JSONL deterministically.
-- `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records.
+- `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records with actor, downstream, owner, delegation, policy, and approval linkage when present.
 - `axym record add --input <record.json> --json`: appends a user-supplied proof record payload.
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --source gait --json --input <path>`: ingests Gait native/proof pack artifacts with translation.
@@ -95,9 +96,9 @@ Public docs should not describe approvals, risk assessments, incidents, guardrai
 - `axym review --date 2026-09-15 --json`: emits a deterministic Daily Review Pack.
 - `axym override create --bundle Q3-2026 --reason "fixture" --signer ops-key --json`: appends signed override evidence and artifacts.
 - `axym replay --model payments-agent --tier A --json`: emits replay-certification evidence with deterministic blast-radius summaries.
-- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, OSCAL, and portable raw records.
+- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, identity-governance artifacts, OSCAL, and portable raw records.
 - `axym verify --chain --json`: verifies append-only chain integrity.
-- `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness without writing store-managed temp artifacts.
+- `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
 
 ## Contributor checks
 

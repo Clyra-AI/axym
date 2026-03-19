@@ -8,6 +8,7 @@ import (
 
 	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/axym/core/store/dedupe"
 	"github.com/Clyra-AI/proof"
@@ -30,18 +31,19 @@ type Request struct {
 }
 
 type Result struct {
-	Source       string   `json:"source"`
-	InputFiles   int      `json:"input_files"`
-	NativeParsed int      `json:"native_parsed"`
-	ProofParsed  int      `json:"proof_parsed"`
-	Appended     int      `json:"appended"`
-	Deduped      int      `json:"deduped"`
-	Rejected     int      `json:"rejected"`
-	RecordCount  int      `json:"record_count"`
-	HeadHash     string   `json:"head_hash,omitempty"`
-	ReasonCodes  []string `json:"reason_codes"`
-	Translated   int      `json:"translated"`
-	Passthrough  int      `json:"passthrough"`
+	Source        string                   `json:"source"`
+	InputFiles    int                      `json:"input_files"`
+	NativeParsed  int                      `json:"native_parsed"`
+	ProofParsed   int                      `json:"proof_parsed"`
+	Appended      int                      `json:"appended"`
+	Deduped       int                      `json:"deduped"`
+	Rejected      int                      `json:"rejected"`
+	RecordCount   int                      `json:"record_count"`
+	HeadHash      string                   `json:"head_hash,omitempty"`
+	ReasonCodes   []string                 `json:"reason_codes"`
+	Translated    int                      `json:"translated"`
+	Passthrough   int                      `json:"passthrough"`
+	IdentityViews []normalize.IdentityView `json:"identity_views,omitempty"`
 }
 
 type Error struct {
@@ -98,6 +100,7 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 		result.NativeParsed += len(packResult.NativeRecords)
 
 		for _, passthrough := range packResult.ProofRecords {
+			appendIdentityView(&result, normalize.IdentityViewFromRecord(passthrough))
 			if err := appendRecord(req.Store, passthrough, &result); err != nil {
 				return Result{}, err
 			}
@@ -118,6 +121,7 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 				continue
 			}
 			result.Translated++
+			appendIdentityView(&result, normalize.IdentityViewFromRecord(record))
 			if err := appendRecord(req.Store, record, &result); err != nil {
 				return Result{}, err
 			}
@@ -189,4 +193,11 @@ func uniqueSorted(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func appendIdentityView(result *Result, view normalize.IdentityView) {
+	if result == nil || view.Empty() {
+		return
+	}
+	result.IdentityViews = append(result.IdentityViews, view)
 }

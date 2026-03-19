@@ -7,14 +7,35 @@
   "record_type": "decision",
   "timestamp": "2026-03-01T00:00:00Z",
   "event": {
-    "action": "allow"
+    "action": "allow",
+    "actor_identity": "agent://requester",
+    "downstream_identity": "agent://executor",
+    "owner_identity": "owner://platform",
+    "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "approval_token_ref": "approval://chg-123",
+    "target_kind": "tool",
+    "target_id": "planner",
+    "delegation_chain": [
+      {
+        "identity": "agent://requester",
+        "role": "requester"
+      },
+      {
+        "identity": "agent://executor",
+        "role": "delegate"
+      }
+    ]
   },
   "metadata": {
     "reason_code": "MATCHED"
+  },
+  "relationship": {
+    "policy_ref": {
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
   },
   "controls": {
     "permissions_enforced": true,
     "approved_scope": "default"
   }
 }
-

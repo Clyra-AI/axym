@@ -201,6 +201,10 @@ func TestVerifyBundleIncludesComplianceEnvelope(t *testing.T) {
 	if verification["oscal_valid"] != true {
 		t.Fatalf("expected oscal_valid=true output=%s", stdout.String())
 	}
+	compliance, _ := verification["compliance"].(map[string]any)
+	if _, ok := compliance["identity_governance"].(map[string]any); !ok {
+		t.Fatalf("expected identity_governance compliance envelope output=%s", stdout.String())
+	}
 }
 
 func TestVerifyBundleUsesBundleDeclaredFrameworksWhenFlagOmitted(t *testing.T) {

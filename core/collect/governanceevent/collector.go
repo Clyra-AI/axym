@@ -92,6 +92,15 @@ func promote(payload map[string]any) (collector.Candidate, error) {
 	action, _ := payload["action"].(string)
 	contextChange, _ := payload["context"].(map[string]any)
 	metadata, _ := payload["metadata"].(map[string]any)
+	delegationChain, _ := payload["delegation_chain"].([]any)
+	actorIdentity := firstString(
+		stringFromMap(actor, "id"),
+		stringFromMap(payload, "actor_identity"),
+	)
+	downstreamIdentity := firstString(
+		stringFromMap(payload, "downstream_identity"),
+		actorIdentity,
+	)
 	if len(metadata) == 0 {
 		metadata = map[string]any{
 			"governance_event_type": eventType,
@@ -103,9 +112,17 @@ func promote(payload map[string]any) (collector.Candidate, error) {
 		"governance_source":     source,
 		"actor_id":              actor["id"],
 		"actor_type":            actor["type"],
+		"actor_identity":        actorIdentity,
+		"downstream_identity":   downstreamIdentity,
 		"action":                action,
 		"target_kind":           target["kind"],
 		"target_id":             target["id"],
+	}
+	copyIfPresent(event, "owner_identity", payload, "owner_identity")
+	copyIfPresent(event, "policy_digest", payload, "policy_digest")
+	copyIfPresent(event, "approval_token_ref", payload, "approval_token_ref")
+	if len(delegationChain) > 0 {
+		event["delegation_chain"] = delegationChain
 	}
 	if len(contextChange) > 0 {
 		event["context_event_class"] = "context_engineering"
@@ -117,6 +134,9 @@ func promote(payload map[string]any) (collector.Candidate, error) {
 		copyIfPresent(event, "context_source_uri", contextChange, "source_uri")
 		copyIfPresent(event, "context_reason_code", contextChange, "reason_code")
 		copyIfPresent(event, "context_approval_ref", contextChange, "approval_ref")
+		if _, ok := event["approval_token_ref"]; !ok {
+			copyIfPresent(event, "approval_token_ref", contextChange, "approval_ref")
+		}
 	}
 
 	return collector.Candidate{
@@ -145,4 +165,21 @@ func copyIfPresent(dst map[string]any, dstKey string, src map[string]any, srcKey
 		return
 	}
 	dst[dstKey] = value
+}
+
+func firstString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func stringFromMap(src map[string]any, key string) string {
+	if src == nil {
+		return ""
+	}
+	value, _ := src[key].(string)
+	return strings.TrimSpace(value)
 }

@@ -23,6 +23,7 @@ jobs:
       - run: mkdir -p .tmp && go build -o .tmp/axym ./cmd/axym
       - run: govulncheck -mode=binary .tmp/axym
       - run: make test-security
+      - run: make test-acceptance
       - run: make test-scenarios
       - run: make test-hardening
       - run: make test-chaos

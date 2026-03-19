@@ -38,6 +38,9 @@
     "metadata": {
       "type": "object"
     },
+    "relationship": {
+      "type": "object"
+    },
     "controls": {
       "type": "object",
       "additionalProperties": false,

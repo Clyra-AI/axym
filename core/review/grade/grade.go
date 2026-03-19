@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
+	"github.com/Clyra-AI/axym/core/compliance/match"
 )
 
 type Result struct {
@@ -23,6 +24,8 @@ func Derive(report coverage.Report) Result {
 	gaps := report.Summary.GapCount
 
 	score := (float64(covered)*1 + float64(partial)*0.5) / float64(total)
+	identityWeaknesses := identityWeaknessCount(report)
+	score = round(score - identityPenalty(identityWeaknesses))
 	var letter string
 	switch {
 	case gaps == 0 && covered == total:
@@ -38,11 +41,19 @@ func Derive(report coverage.Report) Result {
 	default:
 		letter = "F"
 	}
+	switch {
+	case identityWeaknesses >= 3 && (letter == "A" || letter == "B"):
+		letter = "D"
+	case identityWeaknesses >= 2 && (letter == "A" || letter == "B"):
+		letter = "C"
+	case identityWeaknesses >= 1 && letter == "A":
+		letter = "B"
+	}
 
 	return Result{
 		Letter: letter,
 		Score:  round(score),
-		Reason: fmt.Sprintf("weakest_link controls=%d covered=%d partial=%d gap=%d", total, covered, partial, gaps),
+		Reason: fmt.Sprintf("weakest_link controls=%d covered=%d partial=%d gap=%d identity_weaknesses=%d", total, covered, partial, gaps, identityWeaknesses),
 	}
 }
 
@@ -61,4 +72,46 @@ func round(in float64) float64 {
 		return 1
 	}
 	return float64(int(in*10000+0.5)) / 10000
+}
+
+func identityWeaknessCount(report coverage.Report) int {
+	count := 0
+	for _, framework := range report.Frameworks {
+		for _, control := range framework.Controls {
+			for _, reason := range control.ReasonCodes {
+				if isIdentityWeaknessReason(reason) {
+					count++
+					break
+				}
+			}
+		}
+	}
+	return count
+}
+
+func identityPenalty(count int) float64 {
+	if count <= 0 {
+		return 0
+	}
+	penalty := float64(count) * 0.05
+	if penalty > 0.15 {
+		return 0.15
+	}
+	return penalty
+}
+
+func isIdentityWeaknessReason(reason string) bool {
+	switch reason {
+	case match.ReasonMissingActorLinkage,
+		match.ReasonMissingDownstreamLinkage,
+		match.ReasonMissingOwnerLinkage,
+		match.ReasonMissingTargetLinkage,
+		match.ReasonMissingPolicyBinding,
+		match.ReasonMissingApprovalBinding,
+		match.ReasonIncompleteDelegation,
+		match.ReasonUnapprovedPrivilegeDrift:
+		return true
+	default:
+		return false
+	}
 }

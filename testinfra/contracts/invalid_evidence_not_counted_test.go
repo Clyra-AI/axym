@@ -24,17 +24,43 @@ func TestInvalidEvidenceDoesNotCountTowardCoverage(t *testing.T) {
 		Source:        "llmapi",
 		SourceProduct: "axym",
 		Type:          "decision",
-		Event:         map[string]any{"model": "x", "decision": "deny"},
-		Metadata:      map[string]any{"reason_code": "schema_error"},
-		Controls:      proof.Controls{PermissionsEnforced: true},
+		Event: map[string]any{
+			"model":               "x",
+			"decision":            "deny",
+			"actor_identity":      "agent://requester",
+			"downstream_identity": "agent://executor",
+			"owner_identity":      "owner://payments",
+			"policy_digest":       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"target_kind":         "tool",
+			"target_id":           "planner",
+			"delegation_chain": []any{
+				map[string]any{"identity": "agent://requester", "role": "requester"},
+				map[string]any{"identity": "agent://executor", "role": "delegate"},
+			},
+		},
+		Metadata: map[string]any{"reason_code": "schema_error"},
+		Controls: proof.Controls{PermissionsEnforced: true},
 	})
 	validRecord := mustContractRecord(t, proof.RecordOpts{
 		Timestamp:     time.Date(2026, 3, 1, 9, 0, 1, 0, time.UTC),
 		Source:        "llmapi",
 		SourceProduct: "axym",
 		Type:          "decision",
-		Event:         map[string]any{"model": "x", "decision": "allow"},
-		Controls:      proof.Controls{PermissionsEnforced: true},
+		Event: map[string]any{
+			"model":               "x",
+			"decision":            "allow",
+			"actor_identity":      "agent://requester",
+			"downstream_identity": "agent://executor",
+			"owner_identity":      "owner://payments",
+			"policy_digest":       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"target_kind":         "tool",
+			"target_id":           "planner",
+			"delegation_chain": []any{
+				map[string]any{"identity": "agent://requester", "role": "requester"},
+				map[string]any{"identity": "agent://executor", "role": "delegate"},
+			},
+		},
+		Controls: proof.Controls{PermissionsEnforced: true},
 	})
 	if err := proof.AppendToChain(chain, &invalidRecord); err != nil {
 		t.Fatalf("append invalid record: %v", err)

@@ -117,3 +117,36 @@ func TestBuildIncludesOverrideArtifactWhenPresent(t *testing.T) {
 		t.Fatalf("manifest missing override artifact: %s", rawManifest)
 	}
 }
+
+func TestBuildIncludesIdentityGovernanceArtifacts(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	outDir := filepath.Join(root, "bundle")
+
+	result, err := Build(BuildRequest{
+		AuditName:    "Q3-2026",
+		FrameworkIDs: []string{"eu-ai-act", "soc2"},
+		StoreDir:     storeDir,
+		OutputDir:    outDir,
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if result.Files == 0 {
+		t.Fatalf("expected bundle files, got %+v", result)
+	}
+
+	required := []string{
+		"identity-chain-summary.json",
+		"ownership-register.json",
+		"privilege-drift-report.json",
+		"delegated-chain-exceptions.json",
+	}
+	for _, rel := range required {
+		if _, err := os.Stat(filepath.Join(outDir, rel)); err != nil {
+			t.Fatalf("missing identity artifact %s: %v", rel, err)
+		}
+	}
+}

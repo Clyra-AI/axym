@@ -119,6 +119,7 @@ func VerifyBundle(path string, frameworkIDs []string) (BundleResult, error) {
 		"controls_missing_fields": result.Compliance.ControlsMissing,
 		"complete":                result.Compliance.Complete,
 		"grade":                   result.Compliance.Grade,
+		"identity_governance":     result.Compliance.IdentityGovernance,
 	}
 	if !result.ComplianceVerified {
 		compliance = nil

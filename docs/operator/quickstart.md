@@ -1,6 +1,6 @@
 # Axym Operator Quickstart
 
-This guide is for platform, security, and GRC operators wiring Axym into a real environment. It separates three paths that serve different goals: `smoke test`, `sample proof path`, and `real integration path`.
+This guide is for platform, security, and GRC operators wiring Axym into a real environment. Axym's job is to prove identity-governed action in software delivery, not to replace IAM, PAM, or IGA systems. It separates three paths that serve different goals: `smoke test`, `sample proof path`, and `real integration path`.
 
 See the boundary model in [integration-model.md](integration-model.md) and the companion diagram in [integration-boundary.mmd](integration-boundary.mmd).
 
@@ -59,10 +59,10 @@ Use this when you want a supported offline path that produces non-empty local ev
 Expected outcome:
 
 - The sample pack is created locally with no network fetch and no repo fixture dependency.
-- The resulting chain contains 5 records: 3 governance-event decisions, 1 approval, and 1 risk assessment.
+- The resulting chain contains 5 records: 3 governance-event decisions, 1 approval, and 1 risk assessment, all carrying explicit identity-governance fields.
 - `map` reports 5 covered controls out of 6 across `eu-ai-act,soc2`.
 - `gaps` returns grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
-- `bundle` succeeds and `verify --chain --json` reports an intact local chain.
+- `bundle` succeeds, emits identity-governance artifacts, and `verify --chain --json` reports an intact local chain.
 
 ## Real integration path
 
@@ -74,6 +74,7 @@ Use this when you are connecting Axym to your actual runtime, CI, or sibling sys
 - Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
 
 This is the path to use when you want evidence from your own CI, runtime, provider, or sibling governance systems. Approvals, risk assessments, incidents, and similar evidence classes are not claimed as default built-in clean-room capture unless that collector ships.
+Use this path when you need to prove which non-human identity acted, which owner approved it, which target was touched, and which policy or approval bound the action.
 
 ## Failure handling and expected outputs
 
@@ -81,7 +82,7 @@ This is the path to use when you want evidence from your own CI, runtime, provid
 - `collect --json` reports per-source `status`, `captured`, `rejected`, and `failures`; zero capture is valid when no real inputs exist.
 - `map --json` and `gaps --json` emit deterministic summaries even when coverage is incomplete.
 - `verify --chain --json` validates local append-only integrity.
-- `verify --bundle <path> --json` validates bundle cryptographic integrity plus Axym compliance completeness state.
+- `verify --bundle <path> --json` validates bundle cryptographic integrity plus Axym compliance completeness state, including the identity-chain summary, ownership register, privilege-drift report, and delegated-chain exceptions artifacts.
 
 ## Validation
 

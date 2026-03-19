@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Clyra-AI/axym/core/ingest/state"
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/axym/core/review/privilegedrift"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/axym/core/store/dedupe"
@@ -46,17 +47,18 @@ type Request struct {
 }
 
 type Result struct {
-	Source      string               `json:"source"`
-	InputFiles  int                  `json:"input_files"`
-	Parsed      int                  `json:"parsed"`
-	Appended    int                  `json:"appended"`
-	Deduped     int                  `json:"deduped"`
-	Rejected    int                  `json:"rejected"`
-	RecordCount int                  `json:"record_count"`
-	HeadHash    string               `json:"head_hash,omitempty"`
-	StatePath   string               `json:"state_path"`
-	ReasonCodes []string             `json:"reason_codes"`
-	DriftGaps   []privilegedrift.Gap `json:"drift_gaps"`
+	Source        string                   `json:"source"`
+	InputFiles    int                      `json:"input_files"`
+	Parsed        int                      `json:"parsed"`
+	Appended      int                      `json:"appended"`
+	Deduped       int                      `json:"deduped"`
+	Rejected      int                      `json:"rejected"`
+	RecordCount   int                      `json:"record_count"`
+	HeadHash      string                   `json:"head_hash,omitempty"`
+	StatePath     string                   `json:"state_path"`
+	ReasonCodes   []string                 `json:"reason_codes"`
+	DriftGaps     []privilegedrift.Gap     `json:"drift_gaps"`
+	IdentityViews []normalize.IdentityView `json:"identity_views,omitempty"`
 }
 
 type Error struct {
@@ -112,6 +114,9 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 	result.Parsed = len(records)
+	for _, rec := range records {
+		appendIdentityView(&result, normalize.IdentityViewFromRecord(rec))
+	}
 	if len(records) == 0 {
 		result.ReasonCodes = uniqueSorted(result.ReasonCodes)
 		return result, nil
@@ -376,6 +381,13 @@ func uniqueSorted(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func appendIdentityView(result *Result, view normalize.IdentityView) {
+	if result == nil || view.Empty() {
+		return
+	}
+	result.IdentityViews = append(result.IdentityViews, view)
 }
 
 func firstString(candidates ...string) string {

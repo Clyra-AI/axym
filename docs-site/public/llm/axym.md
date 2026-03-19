@@ -1,10 +1,10 @@
 # Axym
 
-Axym is a deterministic AI governance CLI for platform, security, and GRC engineers who need local evidence collection, compliance mapping, and audit-ready bundles.
+Axym is a deterministic CLI for platform, security, and GRC engineers who need local proof of identity-governed action in software delivery, compliance mapping, and audit-ready bundles.
 
 ## Where it fits
 
-Axym sits after your runtime or CI evidence sources. Your code, providers, MCP servers, and sibling systems stay upstream; Axym collects, ingests, or appends structured evidence locally, then maps it and bundles it for audit use.
+Axym sits after your runtime or CI evidence sources. Your code, providers, MCP servers, sibling systems, and IAM/PAM/IGA systems stay upstream; Axym collects, ingests, or appends structured evidence locally, then maps it and bundles it for audit use around the action-governance seam.
 
 Operator walkthroughs live in [../../../docs/operator/quickstart.md](../../../docs/operator/quickstart.md) and [../../../docs/operator/integration-model.md](../../../docs/operator/integration-model.md).
 
@@ -41,7 +41,7 @@ Expected outcome:
 - The sample pack is created locally with no network access and no repo fixture dependency.
 - The sample journey yields 5 covered controls out of 6 across `eu-ai-act,soc2`.
 - `gaps` returns grade `C`, not grade `F`.
-- `bundle` and `verify --chain --json` succeed with an intact 5-record chain.
+- `bundle` emits identity-governance artifacts and `verify --chain --json` succeeds with an intact 5-record chain.
 
 ## Real integration path
 
@@ -51,6 +51,7 @@ Expected outcome:
 - Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
 
 Public launch docs should not describe approvals, risk assessments, guardrails, incidents, or similar surfaces as default built-in clean-room capture unless that collector ships.
+Public launch docs should also not position Axym as an IAM/PAM/IGA replacement or widen the wedge beyond software delivery.
 
 ## Commands
 
@@ -60,7 +61,7 @@ Public launch docs should not describe approvals, risk assessments, guardrails, 
 - `./axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
 - `./axym record add --input <record.json> --json`: appends a JSON proof record payload to the local chain with deterministic dedupe behavior.
 - `./axym collect --json --plugin "<cmd>"`: runs third-party collector protocol (`stdin` config, `stdout` JSONL).
-- `./axym collect --json --governance-event-file <file.jsonl>`: ingests governance events and promotes valid events to proof records.
+- `./axym collect --json --governance-event-file <file.jsonl>`: ingests governance events and promotes valid events to proof records with actor/downstream/owner/policy/approval linkage when present.
 - `./axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls and emits explainable match rationale.
 - `./axym gaps --frameworks eu-ai-act,soc2 --json`: computes deterministic `covered`/`partial`/`gap` ranking, remediation guidance, and auditability grade.
 - `./axym map --policy-config ./axym-policy.yaml --json`: applies schema-validated policy defaults and threshold constraints; invalid policy input exits `6`.
@@ -70,11 +71,11 @@ Public launch docs should not describe approvals, risk assessments, guardrails, 
 - `./axym override create --bundle Q3-2026 --reason "<reason>" --signer ops-key --json`: appends signed override artifacts and proof evidence.
 - `./axym ingest --source wrkr --input <path> --json`: ingests sibling evidence from Wrkr/Gait payloads with deterministic append/dedupe/reject counters.
 - `./axym replay --model payments-agent --tier A --json`: emits deterministic replay-certification evidence for review workflows.
-- `./axym bundle --audit <name> --frameworks eu-ai-act,soc2 --json`: assembles deterministic signed audit bundles with executive summary (`.json` + `.pdf`), chain verification, and OSCAL export.
+- `./axym bundle --audit <name> --frameworks eu-ai-act,soc2 --json`: assembles deterministic signed audit bundles with executive summary (`.json` + `.pdf`), identity-governance artifacts, chain verification, and OSCAL export.
 - `./axym map --json` and `./axym gaps --json`: default to frameworks `eu-ai-act,soc2` when `--frameworks` is omitted.
 - `./axym map --frameworks eu-ai-act --min-coverage 0.80 --json`: enforces threshold policy and exits non-zero when coverage is below threshold.
 - `./axym verify --chain --json`: verifies local append-only chain integrity.
-- `./axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks without writing store-managed temp artifacts.
+- `./axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks, including identity-governance artifact consistency, without writing store-managed temp artifacts.
 
 ## Contributor gates
 

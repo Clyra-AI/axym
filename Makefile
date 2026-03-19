@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: lint-fast lint-go test-fast test-contracts test-scenarios test-hardening test-chaos test-perf test-security test-adapter-parity test-docs-consistency test-docs-storyline test-docs-links prepush codeql release-local release-go-nogo-local prepush-full
+.PHONY: lint-fast lint-go test-fast test-contracts test-acceptance test-scenarios test-hardening test-chaos test-perf test-security test-adapter-parity test-docs-consistency test-docs-storyline test-docs-links prepush codeql release-local release-go-nogo-local prepush-full
 
 lint-fast:
 	@test -z "$$(gofmt -l .)" || (echo "gofmt required"; gofmt -l .; exit 1)
@@ -15,6 +15,9 @@ test-fast:
 
 test-contracts:
 	@go test ./testinfra/contracts/... -count=1
+
+test-acceptance:
+	@go test ./testinfra/acceptance/... -count=1
 
 test-scenarios:
 	@./scripts/validate_scenarios.sh
@@ -68,4 +71,4 @@ release-local:
 release-go-nogo-local:
 	@./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
 
-prepush-full: prepush lint-go test-security codeql test-scenarios test-docs-consistency test-docs-storyline test-docs-links release-local release-go-nogo-local
+prepush-full: prepush lint-go test-security codeql test-acceptance test-scenarios test-docs-consistency test-docs-storyline test-docs-links release-local release-go-nogo-local

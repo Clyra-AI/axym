@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Clyra-AI/axym/core/collect/snowflake"
+	"github.com/Clyra-AI/axym/core/compliance/match"
 	"github.com/Clyra-AI/axym/core/ingest/stitch"
 	"github.com/Clyra-AI/axym/core/policy/freeze"
 	"github.com/Clyra-AI/axym/core/policy/sod"
@@ -21,6 +22,7 @@ const (
 	ExceptionAttach          = "attach"
 	ExceptionReplay          = "replay"
 	ExceptionFreeze          = "freeze"
+	ExceptionIdentity        = "identity"
 	ExceptionChainSessionGap = "chain-session-gap"
 
 	gradeHigh    = "high"
@@ -36,6 +38,7 @@ var exceptionOrder = []string{
 	ExceptionAttach,
 	ExceptionReplay,
 	ExceptionFreeze,
+	ExceptionIdentity,
 	ExceptionChainSessionGap,
 }
 
@@ -255,6 +258,9 @@ func classifyExceptions(record proof.Record) []string {
 			classSet[ExceptionReplay] = struct{}{}
 		}
 	}
+	if _, reasons := match.IdentityWeaknesses(record); len(reasons) > 0 {
+		classSet[ExceptionIdentity] = struct{}{}
+	}
 
 	if record.RecordType == "approval" {
 		decision := strings.ToLower(strings.TrimSpace(stringFromMap(record.Event, "decision")))
@@ -311,6 +317,9 @@ func deriveAuditability(record proof.Record, classes []string) string {
 	}
 	for _, class := range classes {
 		if class == ExceptionReplay || class == ExceptionAttach || class == ExceptionChainSessionGap {
+			return gradeLow
+		}
+		if class == ExceptionIdentity {
 			return gradeLow
 		}
 	}

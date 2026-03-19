@@ -51,6 +51,9 @@ func TestBundleJSONSuccess(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, "oscal-v1.1", "component-definition.json")); err != nil {
 		t.Fatalf("missing oscal export: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(outDir, "identity-chain-summary.json")); err != nil {
+		t.Fatalf("missing identity chain summary: %v", err)
+	}
 }
 
 func TestBundleRejectsUnsafeOutputPath(t *testing.T) {

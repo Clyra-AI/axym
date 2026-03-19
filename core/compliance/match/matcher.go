@@ -9,6 +9,7 @@ import (
 	compliancecontext "github.com/Clyra-AI/axym/core/compliance/context"
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/compliance/threshold"
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -20,6 +21,15 @@ const (
 	ControlStatusCovered = "covered"
 	ControlStatusPartial = "partial"
 	ControlStatusGap     = "gap"
+
+	ReasonMissingActorLinkage      = "MISSING_ACTOR_LINKAGE"
+	ReasonMissingDownstreamLinkage = "MISSING_DOWNSTREAM_LINKAGE"
+	ReasonMissingOwnerLinkage      = "MISSING_OWNER_LINKAGE"
+	ReasonMissingTargetLinkage     = "MISSING_TARGET_LINKAGE"
+	ReasonMissingPolicyBinding     = "MISSING_POLICY_BINDING"
+	ReasonMissingApprovalBinding   = "MISSING_APPROVAL_BINDING"
+	ReasonIncompleteDelegation     = "INCOMPLETE_DELEGATION_CHAIN"
+	ReasonUnapprovedPrivilegeDrift = "UNAPPROVED_PRIVILEGE_DRIFT"
 )
 
 type Options struct {
@@ -155,8 +165,11 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 			}
 		}
 
+		identityMissing, identityReasons := IdentityWeaknesses(record)
+		missingFields = uniqueSorted(append(missingFields, identityMissing...))
+
 		recordStatus := RecordStatusFailed
-		reasons := []string{"MISSING_REQUIRED_FIELDS"}
+		reasons := append([]string{"MISSING_REQUIRED_FIELDS"}, identityReasons...)
 		switch {
 		case len(missingFields) == 0:
 			recordStatus = RecordStatusMatched
@@ -167,9 +180,10 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 			}
 		case len(matchedFields) > 0:
 			recordStatus = RecordStatusPartial
-			reasons = []string{"PARTIAL_FIELD_MATCH"}
+			reasons = append([]string{"PARTIAL_FIELD_MATCH"}, identityReasons...)
 			result.PartialCount++
 		default:
+			reasons = append(reasons, identityReasons...)
 			result.FailedCount++
 		}
 		result.Evidence = append(result.Evidence, buildRecordMatch(record, matchedFields, missingFields, recordStatus, reasons))
@@ -198,6 +212,13 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 	}
 	if result.InvalidExcluded > 0 {
 		reasons = append(reasons, threshold.ReasonInvalidEvidence)
+	}
+	for _, evidence := range result.Evidence {
+		for _, reason := range evidence.ReasonCodes {
+			if isIdentityReasonCode(reason) {
+				reasons = append(reasons, reason)
+			}
+		}
 	}
 	result.ReasonCodes = uniqueSorted(reasons)
 	result.Rationale = buildRationale(result, requiredMatches, matchedInFrequencyWindow)
@@ -280,6 +301,11 @@ func recordFieldExists(record proof.Record, field string) bool {
 
 	switch head {
 	case "event":
+		if len(rest) == 1 {
+			if exists, ok := normalizedIdentityFieldExists(record, rest[0]); ok {
+				return exists
+			}
+		}
 		return nestedMapKeyExists(record.Event, rest)
 	case "metadata":
 		return nestedMapKeyExists(record.Metadata, rest)
@@ -405,4 +431,169 @@ func roundRatio(in float64) float64 {
 		return 1
 	}
 	return float64(int(in*10000+0.5)) / 10000
+}
+
+func IdentityWeaknesses(record proof.Record) ([]string, []string) {
+	recordType := strings.ToLower(strings.TrimSpace(record.RecordType))
+	if !identityGovernedRecordType(recordType) {
+		return nil, nil
+	}
+	view := normalize.IdentityViewFromRecord(&record)
+	missing := make([]string, 0, 8)
+	reasons := make([]string, 0, 8)
+
+	if strings.TrimSpace(view.ActorIdentity) == "" {
+		missing = append(missing, "event.actor_identity")
+		reasons = append(reasons, ReasonMissingActorLinkage)
+	}
+	if strings.TrimSpace(view.DownstreamIdentity) == "" {
+		missing = append(missing, "event.downstream_identity")
+		reasons = append(reasons, ReasonMissingDownstreamLinkage)
+	}
+	if strings.TrimSpace(view.TargetKind) == "" {
+		missing = append(missing, "event.target_kind")
+	}
+	if strings.TrimSpace(view.TargetID) == "" {
+		missing = append(missing, "event.target_id")
+	}
+	if strings.TrimSpace(view.TargetKind) == "" || strings.TrimSpace(view.TargetID) == "" {
+		reasons = append(reasons, ReasonMissingTargetLinkage)
+	}
+	if len(view.DelegationChain) == 0 {
+		missing = append(missing, "event.delegation_chain")
+		reasons = append(reasons, ReasonIncompleteDelegation)
+	}
+	if requiresOwnerLinkage(recordType) && strings.TrimSpace(view.OwnerIdentity) == "" {
+		missing = append(missing, "event.owner_identity")
+		reasons = append(reasons, ReasonMissingOwnerLinkage)
+	}
+	if requiresPolicyBinding(recordType) && strings.TrimSpace(view.PolicyDigest) == "" {
+		missing = append(missing, "event.policy_digest")
+		reasons = append(reasons, ReasonMissingPolicyBinding)
+	}
+	if requiresApprovalBinding(record, view) && strings.TrimSpace(view.ApprovalTokenRef) == "" {
+		missing = append(missing, "event.approval_token_ref")
+		reasons = append(reasons, ReasonMissingApprovalBinding)
+	}
+	if unapprovedPrivilegeDrift(record, view) {
+		reasons = append(reasons, ReasonUnapprovedPrivilegeDrift)
+	}
+	return uniqueSorted(missing), uniqueSorted(reasons)
+}
+
+func normalizedIdentityFieldExists(record proof.Record, field string) (bool, bool) {
+	view := normalize.IdentityViewFromRecord(&record)
+	switch strings.TrimSpace(field) {
+	case "actor_identity":
+		return strings.TrimSpace(view.ActorIdentity) != "", true
+	case "downstream_identity":
+		return strings.TrimSpace(view.DownstreamIdentity) != "", true
+	case "owner_identity":
+		return strings.TrimSpace(view.OwnerIdentity) != "", true
+	case "policy_digest":
+		return strings.TrimSpace(view.PolicyDigest) != "", true
+	case "approval_token_ref":
+		return strings.TrimSpace(view.ApprovalTokenRef) != "", true
+	case "target_kind":
+		return strings.TrimSpace(view.TargetKind) != "", true
+	case "target_id":
+		return strings.TrimSpace(view.TargetID) != "", true
+	case "delegation_chain":
+		return len(view.DelegationChain) > 0, true
+	default:
+		return false, false
+	}
+}
+
+func identityGovernedRecordType(recordType string) bool {
+	switch recordType {
+	case "tool_invocation", "decision", "policy_enforcement", "approval", "scan_finding", "deployment", "data_pipeline_run", "permission_check", "compiled_action":
+		return true
+	default:
+		return false
+	}
+}
+
+func requiresOwnerLinkage(recordType string) bool {
+	switch recordType {
+	case "decision", "policy_enforcement", "approval", "scan_finding", "deployment", "data_pipeline_run", "permission_check", "compiled_action":
+		return true
+	default:
+		return false
+	}
+}
+
+func requiresPolicyBinding(recordType string) bool {
+	switch recordType {
+	case "decision", "policy_enforcement", "approval", "scan_finding", "deployment", "data_pipeline_run", "permission_check", "compiled_action":
+		return true
+	default:
+		return false
+	}
+}
+
+func requiresApprovalBinding(record proof.Record, view normalize.IdentityView) bool {
+	recordType := strings.ToLower(strings.TrimSpace(record.RecordType))
+	if recordType == "approval" {
+		return true
+	}
+	if value := strings.TrimSpace(normalizeFieldString(record.Event, "approval_token_ref")); value != "" {
+		return true
+	}
+	if value := strings.TrimSpace(normalizeFieldString(record.Event, "context_approval_ref")); value != "" {
+		return true
+	}
+	if value := strings.TrimSpace(normalizeFieldString(record.Event, "approval_ref")); value != "" {
+		return true
+	}
+	if record.Controls.HumanOversight != nil && record.Controls.HumanOversight.ApprovalRequired {
+		return true
+	}
+	return unapprovedPrivilegeDrift(record, view)
+}
+
+func unapprovedPrivilegeDrift(record proof.Record, view normalize.IdentityView) bool {
+	if strings.ToLower(strings.TrimSpace(record.RecordType)) != "scan_finding" {
+		return false
+	}
+	if strings.TrimSpace(view.TargetKind) != "privilege" && strings.TrimSpace(normalizeFieldString(record.Event, "privilege")) == "" {
+		return false
+	}
+	approved, ok := normalizeFieldBool(record.Event, "approved")
+	if !ok {
+		approved, ok = normalizeFieldBool(record.Metadata, "approved")
+	}
+	return ok && !approved && strings.TrimSpace(view.ApprovalTokenRef) == ""
+}
+
+func normalizeFieldString(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	value, _ := m[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func normalizeFieldBool(m map[string]any, key string) (bool, bool) {
+	if m == nil {
+		return false, false
+	}
+	value, ok := m[key].(bool)
+	return value, ok
+}
+
+func isIdentityReasonCode(reason string) bool {
+	switch strings.TrimSpace(reason) {
+	case ReasonMissingActorLinkage,
+		ReasonMissingDownstreamLinkage,
+		ReasonMissingOwnerLinkage,
+		ReasonMissingTargetLinkage,
+		ReasonMissingPolicyBinding,
+		ReasonMissingApprovalBinding,
+		ReasonIncompleteDelegation,
+		ReasonUnapprovedPrivilegeDrift:
+		return true
+	default:
+		return false
+	}
 }

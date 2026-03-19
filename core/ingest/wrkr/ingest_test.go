@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/normalize"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/proof"
 )
@@ -138,6 +139,45 @@ func TestIngestRejectsUnsupportedRecordType(t *testing.T) {
 	}
 	if !containsReason(result.ReasonCodes, ReasonUnsupportedType) {
 		t.Fatalf("missing reason code: %+v", result.ReasonCodes)
+	}
+}
+
+func TestIngestPublishesNormalizedIdentityViews(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	st, err := store.New(store.Config{RootDir: filepath.Join(root, "store")})
+	if err != nil {
+		t.Fatalf("store.New: %v", err)
+	}
+	inputPath := filepath.Join(root, "wrkr.jsonl")
+	records := []*proof.Record{
+		newWrkrRecord(t, time.Date(2026, 2, 28, 18, 30, 0, 0, time.UTC), "agent-a", "read", true),
+	}
+	writeJSONLRecords(t, inputPath, records)
+
+	result, err := Ingest(context.Background(), Request{
+		Store:      st,
+		StateDir:   root,
+		InputPaths: []string{inputPath},
+	})
+	if err != nil {
+		t.Fatalf("Ingest: %v", err)
+	}
+	if len(result.IdentityViews) != 1 {
+		t.Fatalf("identity view count mismatch: %+v", result.IdentityViews)
+	}
+	view := result.IdentityViews[0]
+	if view.ActorIdentity != "agent-a" || view.DownstreamIdentity != "agent-a" {
+		t.Fatalf("identity view mismatch: %+v", view)
+	}
+	if view.TargetKind != "privilege" || view.TargetID != "read" {
+		t.Fatalf("target identity mismatch: %+v", view)
+	}
+
+	derived := normalize.IdentityViewFromRecord(records[0])
+	if derived.ActorIdentity != view.ActorIdentity || derived.TargetID != view.TargetID {
+		t.Fatalf("derived identity view mismatch: got %+v want %+v", derived, view)
 	}
 }
 

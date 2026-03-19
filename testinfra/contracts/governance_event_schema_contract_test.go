@@ -14,6 +14,11 @@ func TestGovernanceEventSchemaContract(t *testing.T) {
 		"source":"agent-fw",
 		"timestamp":"2026-02-28T12:00:00Z",
 		"actor":{"id":"agent-1","type":"agent"},
+		"downstream_identity":"agent://executor",
+		"owner_identity":"owner://payments",
+		"policy_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"approval_token_ref":"approval://chg-123",
+		"delegation_chain":[{"identity":"agent://requester","role":"requester"},{"identity":"agent://executor","role":"delegate"}],
 		"action":"tool_call",
 		"target":{"kind":"tool","id":"db.query"}
 	}`)

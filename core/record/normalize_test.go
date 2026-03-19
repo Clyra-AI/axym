@@ -97,3 +97,44 @@ func TestBuildCanonicalizesEmptyMetadata(t *testing.T) {
 		t.Fatalf("expected empty metadata to canonicalize to nil, got %#v", record.Metadata)
 	}
 }
+
+func TestBuildSynthesizesIdentityRelationship(t *testing.T) {
+	t.Parallel()
+
+	normalized := normalize.Record{
+		Source:        "governanceevent",
+		SourceProduct: "axym",
+		RecordType:    "policy_enforcement",
+		AgentID:       "agent://executor",
+		Timestamp:     time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC),
+		Event: map[string]any{
+			"governance_event_type": "policy_eval",
+			"actor_identity":        "agent://requester",
+			"downstream_identity":   "agent://executor",
+			"owner_identity":        "owner://payments",
+			"policy_digest":         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"approval_token_ref":    "approval://chg-123",
+			"target_kind":           "tool",
+			"target_id":             "db.query",
+			"delegation_chain": []any{
+				map[string]any{"identity": "agent://requester", "role": "requester"},
+				map[string]any{"identity": "agent://executor", "role": "delegate"},
+			},
+		},
+		Controls: normalize.Controls{PermissionsEnforced: true},
+	}
+
+	record, err := Build(BuildInput{Normalized: normalized})
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	if record.Relationship == nil {
+		t.Fatalf("expected relationship synthesis")
+	}
+	if record.Relationship.PolicyRef == nil || record.Relationship.PolicyRef.PolicyDigest == "" {
+		t.Fatalf("expected policy digest relationship: %+v", record.Relationship)
+	}
+	if len(record.Relationship.AgentChain) != 2 {
+		t.Fatalf("expected delegation chain relationship: %+v", record.Relationship)
+	}
+}

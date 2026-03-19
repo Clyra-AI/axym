@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
+	"github.com/Clyra-AI/axym/core/compliance/match"
 	"github.com/Clyra-AI/axym/core/review/grade"
 )
 
@@ -110,13 +111,15 @@ func priority(item Item) int {
 	if item.Status == "gap" {
 		severity = 20
 	}
-	return severity + len(item.MissingRecordTypes)*4 + len(item.MissingFields)*2 + item.InvalidExcluded*3
+	return severity + len(item.MissingRecordTypes)*4 + len(item.MissingFields)*2 + item.InvalidExcluded*3 + identityPriority(item.ReasonCodes)
 }
 
 func remediation(item Item) (string, string) {
 	missingTypes := strings.Join(item.MissingRecordTypes, ",")
 	missingFields := strings.Join(item.MissingFields, ",")
 	switch {
+	case hasIdentityWeakness(item.ReasonCodes):
+		return "Link governed actions to actor, executor, owner, delegation, policy, and approval evidence", effortFor(item, true)
 	case missingTypes != "" && missingFields != "":
 		return fmt.Sprintf("Collect evidence types [%s] and populate fields [%s]", missingTypes, missingFields), effortFor(item, true)
 	case missingTypes != "":
@@ -126,6 +129,28 @@ func remediation(item Item) (string, string) {
 	default:
 		return "Increase control evidence frequency and validate schema completeness", effortFor(item, false)
 	}
+}
+
+func identityPriority(reasons []string) int {
+	total := 0
+	for _, reason := range reasons {
+		switch reason {
+		case match.ReasonMissingActorLinkage,
+			match.ReasonMissingDownstreamLinkage,
+			match.ReasonMissingOwnerLinkage,
+			match.ReasonMissingTargetLinkage,
+			match.ReasonMissingPolicyBinding,
+			match.ReasonMissingApprovalBinding,
+			match.ReasonIncompleteDelegation,
+			match.ReasonUnapprovedPrivilegeDrift:
+			total += 5
+		}
+	}
+	return total
+}
+
+func hasIdentityWeakness(reasons []string) bool {
+	return identityPriority(reasons) > 0
 }
 
 func effortFor(item Item, typesAndFields bool) string {

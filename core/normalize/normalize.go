@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Clyra-AI/proof"
 )
 
 type Input struct {
@@ -16,6 +18,7 @@ type Input struct {
 	Timestamp     time.Time
 	Event         map[string]any
 	Metadata      map[string]any
+	Relationship  *proof.Relationship
 	Controls      Controls
 }
 
@@ -32,6 +35,7 @@ type Record struct {
 	Timestamp     time.Time
 	Event         map[string]any
 	Metadata      map[string]any
+	Relationship  *proof.Relationship
 	Controls      Controls
 }
 
@@ -114,6 +118,8 @@ func Normalize(in Input) (Record, error) {
 		return Record{}, fmt.Errorf("normalize metadata: %w", err)
 	}
 	applyAliases(sourceType, event)
+	view := DeriveIdentityView(in.AgentID, event, metadata, in.Relationship)
+	event, metadata, relationship := ApplyIdentityView(event, metadata, in.Relationship, view)
 	for _, key := range contract.RequiredEventKeys {
 		if _, exists := event[key]; !exists {
 			return Record{}, fmt.Errorf("missing required event key %q for source_type %q", key, sourceType)
@@ -145,6 +151,7 @@ func Normalize(in Input) (Record, error) {
 		Timestamp:     timestamp,
 		Event:         event,
 		Metadata:      metadata,
+		Relationship:  relationship,
 		Controls:      in.Controls,
 	}, nil
 }

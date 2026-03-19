@@ -109,10 +109,11 @@ func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
 		t.Fatalf("ReadFile(contract): %v", err)
 	}
 	var contract struct {
-		Frameworks          string `json:"frameworks"`
-		MinimumCoveredCount int    `json:"minimum_covered_count"`
-		ForbiddenGrade      string `json:"forbidden_grade"`
-		SamplePackPath      string `json:"sample_pack_path"`
+		Frameworks          string   `json:"frameworks"`
+		MinimumCoveredCount int      `json:"minimum_covered_count"`
+		ForbiddenGrade      string   `json:"forbidden_grade"`
+		SamplePackPath      string   `json:"sample_pack_path"`
+		RequiredArtifacts   []string `json:"required_bundle_artifacts"`
 	}
 	if err := json.Unmarshal(rawContract, &contract); err != nil {
 		t.Fatalf("Unmarshal(contract): %v", err)
@@ -149,7 +150,23 @@ func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
 		t.Fatalf("unexpected grade %v output=%v", letter, gapsPayload)
 	}
 
-	runAcceptanceJSON(t, binaryPath, workdir, "bundle", "--audit", "sample", "--frameworks", contract.Frameworks, "--json")
+	bundlePayload := runAcceptanceJSON(t, binaryPath, workdir, "bundle", "--audit", "sample", "--frameworks", contract.Frameworks, "--json")
+	bundleData, _ := bundlePayload["data"].(map[string]any)
+	bundlePath, _ := bundleData["path"].(string)
+	if bundlePath != "" && !filepath.IsAbs(bundlePath) {
+		bundlePath = filepath.Join(workdir, bundlePath)
+	}
+	for _, rel := range contract.RequiredArtifacts {
+		if _, err := os.Stat(filepath.Join(workdir, rel)); err == nil {
+			continue
+		}
+		if bundlePath == "" {
+			t.Fatalf("bundle path missing for required artifact check: %v", bundlePayload)
+		}
+		if _, err := os.Stat(filepath.Join(bundlePath, rel)); err != nil {
+			t.Fatalf("missing required bundle artifact %s: %v", rel, err)
+		}
+	}
 	verifyPayload := runAcceptanceJSON(t, binaryPath, workdir, "verify", "--chain", "--json")
 	verifyData, _ := verifyPayload["data"].(map[string]any)
 	verification, _ := verifyData["verification"].(map[string]any)
