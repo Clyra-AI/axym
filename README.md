@@ -174,7 +174,7 @@ Built-in collection is limited to the collectors listed above. Plugin collection
 
 `init` bootstraps local store material and an `axym-policy.yaml` file with deterministic defaults. `init --sample-pack <dir>` additively materializes a local sample proof path with machine-readable created files and next-step commands.
 
-`record add` appends a user-supplied proof record JSON payload to the local chain with deterministic dedupe semantics.
+`record add` appends a user-supplied proof record JSON payload only after Axym validates the proof schema/record type, signs it with the local Axym key, and links it into the append-only chain with deterministic dedupe semantics.
 
 `map`/`gaps` default to frameworks from `axym-policy.yaml` when present, otherwise `eu-ai-act,soc2`. Invalid policy config fails closed with exit `6`.
 
@@ -190,7 +190,9 @@ Built-in collection is limited to the collectors listed above. Plugin collection
 
 `bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, identity-governance artifacts, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
 
-`verify --bundle` reports cryptographic integrity plus deterministic Axym compliance-completeness checks (required record classes, field-coverage state, identity-governance artifact consistency, grade recomputation, and OSCAL schema validation) without creating store-managed temp artifacts.
+`verify --chain` reports deterministic local integrity for both append-only chain linkage and Axym-managed record signatures.
+
+`verify --bundle` reports manifest-signature verification, per-record signature verification for Axym-authored bundles, and deterministic Axym compliance-completeness checks (required record classes, field-coverage state, identity-governance artifact consistency, grade recomputation, and OSCAL schema validation) without creating store-managed temp artifacts.
 
 Release verification uses:
 

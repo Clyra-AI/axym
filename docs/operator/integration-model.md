@@ -54,7 +54,7 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 
 - `collect --dry-run` for immediate environment and would-capture validation.
 - `collect` against local or mounted artifacts that are available at command time.
-- `record add` when an operator or workflow already has the exact proof payload to append.
+- `record add` when an operator or workflow already has the exact proof payload to append and wants Axym to validate/sign/link it locally.
 
 ### Async paths
 
@@ -73,5 +73,5 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - Zero capture on clean-room `collect --json` is expected when no real inputs are present.
 - Per-source `reason_codes` explain empty, degraded, or failed collection paths.
 - `map` and `gaps` stay deterministic even when the result is incomplete.
-- `verify --chain` validates append-only local integrity.
-- `verify --bundle` validates portable bundle integrity and reports compliance completeness explicitly, including identity-governance artifact consistency.
+- `verify --chain` validates append-only local integrity and Axym-managed record signatures.
+- `verify --bundle` validates portable bundle manifest signatures, Axym-authored record signatures, and reports compliance completeness explicitly, including identity-governance artifact consistency.

@@ -36,7 +36,7 @@ func TestMalformedJSONLRejected(t *testing.T) {
 		"--json",
 		"--fixture-dir", filepath.Join(repoRoot, "fixtures", "collectors"),
 		"--store-dir", storeDir,
-		"--plugin-timeout", "15s",
+		"--plugin-timeout", "60s",
 		"--plugin", "go run "+pluginPath,
 	)
 	cmd.Dir = repoRoot

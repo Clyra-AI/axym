@@ -71,13 +71,14 @@ func emitVerifyError(err error, stdout io.Writer, stderr io.Writer, global *glob
 	var vErr *coreVerify.Error
 	if errors.As(err, &vErr) {
 		if global.JSON {
+			breakIndex := vErr.BreakIndex
 			_ = printJSON(stdout, envelope{
 				OK:      false,
 				Command: "verify",
 				Error: &errorEnvelope{
 					Reason:     vErr.ReasonCode,
 					Message:    vErr.Message,
-					BreakIndex: vErr.BreakIndex,
+					BreakIndex: &breakIndex,
 					BreakPoint: vErr.BreakPoint,
 				},
 			})

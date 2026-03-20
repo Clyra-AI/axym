@@ -116,3 +116,55 @@ func TestCollectPluginEmptyMetadataRoundTripContract(t *testing.T) {
 		t.Fatalf("expected count=1 output=%s", verifyOut)
 	}
 }
+
+func TestCollectPluginRelationshipRoundTripContract(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	pluginPath := filepath.Join(root, "plugin.go")
+	pluginSource := []byte("package main\nimport \"fmt\"\nfunc main(){fmt.Println(`{\"source_type\":\"plugin\",\"source\":\"custom\",\"source_product\":\"axym\",\"record_type\":\"tool_invocation\",\"agent_id\":\"agent-1\",\"timestamp\":\"2026-03-18T00:00:00Z\",\"event\":{\"tool_name\":\"scan\"},\"metadata\":{},\"relationship\":{\"parent_ref\":{\"kind\":\"trace\",\"id\":\"trace-123\"},\"entity_refs\":[{\"kind\":\"resource\",\"id\":\"db://prod\"}],\"policy_ref\":{\"policy_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}},\"controls\":{\"permissions_enforced\":true}}`)}\n")
+	if err := os.WriteFile(pluginPath, pluginSource, 0o600); err != nil {
+		t.Fatalf("write plugin source: %v", err)
+	}
+
+	storeDir := filepath.Join(root, "store")
+	stdout, exit := runAxymContract(t, "collect", "--plugin-timeout", "60s", "--plugin", "go run "+pluginPath, "--store-dir", storeDir, "--json")
+	if exit != 0 {
+		t.Fatalf("unexpected collect exit %d output=%s", exit, stdout)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(storeDir, "chain.json"))
+	if err != nil {
+		t.Fatalf("read chain: %v", err)
+	}
+	var chain map[string]any
+	if err := json.Unmarshal(raw, &chain); err != nil {
+		t.Fatalf("decode chain: %v", err)
+	}
+	records, _ := chain["records"].([]any)
+	if len(records) != 1 {
+		t.Fatalf("expected one record, got %d", len(records))
+	}
+	record, _ := records[0].(map[string]any)
+	relationship, _ := record["relationship"].(map[string]any)
+	parent, _ := relationship["parent_ref"].(map[string]any)
+	if parent["kind"] != "trace" || parent["id"] != "trace-123" {
+		t.Fatalf("parent ref mismatch: %+v", parent)
+	}
+	policy, _ := relationship["policy_ref"].(map[string]any)
+	if policy["policy_digest"] != "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("policy ref mismatch: %+v", policy)
+	}
+	entityRefs, _ := relationship["entity_refs"].([]any)
+	foundResource := false
+	for _, item := range entityRefs {
+		ref, _ := item.(map[string]any)
+		if ref["kind"] == "resource" && ref["id"] == "db://prod" {
+			foundResource = true
+			break
+		}
+	}
+	if !foundResource {
+		t.Fatalf("resource relationship ref missing: %+v", entityRefs)
+	}
+}

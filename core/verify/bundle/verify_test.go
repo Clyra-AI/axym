@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,6 +18,7 @@ import (
 	"github.com/Clyra-AI/axym/core/policy/sink"
 	"github.com/Clyra-AI/axym/core/store"
 	verifybundle "github.com/Clyra-AI/axym/core/verify/bundle"
+	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -46,7 +48,7 @@ func TestVerifyBundleWithCompliance(t *testing.T) {
 func TestVerifyBundleDetectsComplianceMismatch(t *testing.T) {
 	t.Parallel()
 
-	_, outDir := setupBundleFixture(t)
+	storeDir, outDir := setupBundleFixture(t)
 	summaryPath := filepath.Join(outDir, "executive-summary.json")
 	raw, err := os.ReadFile(summaryPath)
 	if err != nil {
@@ -68,6 +70,9 @@ func TestVerifyBundleDetectsComplianceMismatch(t *testing.T) {
 	if err := updateManifestHash(outDir, "executive-summary.json"); err != nil {
 		t.Fatalf("update manifest hash: %v", err)
 	}
+	if err := resignManifest(storeDir, outDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
+	}
 
 	_, err = verifybundle.Verify(outDir, []string{"eu-ai-act", "soc2"})
 	if err == nil {
@@ -88,7 +93,7 @@ func TestVerifyBundleDetectsComplianceMismatch(t *testing.T) {
 func TestVerifyBundleSchemaValidationReturnsPolicyViolationExit(t *testing.T) {
 	t.Parallel()
 
-	_, outDir := setupBundleFixture(t)
+	storeDir, outDir := setupBundleFixture(t)
 	summaryPath := filepath.Join(outDir, "executive-summary.json")
 	raw, err := os.ReadFile(summaryPath)
 	if err != nil {
@@ -108,6 +113,9 @@ func TestVerifyBundleSchemaValidationReturnsPolicyViolationExit(t *testing.T) {
 	}
 	if err := updateManifestHash(outDir, "executive-summary.json"); err != nil {
 		t.Fatalf("update manifest hash: %v", err)
+	}
+	if err := resignManifest(storeDir, outDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
 	}
 
 	_, err = verifybundle.Verify(outDir, []string{"eu-ai-act", "soc2"})
@@ -129,7 +137,7 @@ func TestVerifyBundleSchemaValidationReturnsPolicyViolationExit(t *testing.T) {
 func TestVerifyBundleChecksChainIntegrityBeforeCompliance(t *testing.T) {
 	t.Parallel()
 
-	_, outDir := setupBundleFixture(t)
+	storeDir, outDir := setupBundleFixture(t)
 	chainPath := filepath.Join(outDir, "chain.json")
 	raw, err := os.ReadFile(chainPath)
 	if err != nil {
@@ -153,6 +161,9 @@ func TestVerifyBundleChecksChainIntegrityBeforeCompliance(t *testing.T) {
 	if err := updateManifestHash(outDir, "chain.json"); err != nil {
 		t.Fatalf("update manifest hash: %v", err)
 	}
+	if err := resignManifest(storeDir, outDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
+	}
 
 	_, err = verifybundle.Verify(outDir, []string{"eu-ai-act", "soc2"})
 	if err == nil {
@@ -163,6 +174,53 @@ func TestVerifyBundleChecksChainIntegrityBeforeCompliance(t *testing.T) {
 		t.Fatalf("expected *Error, got %T", err)
 	}
 	if vErr.ReasonCode != verifybundle.ReasonBundleVerify {
+		t.Fatalf("reason mismatch: got %s", vErr.ReasonCode)
+	}
+	if vErr.ExitCode != 2 {
+		t.Fatalf("exit mismatch: got %d want 2", vErr.ExitCode)
+	}
+}
+
+func TestVerifyBundleFailsOnInvalidRecordSignature(t *testing.T) {
+	t.Parallel()
+
+	storeDir, outDir := setupBundleFixture(t)
+	chainPath := filepath.Join(outDir, "chain.json")
+	raw, err := os.ReadFile(chainPath)
+	if err != nil {
+		t.Fatalf("ReadFile chain: %v", err)
+	}
+	var chain proof.Chain
+	if err := json.Unmarshal(raw, &chain); err != nil {
+		t.Fatalf("Unmarshal chain: %v", err)
+	}
+	if len(chain.Records) == 0 {
+		t.Fatal("expected non-empty chain fixture")
+	}
+	chain.Records[0].Integrity.Signature = "base64:AAAA"
+	tampered, err := json.MarshalIndent(chain, "", "  ")
+	if err != nil {
+		t.Fatalf("Marshal tampered chain: %v", err)
+	}
+	if err := os.WriteFile(chainPath, tampered, 0o600); err != nil {
+		t.Fatalf("WriteFile chain: %v", err)
+	}
+	if err := updateManifestHash(outDir, "chain.json"); err != nil {
+		t.Fatalf("update manifest hash: %v", err)
+	}
+	if err := resignManifest(storeDir, outDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
+	}
+
+	_, err = verifybundle.Verify(outDir, []string{"eu-ai-act", "soc2"})
+	if err == nil {
+		t.Fatal("expected bundle signature verification failure")
+	}
+	vErr, ok := err.(*verifybundle.Error)
+	if !ok {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if vErr.ReasonCode != verifybundle.ReasonBundleSignature {
 		t.Fatalf("reason mismatch: got %s", vErr.ReasonCode)
 	}
 	if vErr.ExitCode != 2 {
@@ -205,6 +263,38 @@ func updateManifestHash(bundleDir string, relPath string) error {
 		return err
 	}
 	return os.WriteFile(manifestPath, out, 0o600)
+}
+
+func resignManifest(storeDir string, bundleDir string) error {
+	signingKey, err := verifysupport.LoadStoreSigningKey(storeDir)
+	if err != nil {
+		return err
+	}
+	manifestPath := filepath.Join(bundleDir, "manifest.json")
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return err
+	}
+	var manifestPayload map[string]any
+	if err := json.Unmarshal(raw, &manifestPayload); err != nil {
+		return err
+	}
+	delete(manifestPayload, "signatures")
+	cleaned, err := json.MarshalIndent(manifestPayload, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(manifestPath, cleaned, 0o600); err != nil {
+		return err
+	}
+	signedManifest, err := proof.SignBundleFile(bundleDir, signingKey)
+	if err != nil {
+		return err
+	}
+	if len(signedManifest.Signatures) == 0 {
+		return errors.New("manifest signatures missing after resign")
+	}
+	return nil
 }
 
 func setupBundleFixture(t *testing.T) (string, string) {

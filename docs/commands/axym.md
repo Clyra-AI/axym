@@ -84,9 +84,9 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym init --sample-pack ./axym-sample --json`: creates the local store plus a deterministic sample pack with machine-readable created files and next steps.
 - `axym collect --dry-run --json`: validates fixture and environment readiness without writes.
 - `axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
-- `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and rejects malformed JSONL deterministically.
+- `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and promotes normalized collector JSONL (`source_type`, `source`, `source_product`, `record_type`, `agent_id`, `timestamp`, `event`, `metadata`, optional `relationship`, `controls`) into signed proof records while rejecting malformed payloads deterministically.
 - `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records with actor, downstream, owner, delegation, policy, and approval linkage when present.
-- `axym record add --input <record.json> --json`: appends a user-supplied proof record payload.
+- `axym record add --input <record.json> --json`: validates a user-supplied proof record payload, then signs and appends it to the local chain.
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --source gait --json --input <path>`: ingests Gait native/proof pack artifacts with translation.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.
@@ -97,8 +97,8 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym override create --bundle Q3-2026 --reason "fixture" --signer ops-key --json`: appends signed override evidence and artifacts.
 - `axym replay --model payments-agent --tier A --json`: emits replay-certification evidence with deterministic blast-radius summaries.
 - `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, identity-governance artifacts, OSCAL, and portable raw records.
-- `axym verify --chain --json`: verifies append-only chain integrity.
-- `axym verify --bundle ./axym-evidence --json`: verifies cryptographic bundle integrity and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
+- `axym verify --chain --json`: verifies append-only chain integrity plus Axym-managed record signatures.
+- `axym verify --bundle ./axym-evidence --json`: verifies bundle manifest signatures, Axym-authored record signatures, and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
 
 ## Contributor checks
 

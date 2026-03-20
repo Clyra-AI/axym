@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -20,6 +21,11 @@ func TestVerifyChainAgreementWithProof(t *testing.T) {
 	}
 
 	chain := proof.NewChain("agreement")
+	key, err := proof.GenerateSigningKey()
+	if err != nil {
+		t.Fatalf("GenerateSigningKey: %v", err)
+	}
+	writeStoreSigningKey(t, storeDir, key)
 	record, err := proof.NewRecord(proof.RecordOpts{
 		Source:        "axym",
 		SourceProduct: "axym",
@@ -30,6 +36,9 @@ func TestVerifyChainAgreementWithProof(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("NewRecord: %v", err)
+	}
+	if _, err := proof.Sign(record, key); err != nil {
+		t.Fatalf("Sign: %v", err)
 	}
 	if err := proof.AppendToChain(chain, record); err != nil {
 		t.Fatalf("AppendToChain: %v", err)
@@ -77,5 +86,75 @@ func TestVerifyChainAgreementWithProof(t *testing.T) {
 	}
 	if proofResult.Intact {
 		t.Fatal("proof.VerifyChain should fail on tampered chain")
+	}
+}
+
+func TestVerifyChainFailsOnInvalidSignature(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	if err := os.MkdirAll(storeDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	key, err := proof.GenerateSigningKey()
+	if err != nil {
+		t.Fatalf("GenerateSigningKey: %v", err)
+	}
+	writeStoreSigningKey(t, storeDir, key)
+
+	chain := proof.NewChain("signature")
+	record, err := proof.NewRecord(proof.RecordOpts{
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "tool_invocation",
+		Timestamp:     time.Date(2026, 2, 28, 16, 0, 0, 0, time.UTC),
+		Event:         map[string]any{"tool_name": "fetch"},
+		Controls:      proof.Controls{PermissionsEnforced: true},
+	})
+	if err != nil {
+		t.Fatalf("NewRecord: %v", err)
+	}
+	if _, err := proof.Sign(record, key); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if err := proof.AppendToChain(chain, record); err != nil {
+		t.Fatalf("AppendToChain: %v", err)
+	}
+	chain.Records[0].Integrity.Signature = "base64:AAAA"
+	raw, err := json.MarshalIndent(chain, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal chain: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storeDir, "chain.json"), raw, 0o600); err != nil {
+		t.Fatalf("write chain: %v", err)
+	}
+
+	_, err = VerifyChainFromStoreDir(storeDir)
+	if err == nil {
+		t.Fatal("expected signature verification error")
+	}
+	var verifyErr *Error
+	if !errors.As(err, &verifyErr) {
+		t.Fatalf("expected verify.Error, got %T", err)
+	}
+	if verifyErr.ReasonCode != ReasonChainSignature {
+		t.Fatalf("reason mismatch: got %s", verifyErr.ReasonCode)
+	}
+}
+
+func writeStoreSigningKey(t *testing.T, storeDir string, key proof.SigningKey) {
+	t.Helper()
+	storePayload := map[string]any{
+		"key_id":  key.KeyID,
+		"public":  base64.StdEncoding.EncodeToString(key.Public),
+		"private": base64.StdEncoding.EncodeToString(key.Private),
+	}
+	raw, err := json.MarshalIndent(storePayload, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal signing key: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storeDir, "signing-key.json"), raw, 0o600); err != nil {
+		t.Fatalf("write signing key: %v", err)
 	}
 }

@@ -3,6 +3,8 @@ package collector
 import (
 	"context"
 	"time"
+
+	"github.com/Clyra-AI/proof"
 )
 
 // Controls carries compliance control hints that are copied into proof records.
@@ -21,6 +23,7 @@ type Candidate struct {
 	Timestamp     time.Time
 	Event         map[string]any
 	Metadata      map[string]any
+	Relationship  *proof.Relationship
 	Controls      Controls
 }
 

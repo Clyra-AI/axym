@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestCollectDryRunJSONNoWrites(t *testing.T) {
@@ -161,6 +164,120 @@ func TestCollectPluginEmptyMetadataRoundTripsVerify(t *testing.T) {
 	}
 	if count, _ := verification["count"].(float64); count != 1 {
 		t.Fatalf("expected verified record count=1, output=%s", stdout.String())
+	}
+}
+
+func TestCollectPluginRelationshipRoundTripsToChain(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	pluginPath := filepath.Join(root, "plugin.go")
+	pluginSource := []byte("package main\nimport \"fmt\"\nfunc main(){fmt.Println(`{\"source_type\":\"plugin\",\"source\":\"custom\",\"source_product\":\"axym\",\"record_type\":\"tool_invocation\",\"agent_id\":\"agent-1\",\"timestamp\":\"2026-03-18T00:00:00Z\",\"event\":{\"tool_name\":\"scan\"},\"metadata\":{},\"relationship\":{\"parent_ref\":{\"kind\":\"trace\",\"id\":\"trace-123\"},\"entity_refs\":[{\"kind\":\"resource\",\"id\":\"db://prod\"}],\"policy_ref\":{\"policy_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}},\"controls\":{\"permissions_enforced\":true}}`)}\n")
+	if err := os.WriteFile(pluginPath, pluginSource, 0o600); err != nil {
+		t.Fatalf("write plugin source: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{
+		"collect",
+		"--store-dir", storeDir,
+		"--plugin-timeout", "60s",
+		"--plugin", "go run " + pluginPath,
+		"--json",
+	}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("collect exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+
+	raw, err := os.ReadFile(filepath.Join(storeDir, "chain.json"))
+	if err != nil {
+		t.Fatalf("read chain: %v", err)
+	}
+	var chain struct {
+		Records []struct {
+			Relationship struct {
+				ParentRef *struct {
+					Kind string `json:"kind"`
+					ID   string `json:"id"`
+				} `json:"parent_ref,omitempty"`
+				EntityRefs []struct {
+					Kind string `json:"kind"`
+					ID   string `json:"id"`
+				} `json:"entity_refs,omitempty"`
+				PolicyRef *struct {
+					PolicyDigest string `json:"policy_digest"`
+				} `json:"policy_ref,omitempty"`
+			} `json:"relationship"`
+		} `json:"records"`
+	}
+	if err := json.Unmarshal(raw, &chain); err != nil {
+		t.Fatalf("decode chain: %v", err)
+	}
+	if len(chain.Records) != 1 {
+		t.Fatalf("expected one record in chain, got %d", len(chain.Records))
+	}
+	relationship := chain.Records[0].Relationship
+	if relationship.ParentRef == nil || relationship.ParentRef.Kind != "trace" || relationship.ParentRef.ID != "trace-123" {
+		t.Fatalf("parent ref mismatch: %+v", relationship.ParentRef)
+	}
+	foundResource := false
+	for _, ref := range relationship.EntityRefs {
+		if ref.Kind == "resource" && ref.ID == "db://prod" {
+			foundResource = true
+			break
+		}
+	}
+	if !foundResource {
+		t.Fatalf("expected resource entity ref: %+v", relationship.EntityRefs)
+	}
+	if relationship.PolicyRef == nil || relationship.PolicyRef.PolicyDigest != "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("policy ref mismatch: %+v", relationship.PolicyRef)
+	}
+}
+
+func TestCollectUsesCommandContextCancellationForPlugin(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	pluginPath := filepath.Join(root, "plugin.go")
+	pluginBinary := filepath.Join(root, "plugin")
+	if runtime.GOOS == "windows" {
+		pluginBinary += ".exe"
+	}
+	pluginSource := []byte("package main\nimport \"time\"\nfunc main(){time.Sleep(5*time.Second)}\n")
+	if err := os.WriteFile(pluginPath, pluginSource, 0o600); err != nil {
+		t.Fatalf("write plugin source: %v", err)
+	}
+	build := exec.Command("go", "build", "-o", pluginBinary, pluginPath)
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build plugin: %v output=%s", err, string(out))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(100*time.Millisecond, cancel)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := executeContext(ctx, []string{
+		"collect",
+		"--store-dir", storeDir,
+		"--plugin-timeout", "60s",
+		"--plugin", pluginBinary,
+		"--json",
+	}, &stdout, &stderr)
+	if exit != exitRuntimeFailure {
+		t.Fatalf("exit mismatch: got %d want %d stderr=%s stdout=%s", exit, exitRuntimeFailure, stderr.String(), stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v output=%s", err, stdout.String())
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "COLLECT_CONTEXT_CANCELED" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
 	}
 }
 

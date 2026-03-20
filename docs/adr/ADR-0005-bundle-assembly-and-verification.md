@@ -21,9 +21,11 @@ Epic 5 requires deterministic, signed bundle assembly with safe output-path cont
   - managed marker must be a regular file,
   - unsafe operations fail closed with exit `8`.
 - Add deterministic manifest generation boundary `core/export/manifest` and sign bundles via `Clyra-AI/proof` manifest primitives.
+- Export additive public-key material for Axym-authored bundles so bundle verification can remain offline while checking both manifest signatures and Axym-managed record signatures.
 - Add OSCAL export boundary `core/export/oscal` with schema-validated output using `schemas/v1/bundle`.
 - Add compliance-aware bundle verification boundary `core/verify/bundle`:
-  - keep crypto verification delegated to `proof.VerifyBundle`,
+  - keep manifest-hash verification delegated to `proof.VerifyBundle`,
+  - verify bundle manifest signatures and Axym-managed record signatures using exported bundle public-key material,
   - recompute deterministic compliance completeness and grade from bundle chain evidence,
   - validate OSCAL and executive-summary schema contracts.
 - Add CLI surface `axym bundle` and extend `axym verify --bundle` to emit both crypto and compliance verification in one deterministic envelope.

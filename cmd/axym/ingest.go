@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -49,7 +48,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 
 			switch selectedSource {
 			case "wrkr":
-				result, err := wrkr.Ingest(context.Background(), wrkr.Request{
+				result, err := wrkr.Ingest(cmd.Context(), wrkr.Request{
 					InputPaths: inputPaths,
 					Store:      evidenceStore,
 					StateDir:   resolvedStateDir,
@@ -77,7 +76,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				}
 				return nil
 			case "gait":
-				result, err := gait.Ingest(context.Background(), gait.Request{
+				result, err := gait.Ingest(cmd.Context(), gait.Request{
 					InputPaths: inputPaths,
 					Store:      evidenceStore,
 				})

@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
+	"github.com/Clyra-AI/proof"
 )
 
 func TestBundleAndVerifyBundleJSONEnvelopeContract(t *testing.T) {
@@ -102,6 +105,9 @@ func TestVerifyBundleInvalidOSCALContractExit(t *testing.T) {
 	if err := updateManifestHash(bundleDir, filepath.ToSlash(filepath.Join("oscal-v1.1", "component-definition.json"))); err != nil {
 		t.Fatalf("update manifest hash: %v", err)
 	}
+	if err := resignManifest(storeDir, bundleDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
+	}
 	out, exit := runAxymContract(t, "verify", "--bundle", bundleDir, "--json")
 	if exit != 3 {
 		t.Fatalf("exit mismatch: got=%d want=3 output=%s", exit, out)
@@ -140,4 +146,30 @@ func updateManifestHash(bundleDir string, relPath string) error {
 		return err
 	}
 	return os.WriteFile(manifestPath, out, 0o600)
+}
+
+func resignManifest(storeDir string, bundleDir string) error {
+	signingKey, err := verifysupport.LoadStoreSigningKey(storeDir)
+	if err != nil {
+		return err
+	}
+	manifestPath := filepath.Join(bundleDir, "manifest.json")
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return err
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return err
+	}
+	delete(manifest, "signatures")
+	cleaned, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(manifestPath, cleaned, 0o600); err != nil {
+		return err
+	}
+	_, err = proof.SignBundleFile(bundleDir, signingKey)
+	return err
 }

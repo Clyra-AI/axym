@@ -115,6 +115,51 @@ func TestVerifyBundleDoesNotMutateStoreOrTempPath(t *testing.T) {
 	}
 }
 
+func TestVerifyRejectsSignatureTamperWithVerificationFailureExit(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	collectOut, collectExit := runAxymContract(t, "collect", "--fixture-dir", filepath.Join(testRepoRoot(t), "fixtures", "collectors"), "--store-dir", storeDir, "--json")
+	if collectExit != 0 {
+		t.Fatalf("collect setup exit=%d output=%s", collectExit, collectOut)
+	}
+
+	chainPath := filepath.Join(storeDir, "chain.json")
+	raw, err := os.ReadFile(chainPath)
+	if err != nil {
+		t.Fatalf("read chain: %v", err)
+	}
+	var chain map[string]any
+	if err := json.Unmarshal(raw, &chain); err != nil {
+		t.Fatalf("decode chain: %v", err)
+	}
+	records := chain["records"].([]any)
+	record := records[0].(map[string]any)
+	integrity := record["integrity"].(map[string]any)
+	integrity["signature"] = "base64:AAAA"
+	tampered, err := json.MarshalIndent(chain, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal chain: %v", err)
+	}
+	if err := os.WriteFile(chainPath, tampered, 0o600); err != nil {
+		t.Fatalf("write chain: %v", err)
+	}
+
+	verifyOut, verifyExit := runAxymContract(t, "verify", "--chain", "--store-dir", storeDir, "--json")
+	if verifyExit != 2 {
+		t.Fatalf("exit mismatch: got %d want 2 output=%s", verifyExit, verifyOut)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(verifyOut), &payload); err != nil {
+		t.Fatalf("decode verify json: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "chain_signature_invalid" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], verifyOut)
+	}
+}
+
 func runAxymContract(t *testing.T, args ...string) (string, int) {
 	t.Helper()
 	_, currentFile, _, ok := runtime.Caller(0)

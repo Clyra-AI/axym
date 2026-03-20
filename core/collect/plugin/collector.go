@@ -14,6 +14,7 @@ import (
 
 	"github.com/Clyra-AI/axym/core/collect/collectorerr"
 	"github.com/Clyra-AI/axym/core/collector"
+	"github.com/Clyra-AI/proof"
 )
 
 const (
@@ -35,14 +36,15 @@ type configPayload struct {
 }
 
 type outputRecord struct {
-	SourceType    string         `json:"source_type"`
-	Source        string         `json:"source"`
-	SourceProduct string         `json:"source_product"`
-	RecordType    string         `json:"record_type"`
-	AgentID       string         `json:"agent_id"`
-	Timestamp     string         `json:"timestamp"`
-	Event         map[string]any `json:"event"`
-	Metadata      map[string]any `json:"metadata"`
+	SourceType    string              `json:"source_type"`
+	Source        string              `json:"source"`
+	SourceProduct string              `json:"source_product"`
+	RecordType    string              `json:"record_type"`
+	AgentID       string              `json:"agent_id"`
+	Timestamp     string              `json:"timestamp"`
+	Event         map[string]any      `json:"event"`
+	Metadata      map[string]any      `json:"metadata"`
+	Relationship  *proof.Relationship `json:"relationship,omitempty"`
 	Controls      struct {
 		PermissionsEnforced bool   `json:"permissions_enforced"`
 		ApprovedScope       string `json:"approved_scope"`
@@ -144,6 +146,7 @@ func (c Collector) Collect(ctx context.Context, req collector.Request) (collecto
 			Timestamp:     timestamp.UTC().Truncate(time.Second),
 			Event:         out.Event,
 			Metadata:      out.Metadata,
+			Relationship:  out.Relationship,
 			Controls: collector.Controls{
 				PermissionsEnforced: out.Controls.PermissionsEnforced,
 				ApprovedScope:       out.Controls.ApprovedScope,

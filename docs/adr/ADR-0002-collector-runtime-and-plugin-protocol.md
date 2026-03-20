@@ -12,12 +12,12 @@ Epic 2 requires deterministic collector acquisition across built-in surfaces, da
 - Add built-in collectors for MCP, LLM middleware, webhook, GitHub Actions, git metadata, dbt, and Snowflake.
 - Keep data-pipeline policy evaluation in policy layer packages (`core/policy/sod`, `core/policy/freeze`) and surface deterministic `decision.pass` + reason codes.
 - Enforce digest-first semantics for SQL/query capture and attach replay inputs in metadata.
-- Add plugin runtime (`stdin` config, `stdout` JSONL, timeout/isolation, deterministic error classification).
+- Add plugin runtime (`stdin` config, `stdout` normalized collector JSONL with optional relationship envelope, timeout/isolation, deterministic error classification).
 - Add governance-event promotion path with strict JSON Schema validation before proof-record construction.
 
 ## Alternatives Considered
 - Let collectors append directly to chain: rejected because it collapses architecture boundaries and weakens fail-closed reasoning.
-- Accept plugin output as already-valid proof records: rejected because it could bypass normalization/schema gates.
+- Accept plugin output as already-valid proof records: rejected because it could bypass normalization/schema gates and the collector/runtime relationship-preservation contract.
 - Fail whole collect command on any collector failure: rejected because non-blocking collection mode is required.
 
 ## Tradeoffs

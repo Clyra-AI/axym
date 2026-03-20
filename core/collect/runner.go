@@ -35,8 +35,14 @@ func (r *Runner) Run(ctx context.Context, req collector.Request, dryRun bool) (R
 	}
 
 	for _, sourceCollector := range r.Registry.Ordered() {
+		if ctx != nil && ctx.Err() != nil {
+			return result, &Error{ReasonCode: ReasonContextCanceled, Message: "collection canceled", ExitCode: 1, Err: ctx.Err()}
+		}
 		summary := SourceSummary{Name: sourceCollector.Name(), Status: "ok"}
 		collectorResult, err := sourceCollector.Collect(ctx, req)
+		if ctx != nil && ctx.Err() != nil {
+			return result, &Error{ReasonCode: ReasonContextCanceled, Message: "collection canceled", ExitCode: 1, Err: ctx.Err()}
+		}
 		if err != nil {
 			reason := ReasonCollectorError
 			if rc, ok := err.(reasonCoder); ok {
@@ -65,6 +71,7 @@ func (r *Runner) Run(ctx context.Context, req collector.Request, dryRun bool) (R
 				Timestamp:     candidate.Timestamp,
 				Event:         candidate.Event,
 				Metadata:      candidate.Metadata,
+				Relationship:  candidate.Relationship,
 				Controls: normalize.Controls{
 					PermissionsEnforced: candidate.Controls.PermissionsEnforced,
 					ApprovedScope:       candidate.Controls.ApprovedScope,

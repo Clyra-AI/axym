@@ -47,6 +47,34 @@ type AppendResult struct {
 	RecordID    string
 }
 
+type ValidationError struct {
+	Message string
+	Err     error
+}
+
+func (e *ValidationError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Message == "" {
+		if e.Err == nil {
+			return "validation failed"
+		}
+		return e.Err.Error()
+	}
+	if e.Err == nil {
+		return e.Message
+	}
+	return e.Message + ": " + e.Err.Error()
+}
+
+func (e *ValidationError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 type Store struct {
 	cfg         Config
 	mu          sync.Mutex
@@ -172,6 +200,12 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 	}
 	if _, err := proof.Sign(linked, signingKey); err != nil {
 		return AppendResult{}, fmt.Errorf("sign record: %w", err)
+	}
+	if err := proof.ValidateRecord(linked); err != nil {
+		return AppendResult{}, &ValidationError{
+			Message: "record schema validation failed",
+			Err:     err,
+		}
 	}
 	if err := proof.AppendToChain(chain, linked); err != nil {
 		return AppendResult{}, fmt.Errorf("append to chain: %w", err)

@@ -70,7 +70,7 @@ Use this when you are connecting Axym to your actual runtime, CI, or sibling sys
 
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `./axym collect --json --plugin "<cmd>"`.
-- Manual record append: `./axym record add --input <record.json> --json`.
+- Manual record append: `./axym record add --input <record.json> --json` after Axym validates the proof payload and signs/links it locally.
 - Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
 
 This is the path to use when you want evidence from your own CI, runtime, provider, or sibling governance systems. Approvals, risk assessments, incidents, and similar evidence classes are not claimed as default built-in clean-room capture unless that collector ships.
@@ -81,8 +81,8 @@ Use this path when you need to prove which non-human identity acted, which owner
 - `collect --dry-run --json` is expected to report per-source `would_capture` and `reason_codes` without side effects.
 - `collect --json` reports per-source `status`, `captured`, `rejected`, and `failures`; zero capture is valid when no real inputs exist.
 - `map --json` and `gaps --json` emit deterministic summaries even when coverage is incomplete.
-- `verify --chain --json` validates local append-only integrity.
-- `verify --bundle <path> --json` validates bundle cryptographic integrity plus Axym compliance completeness state, including the identity-chain summary, ownership register, privilege-drift report, and delegated-chain exceptions artifacts.
+- `verify --chain --json` validates local append-only integrity plus Axym-managed record signatures.
+- `verify --bundle <path> --json` validates manifest signatures, Axym-authored record signatures, and Axym compliance completeness state, including the identity-chain summary, ownership register, privilege-drift report, and delegated-chain exceptions artifacts.
 
 ## Validation
 

@@ -244,7 +244,7 @@ Record 1 → hash(record_1) →┐
 Record 2 → hash(record_2 + prev_hash) →┐
 Record 3 → hash(record_3 + prev_hash) →┐
 ...
-Verification: axym verify --chain → delegates to proof.VerifyChain()
+Verification: axym verify --chain → verifies append-only chain linkage plus Axym-managed record signatures
               proof verify --chain → "Chain intact. 1,427 records. No gaps."
 ```
 
@@ -502,7 +502,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - **Graph-linkable relationship envelope (implemented in `Clyra-AI/proof`, H0 data architecture for H3 PolicyGraph).** Every proof record includes an optional `relationship` field (`proof.Relationship`) carrying graph-structured context. The envelope is already implemented in proof, Gait, and Wrkr — Axym ingests and preserves it. Fields: `parent_ref` (typed node reference — `kind` + `id` — linking to the record's parent: session, trace, run, intent, policy, agent, or evidence), `entity_refs[]` (typed references to all entities involved — agents, tools, resources, policies, evidence — each with `kind` and `id`), `policy_ref` (full policy lineage: `policy_id`, `policy_version`, `policy_digest` as SHA-256, `matched_rule_ids[]`), `agent_chain[]` (ordered delegation hops with `identity` and `role`: requester, delegator, delegate), `edges[]` (typed graph edges with `kind`, `from`, `to` — edge kinds: `calls`, `governed_by`, `delegates_to`, `targets`, `derived_from`, `emits_evidence`). Legacy compatibility fields (`parent_record_id`, `related_entity_ids[]`, `agent_lineage[]`) are preserved for backward compatibility. All fields are nullable with `omitempty`. Each relationship component has an `Extra` field (`map[string]json.RawMessage`) preserving additive fields for future graph extensions without breaking existing records. Gait emits relationship envelopes on TraceRecords, SessionEvents, ApprovalAuditRecords, and DelegationAuditRecords. Wrkr emits them on findings, risk assessments, attack paths, and posture scores via `proofmap.go`. When Axym ingests these records, the relationship data is preserved in the evidence chain — so when PolicyGraph ships (H3), it launches pre-populated with 18+ months of graph-structured governance topology accumulated from day-one proof records across all three sibling products
 - Records are created via `proof.NewRecord()` and signed via `proof.Sign()` from the `Clyra-AI/proof` module
 - Records are chained via `proof.AppendToChain()` — each record's hash includes the previous record's hash
-- Chain integrity can be verified at any time (`axym verify --chain` delegates to `proof.VerifyChain()`)
+- Chain integrity can be verified at any time (`axym verify --chain` checks append-only linkage and Axym-managed record signatures)
 - Broken chains are detected and flagged with the exact break point
 - Records are immutable once written (append-only evidence store)
 - Proof records are signed with Ed25519 (default) or cosign (Sigstore)
@@ -720,9 +720,9 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - `axym gaps` — show all compliance gaps ranked by severity
 - `axym bundle --audit [name] --frameworks [list] --from [date] --to [date]` — generate audit bundle
 - `axym review --date [date]` — generate Daily Review Pack for the specified date (default: yesterday)
-- `axym verify --chain` — verify proof chain integrity (delegates to `Clyra-AI/proof`)
-- `axym verify --bundle [path]` — verify audit bundle integrity: cryptographic verification (signatures, hashes, chain — delegates to `proof.Verify()`) **plus** compliance completeness checks (required record types present per framework, field coverage, auditability grade recalculation). `proof verify --bundle` performs cryptographic verification only — no compliance opinions. Auditors use `proof verify`; GRC analysts use `axym verify` for the full picture
-- `axym record add --type [type] --file [path]` — add manual proof record (for non-automated controls)
+- `axym verify --chain` — verify proof chain integrity: append-only linkage plus Axym-managed record signatures
+- `axym verify --bundle [path]` — verify audit bundle integrity: manifest signatures, Axym-managed record signatures, hashes, chain, and compliance completeness checks (required record types present per framework, field coverage, auditability grade recalculation). `proof verify --bundle` performs proof-level manifest/hash verification only — no Axym compliance opinions. Auditors use `proof verify`; GRC analysts use `axym verify` for the full picture
+- `axym record add --input [path]` — validate, sign, and append a manual proof record payload (for non-automated controls)
 - `axym override create --bundle [id] --reason [text] --signer [key]` — create signed exception
 - `axym ingest --source [wrkr|gait|path]` — ingest proof records from sibling products or external sources. For `gait`: accepts PackSpec v1 ZIP files (extracted automatically), directories of extracted pack files, or individual pack paths; Gait's `gait.gate.trace` and token types are translated to proof record format at ingestion time. For `wrkr`: reads wrkr's proof record output directory. For `path`: reads JSONL files containing proof-format records
 - `axym replay --model [name] --tier [A|B|C]` — run replay certification for a specific pipeline model
@@ -738,7 +738,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - Collectors are plugins that capture evidence from specific sources
 - Built-in collectors: MCP server logs, MCP gateway audit logs (Kong, Docker, MintMCP), LLM API middleware (OpenAI, Anthropic), CI/CD events (GitHub Actions), Git metadata, dbt pipeline logs, Snowflake query history, eval platform results (Braintrust, Arize, LangSmith), model registry events (MLflow, Hugging Face Hub, W&B), adversarial/red team results (Giskard, NeMo Red Team)
 - Collector interface: `Collect(config CollectorConfig) ([]proof.Record, error)`
-- Third-party collectors can be built as standalone binaries implementing the collector protocol: Axym invokes the binary, passes `CollectorConfig` as JSON on stdin, reads `[]proof.Record` as JSONL on stdout. Exit code 0 = success, non-zero = failure (stderr contains error message). Go plugins (`plugin` package) are supported as a secondary option but are fragile — same Go version, OS, and build flags required
+- Third-party collectors can be built as standalone binaries implementing the collector protocol: Axym invokes the binary, passes `CollectorConfig` as JSON on stdin, reads normalized collector JSONL on stdout (`source_type`, `source`, `source_product`, `record_type`, `agent_id`, `timestamp`, `event`, `metadata`, optional `relationship`, `controls`), and promotes it into signed proof records. Exit code 0 = success, non-zero = failure (stderr contains error message). Go plugins (`plugin` package) are supported as a secondary option but are fragile — same Go version, OS, and build flags required
 - Collector registry documents available collectors and their configuration
 - **Adapter-first design:** Collectors read existing outputs — MCP server log files, LLM API response middleware, CI pipeline event webhooks, git metadata, dbt run results. Collectors never require modifications to the source system. No SDK installation in agent frameworks, no upstream PRs to MCP servers, no changes to CI pipeline definitions beyond adding a post-step. The moment a collector requires the source to change how it works, adoption stalls. This is the same pattern Gait proved with eight reference integrations: wrap existing tools, never ask them to change.
 - **MCP gateway audit log ingestion.** MCP gateways (Kong, Docker MCP Gateway, MintMCP, Lunar) centralize agent-to-tool access control and produce structured audit logs documenting which agents called which tools, when, with what auth, and whether the call was allowed or blocked. The `MCPGatewayCollector` reads these logs and translates entries into `permission_check` proof records (access allowed) and `policy_enforcement` proof records (access blocked). This is valuable because many enterprises will deploy MCP gateways before adopting Gait — the gateway handles auth and rate limiting, Axym produces the signed compliance evidence. Supported log formats: Kong gateway JSON logs, Docker MCP Gateway interceptor events, MintMCP audit trail exports. The collector extracts: agent identity (from gateway auth context), tool name, action, verdict, timestamp, and gateway policy version. Gateway-sourced records are tagged with `evidence_source: mcp_gateway` in metadata so compliance mapping can distinguish them from Gait-sourced enforcement evidence
@@ -904,7 +904,7 @@ An audit bundle for Q3-2026 has a gap: no `risk_assessment` records for a specif
 
 ### AC17: The "Custom Collector"
 
-A third-party collector built as a standalone binary implementing the collector protocol (receives `CollectorConfig` as JSON on stdin, emits `[]proof.Record` as JSONL on stdout) is registered with Axym. The collector captures events from a custom internal tool, produces valid proof records with correct schema validation. `axym collect` discovers and runs the custom collector alongside built-in collectors. The custom collector's records appear in compliance maps and audit bundles indistinguishable from built-in collector output. A collector that returns malformed records (missing required fields, invalid record type) is rejected at schema validation with a clear error — the malformed records do not enter the proof chain.
+A third-party collector built as a standalone binary implementing the collector protocol (receives `CollectorConfig` as JSON on stdin, emits normalized collector JSONL with `event`, `metadata`, optional `relationship`, and control hints on stdout) is registered with Axym. The collector captures events from a custom internal tool, produces valid proof-ready collector payloads with correct schema validation and relationship preservation. `axym collect` discovers and runs the custom collector alongside built-in collectors. The promoted records appear in compliance maps and audit bundles indistinguishable from built-in collector output. A collector that returns malformed payloads (missing required fields, invalid record type, malformed relationship envelope) is rejected deterministically — the malformed payloads do not enter the proof chain.
 
 -----
 
@@ -1128,7 +1128,7 @@ type Redaction struct {
 // Collector is the interface that collector plugins implement.
 type Collector interface {
     Name() string
-    Collect(config CollectorConfig) ([]proof.Record, error)
+    Collect(config CollectorConfig) ([]CollectorCandidate, error)
 }
 ```
 

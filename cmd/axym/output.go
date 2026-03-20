@@ -22,7 +22,7 @@ type envelope struct {
 type errorEnvelope struct {
 	Reason     string `json:"reason"`
 	Message    string `json:"message"`
-	BreakIndex int    `json:"break_index"`
+	BreakIndex *int   `json:"break_index,omitempty"`
 	BreakPoint string `json:"break_point,omitempty"`
 }
 

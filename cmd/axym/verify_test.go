@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -40,6 +41,22 @@ func TestVerifyChainTamperExitCodeAndReason(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	chain := proof.NewChain("test")
+	key, err := proof.GenerateSigningKey()
+	if err != nil {
+		t.Fatalf("GenerateSigningKey: %v", err)
+	}
+	storeKey := map[string]any{
+		"key_id":  key.KeyID,
+		"public":  base64.StdEncoding.EncodeToString(key.Public),
+		"private": base64.StdEncoding.EncodeToString(key.Private),
+	}
+	storeKeyRaw, err := json.MarshalIndent(storeKey, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal signing key: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storeDir, "signing-key.json"), storeKeyRaw, 0o600); err != nil {
+		t.Fatalf("write signing key: %v", err)
+	}
 	r1, err := proof.NewRecord(proof.RecordOpts{
 		Source:        "axym",
 		SourceProduct: "axym",
@@ -50,6 +67,13 @@ func TestVerifyChainTamperExitCodeAndReason(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("NewRecord r1: %v", err)
+	}
+	r1.Integrity.PreviousRecordHash = chain.HeadHash
+	r1.Integrity.RecordHash = ""
+	r1.Integrity.Signature = ""
+	r1.Integrity.SigningKeyID = ""
+	if _, err := proof.Sign(r1, key); err != nil {
+		t.Fatalf("Sign r1: %v", err)
 	}
 	if err := proof.AppendToChain(chain, r1); err != nil {
 		t.Fatalf("AppendToChain r1: %v", err)
@@ -64,6 +88,13 @@ func TestVerifyChainTamperExitCodeAndReason(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("NewRecord r2: %v", err)
+	}
+	r2.Integrity.PreviousRecordHash = chain.HeadHash
+	r2.Integrity.RecordHash = ""
+	r2.Integrity.Signature = ""
+	r2.Integrity.SigningKeyID = ""
+	if _, err := proof.Sign(r2, key); err != nil {
+		t.Fatalf("Sign r2: %v", err)
 	}
 	if err := proof.AppendToChain(chain, r2); err != nil {
 		t.Fatalf("AppendToChain r2: %v", err)
@@ -93,6 +124,81 @@ func TestVerifyChainTamperExitCodeAndReason(t *testing.T) {
 	}
 	if errObj["reason"] != "chain_tamper_detected" {
 		t.Fatalf("reason mismatch: got %v", errObj["reason"])
+	}
+}
+
+func TestVerifyChainSignatureFailureExitCodeAndReason(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	if err := os.MkdirAll(storeDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	key, err := proof.GenerateSigningKey()
+	if err != nil {
+		t.Fatalf("GenerateSigningKey: %v", err)
+	}
+	storeKey := map[string]any{
+		"key_id":  key.KeyID,
+		"public":  base64.StdEncoding.EncodeToString(key.Public),
+		"private": base64.StdEncoding.EncodeToString(key.Private),
+	}
+	storeKeyRaw, err := json.MarshalIndent(storeKey, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal signing key: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storeDir, "signing-key.json"), storeKeyRaw, 0o600); err != nil {
+		t.Fatalf("write signing key: %v", err)
+	}
+
+	chain := proof.NewChain("sig-fail")
+	record, err := proof.NewRecord(proof.RecordOpts{
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "tool_invocation",
+		Timestamp:     time.Date(2026, 2, 28, 15, 0, 0, 0, time.UTC),
+		Event:         map[string]any{"tool_name": "fetch"},
+		Controls:      proof.Controls{PermissionsEnforced: true},
+	})
+	if err != nil {
+		t.Fatalf("NewRecord: %v", err)
+	}
+	record.Integrity.PreviousRecordHash = chain.HeadHash
+	record.Integrity.RecordHash = ""
+	record.Integrity.Signature = ""
+	record.Integrity.SigningKeyID = ""
+	if _, err := proof.Sign(record, key); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if err := proof.AppendToChain(chain, record); err != nil {
+		t.Fatalf("AppendToChain: %v", err)
+	}
+	chain.Records[0].Integrity.Signature = "base64:AAAA"
+	raw, err := json.MarshalIndent(chain, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal chain: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storeDir, "chain.json"), raw, 0o600); err != nil {
+		t.Fatalf("write chain: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"verify", "--chain", "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitVerificationFailed {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitVerificationFailed, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	errObj, ok := payload["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing error object: %s", stdout.String())
+	}
+	if errObj["reason"] != "chain_signature_invalid" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
 	}
 }
 
@@ -161,6 +267,9 @@ func TestVerifyInvalidTargetJSONContract(t *testing.T) {
 	errObj, _ := payload["error"].(map[string]any)
 	if errObj["reason"] != "invalid_input" {
 		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
+	}
+	if _, ok := errObj["break_index"]; ok {
+		t.Fatalf("unexpected break_index in invalid input output=%s", stdout.String())
 	}
 }
 

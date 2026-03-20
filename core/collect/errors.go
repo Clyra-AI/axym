@@ -3,9 +3,10 @@ package collect
 import "fmt"
 
 const (
-	ReasonCollectorError = "COLLECTOR_ERROR"
-	ReasonMalformed      = "MALFORMED_PAYLOAD"
-	ReasonRuntime        = "COLLECT_RUNTIME_ERROR"
+	ReasonCollectorError  = "COLLECTOR_ERROR"
+	ReasonContextCanceled = "COLLECT_CONTEXT_CANCELED"
+	ReasonMalformed       = "MALFORMED_PAYLOAD"
+	ReasonRuntime         = "COLLECT_RUNTIME_ERROR"
 )
 
 type Error struct {
