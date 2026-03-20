@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -98,7 +97,7 @@ func newCollectCmd(stdout io.Writer, global *globalFlags) *cobra.Command {
 					},
 				},
 			}
-			result, err := runner.Run(context.Background(), request, dryRun)
+			result, err := runner.Run(cmd.Context(), request, dryRun)
 			if err != nil {
 				return emitCollectError(err, stdout, global)
 			}

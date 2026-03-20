@@ -59,8 +59,8 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - `./axym init --json`: initializes local store scaffolding and writes `axym-policy.yaml` defaults.
 - `./axym init --sample-pack ./axym-sample --json`: additively materializes a deterministic sample pack with created files and next-step commands.
 - `./axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
-- `./axym record add --input <record.json> --json`: appends a JSON proof record payload to the local chain with deterministic dedupe behavior.
-- `./axym collect --json --plugin "<cmd>"`: runs third-party collector protocol (`stdin` config, `stdout` JSONL).
+- `./axym record add --input <record.json> --json`: validates a proof record payload, then signs and appends it to the local chain with deterministic dedupe behavior.
+- `./axym collect --json --plugin "<cmd>"`: runs third-party collector protocol (`stdin` config, `stdout` normalized collector JSONL with optional `relationship`).
 - `./axym collect --json --governance-event-file <file.jsonl>`: ingests governance events and promotes valid events to proof records with actor/downstream/owner/policy/approval linkage when present.
 - `./axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls and emits explainable match rationale.
 - `./axym gaps --frameworks eu-ai-act,soc2 --json`: computes deterministic `covered`/`partial`/`gap` ranking, remediation guidance, and auditability grade.
@@ -74,8 +74,8 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - `./axym bundle --audit <name> --frameworks eu-ai-act,soc2 --json`: assembles deterministic signed audit bundles with executive summary (`.json` + `.pdf`), identity-governance artifacts, chain verification, and OSCAL export.
 - `./axym map --json` and `./axym gaps --json`: default to frameworks `eu-ai-act,soc2` when `--frameworks` is omitted.
 - `./axym map --frameworks eu-ai-act --min-coverage 0.80 --json`: enforces threshold policy and exits non-zero when coverage is below threshold.
-- `./axym verify --chain --json`: verifies local append-only chain integrity.
-- `./axym verify --bundle <path> --json`: combines proof cryptographic verification with deterministic bundle compliance-completeness checks, including identity-governance artifact consistency, without writing store-managed temp artifacts.
+- `./axym verify --chain --json`: verifies local append-only chain integrity plus Axym-managed record signatures.
+- `./axym verify --bundle <path> --json`: verifies bundle manifest signatures, Axym-authored record signatures, and deterministic bundle compliance-completeness checks, including identity-governance artifact consistency, without writing store-managed temp artifacts.
 
 ## Contributor gates
 

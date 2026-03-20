@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "algorithm",
+    "key_id",
+    "public"
+  ],
+  "properties": {
+    "version": {
+      "const": "v1"
+    },
+    "algorithm": {
+      "const": "ed25519"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "public": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/=]+$",
+      "minLength": 1
+    }
+  }
+}

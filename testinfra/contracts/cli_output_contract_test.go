@@ -44,6 +44,9 @@ func TestCLIOutputErrorEnvelopeContract(t *testing.T) {
 	if strings.TrimSpace(toString(errorPayload["message"])) == "" {
 		t.Fatalf("missing non-empty message output=%s", stdout)
 	}
+	if _, ok := errorPayload["break_index"]; ok {
+		t.Fatalf("unexpected break_index on non-verify error output=%s", stdout)
+	}
 }
 
 func TestCLIOutputCommandHelpCarriesGlobalJSONFlag(t *testing.T) {

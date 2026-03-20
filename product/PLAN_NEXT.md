@@ -1,52 +1,54 @@
-# PLAN Axym: Identity-Governed Action Proof for Software Delivery
+# PLAN Axym: Proof Integrity and Ingress Contract Hardening
 
-Date: 2026-03-19
-Source of truth: user-provided 2026-03-19 recommendations, `product/axym.md`, `product/dev_guides.md`, `product/architecture_guides.md`, `AGENTS.md`
-Scope: Axym OSS CLI only. Plan the minimum backlog required to shift Axym from action-first proof language to portable proof of identity-governed action in software delivery, without weakening determinism, offline-first defaults, fail-closed behavior, schema stability, or exit-code stability.
+Date: 2026-03-20
+Source of truth: user-provided 2026-03-20 code-review findings and fix-wave guidance, `product/axym.md`, `product/dev_guides.md`, `product/architecture_guides.md`, `AGENTS.md`
+Scope: Axym OSS CLI only. Convert the current review blockers into an execution-ready remediation backlog covering proof integrity verification, fail-closed proof ingress validation, collector relationship-envelope preservation, machine-readable CLI contract cleanup, cancellation propagation, and required docs/ADR synchronization. No new product-scope expansion beyond Axym's existing CLI and `Clyra-AI/proof` interoperability.
 
 ---
 
 ## Global Decisions (Locked)
 
-- Keep the wedge inside software delivery. This backlog does not widen Axym into a general-purpose IAM, PAM, or IGA product.
-- Reframe Axym as proof of which non-human identity acted, through which delegated chain, against which target, under which policy and approval, not merely proof of what an AI system did.
-- Preserve Axym's non-negotiables: deterministic collect/map/gaps/bundle/verify behavior, offline-first defaults, local evidence handling, stable `--json` envelopes, and stable exit codes.
-- Model identity-governance additively on top of existing `Clyra-AI/proof` semantics. Prefer canonical field placement inside existing `event`, `metadata`, and `relationship` extension points over inventing a second Axym-only record format.
-- The public contract must still expose named normalized fields such as `actor_identity`, `downstream_identity`, `delegation_chain`, `policy_digest`, `approval_token_ref`, and `owner_identity` or an equivalent owner pointer.
-- Treat architecture boundaries as enforcement points: source adapters and collection, normalization and record construction, proof emission, sibling ingestion and translation, compliance matching, gap/review/regression evaluation, and bundle/export/verification remain separate.
-- Missing identity linkage is not "just another event." When Axym cannot tie an action to a known non-human identity, owner, policy digest, or approval chain, the evidence must downgrade deterministically to `partial` or `gap`.
-- Do not add speculative sibling-product scope. There is no `agnt` integration surface in this repo today; Agnt alignment in this backlog must land through generic proof-format, governance-event, or manual-record compatibility rather than a new Axym-owned product integration.
-- Bundle outputs must make the boundary explicit: Axym proves portable action-governance evidence around IAM/PAM/IGA systems, while those systems remain authoritative for identity lifecycle, credential issuance, entitlement management, and interactive access control.
-- Public docs and examples must never position Axym as an IAM replacement or imply identity-governance coverage beyond the shipped software-delivery seam.
+- This plan supersedes the older `PLAN_NEXT.md` theme. The new scope is release-blocker remediation, not broader product reframing work.
+- Contract/runtime correctness must land before docs, onboarding, or distribution-language changes.
+- Axym record validity is a three-part contract for Axym-authored evidence: proof-schema-valid record payload, valid record signature, and valid append-only chain linkage.
+- Fail-closed enforcement points are mandatory at the append boundary, verify boundary, bundle build/verify boundary, and collector/runtime boundary.
+- `record add` must not be the only validation gate. The shared append path must reject schema-invalid proof payloads so future callers cannot bypass CLI-only checks.
+- The collector/plugin protocol remains adapter-first. `collect --plugin` must not accept arbitrary pre-signed `proof.Record` payloads as a bypass around normalization, redaction, or policy enforcement.
+- Relationship-envelope preservation is required across supported collector ingress. If Axym accepts a relationship-bearing collector payload, it must preserve `parent_ref`, `entity_refs`, `policy_ref`, `agent_chain`, `edges`, and additive relationship extras instead of silently flattening them away.
+- Bundle verification must stay offline and deterministic. If per-record signature verification needs exported public-key material, Axym must ship a versioned bundle artifact for that purpose rather than relying on any network lookup.
+- Public contract changes must be additive wherever possible. Exit code vocabulary remains `0,1,2,3,4,5,6,7,8`.
+- Verification-only JSON fields such as `break_index` and `break_point` must never appear on non-verification errors.
+- Long-running CLI paths must propagate cancellation and timeout state from the process boundary through `collect`, `ingest`, and plugin execution.
+- Public docs are source-of-truth for supported runtime behavior. They must match shipped plugin protocol shape, verify semantics, and manual proof-ingress guarantees exactly.
 
 ---
 
 ## Current Baseline (Observed)
 
-- `product/axym.md` already contains identity-adjacent primitives deeper in the document: relationship-envelope preservation, Gait approval/delegation token translation, Wrkr privilege-drift mapping, deterministic auditability grades, and `boundary-contract.md` in the bundle.
-- The top-level framing is still action-first. The Executive Summary and JTBD describe structured proof of AI system behavior more strongly than proof of identity-governed action.
-- The evidence-surface tables mention permissions and human approvals, but they do not yet elevate acting identity, downstream execution identity, owner/approver, delegation chain, policy digest binding, approval-token binding, and identity/privilege drift as first-class capture targets.
-- The proof-record example does not explicitly show `actor_identity`, `downstream_identity`, `delegation_chain`, `policy_digest`, `approval_token_ref`, or `owner_identity`, even though later sections discuss related lineage concepts.
-- The bundle section already includes `auditability-grade.yaml` and `boundary-contract.md`, but it does not foreground identity-governance artifacts such as an identity-chain summary, owner/approver register, privilege-drift report, or delegated-chain exceptions view.
-- Runtime already has nearby implementation surfaces for this seam: `core/normalize`, `core/record`, `core/collect/governanceevent`, `core/ingest/wrkr`, `core/ingest/gait/translate`, `core/compliance/match`, `core/gaps`, `core/review/grade`, `core/bundle`, and `core/verify`.
-- Wrkr ingest already computes deterministic privilege-drift gaps in `core/review/privilegedrift`, and Gait ingest already preserves the `relationship` envelope during translation.
-- `cmd/axym/ingest` currently supports `wrkr` and `gait` only. Generic producer inputs currently enter Axym through `collect --governance-event-file` and `record add`, which is the correct in-scope landing point for Agnt-compatible inputs in this backlog.
-- Current grade derivation in `core/review/grade/grade.go` is driven by global `covered` / `partial` / `gap` counts. It does not yet appear to apply an explicit identity-linkage penalty model.
-- The repo already has relevant fixtures and acceptance surfaces to extend: `fixtures/governance/context_engineering.jsonl`, `fixtures/ingest/wrkr/proof_records.jsonl`, `fixtures/ingest/gait/native_records.jsonl`, `fixtures/records/decision.json`, `scenarios/axym/**`, and `testinfra/acceptance`.
+- `go build ./cmd/axym` and `go test ./... -count=1` currently pass, including internal integration and e2e lanes.
+- `core/verify/verify.go` and `core/verify/bundle/verify.go` delegate to `proof.VerifyChain()` only, so record-signature tampering is not detected by `verify --chain` or `verify --bundle`.
+- `core/bundle/bundle.go` gates bundle creation on the same chain-only verification path, so Axym can ship bundles containing records with invalid signatures.
+- `cmd/axym/record.go` performs shallow field checks only, then calls `store.Append`; `core/store/store.go` signs and appends without a full `proof.ValidateRecord` gate at the shared append boundary.
+- `core/collector/types.go` has no `Relationship` field on `Candidate`, `core/collect/plugin/collector.go` has no `relationship` parser, and `core/collect/runner.go` never forwards relationship data into normalization.
+- `cmd/axym/output.go` serializes `break_index` unconditionally, so non-verify failures surface a phantom `break_index: 0`.
+- `cmd/axym/collect.go`, `cmd/axym/ingest.go`, `cmd/axym/root.go`, and `cmd/axym/main.go` use `context.Background()` or `Execute()` instead of a signal-aware command context.
+- Existing green areas remain strong: Wrkr ingest already rejects unsupported proof record types, Gait native translation preserves relationships within the ingest path, and map/gaps/regress/review logic already has healthy deterministic coverage.
+- Current public docs drift from shipped behavior in two important places: plugin collector docs still describe raw `[]proof.Record` emission, and verification docs imply signed/tamper-evident guarantees stronger than the runtime currently enforces.
 
 ---
 
 ## Exit Criteria
 
-1. Axym's source-of-truth product framing explicitly states that Axym proves which non-human identity acted, through which delegated chain, against which target, under which policy and approval.
-2. Axym has one additive normalized identity-governance view across native collection, Wrkr ingest, Gait translation, and Agnt-compatible governance-event/manual/proof-record inputs.
-3. The normalized view covers: who initiated, which identity executed, which target was touched, which owner/approver was responsible, which delegation chain applied, which policy digest applied, and which approval token bound the action when applicable.
-4. Missing identity linkage deterministically downgrades evidence quality, control coverage, and auditability grade with stable reason codes and stable `--json` behavior.
-5. Audit bundles include dedicated identity-governance artifacts: identity-chain summary, ownership/approver register, privilege-drift report, delegated-chain exceptions, and a clear Axym-vs-IAM/PAM/IGA boundary note.
-6. `map`, `gaps`, `review`, `regress`, `bundle`, and `verify` surfaces remain deterministic and explain weak identity linkage as weak evidence rather than silently counting it as full coverage.
-7. Public docs, operator docs, sample assets, and docs-site content reflect the identity-governed action seam truthfully without widening Axym into an identity product.
-8. Cross-product and scenario tests cover Wrkr + Gait + Axym interoperability and an Agnt-compatible input path without adding out-of-scope sibling-product logic.
-9. CI wiring enforces the new contract in Fast, Core CI, Acceptance, Cross-platform, and Risk lanes where applicable.
+1. `axym verify --chain --json` fails with exit `2` and stable verification reason codes when any stored record signature is missing or invalid, even if chain hashes remain intact.
+2. `axym bundle --json` and `axym verify --bundle --json` fail closed on invalid or unverifiable record signatures for Axym-authored bundles without any network dependency.
+3. Axym emits or embeds the deterministic public-key material needed for offline bundle record-signature verification through an additive, versioned artifact path.
+4. `axym record add --json` rejects unknown record types and type-schema-invalid proof payloads deterministically, and rejected payloads do not mutate chain count or head hash.
+5. Manual proof ingress uses one authoritative validation gate that future callers cannot bypass accidentally.
+6. `axym collect --json --plugin "<cmd>"` preserves supported relationship-envelope data end-to-end instead of silently flattening it away.
+7. Non-verify JSON errors omit verification breakpoint fields; verify failures continue to expose breakpoint data when applicable.
+8. `collect`, `ingest`, and plugin execution honor process cancellation and configured timeouts end-to-end without ambiguous partial behavior.
+9. Contract, acceptance, and release-risk lanes include signature-tamper, schema-invalid manual append, relationship round-trip, and JSON envelope regressions as blocking checks.
+10. `product/axym.md`, `README.md`, `docs/`, and `docs-site/public/llm/*.md` describe shipped verification, plugin, and manual-ingest behavior truthfully and consistently.
 
 ---
 
@@ -54,14 +56,12 @@ Scope: Axym OSS CLI only. Plan the minimum backlog required to shift Axym from a
 
 | Recommendation | Why | Strategic direction | Expected moat/benefit | Planned stories |
 |---|---|---|---|---|
-| Reframe the Executive Summary and JTBD around which non-human identity acted, through which delegated chain, under which policy and approval | Current top-level framing is still behavior-first and undersells the identity-governance seam | Make Axym the proof layer for governed action in software delivery | Sharper market wedge; clearer differentiation from telemetry-only tools | `W1-S1`, `W3-S1` |
-| Add identity-bearing signals as first-class evidence targets: acting identity, downstream identity, owner/approver, delegated chain, policy digest and approval binding, identity/privilege drift | Permissions and approvals are present today, but the full accountability chain is not foregrounded strongly enough | Normalize one explainable accountability view across runtime and sibling ingest | Stronger compliance narrative and more defensible audit evidence | `W1-S1`, `W1-S2`, `W2-S1` |
-| Show explicit identity-chain fields in the proof-record example | The current example is still tool-event-centric | Turn identity chain from implied concept into concrete contract | Makes the record format memorable, implementable, and auditable | `W1-S1`, `W1-S2`, `W3-S1` |
-| Add dedicated identity-governance outputs to the audit bundle | Current bundle structure is strong but does not foreground identity lineage | Make bundles auditor-ready for action governance, not only activity evidence | More compelling bundle deliverable and clearer audit handoff | `W2-S2`, `W3-S1`, `W3-S2` |
-| Add explicit identity-chain normalization across Wrkr, Gait, and Agnt-compatible inputs | Gait delegation ingestion exists, but the unified "who initiated / who executed / what was touched / what policy applied" view is not explicit enough | Use Axym as the normalizer, not an identity-system replacement | Higher interoperability moat across the Clyra loop and adjacent agent producers | `W1-S2`, `W3-S2` |
-| Missing identity linkage must lower auditability grade and weaken coverage | Unlinked actions should not count like fully governed evidence | Make evidence strength deterministic and explainable | Harder-to-game coverage metrics; better auditor trust | `W2-S1`, `W2-S2` |
-| Add a small non-goal that Axym does not replace IAM / PAM / IGA | Prevent category drift and avoid overclaiming | Keep Axym in the proof/evidence lane | Protects positioning and reduces expectation mismatch | `W1-S1`, `W3-S1` |
-| Do not widen the wedge beyond software delivery or reposition Axym as an identity product | The recommendation is a seam refinement, not a new category | Tighten focus while expanding proof depth | Higher credibility and lower implementation risk | `W1-S1`, `W3-S1` |
+| Verify record signatures, not just chain hashes | Invalid signatures currently pass `verify --chain`, `verify --bundle`, and bundle build | Restore cryptographic record-integrity enforcement at the verification boundary | Re-establishes the signed/tamper-evident proof guarantee and auditor trust | `W1-S1`, `W3-S1` |
+| Reject schema-invalid manual records before append | Unsupported or malformed proof payloads can currently enter the canonical chain through `record add` | Make proof ingress fail closed at the authoritative append boundary | Prevents poisoned chains and future bypasses from new callers | `W1-S2`, `W3-S1` |
+| Preserve full relationship envelopes through the collector/plugin boundary | Plugin-collected provenance is silently flattened today | Keep Axym's collector path truthful to its published relationship-preservation claim | Stronger provenance continuity and better sibling-product alignment | `W2-S1`, `W3-S1` |
+| Remove phantom verification fields from generic JSON errors | Machine-readable consumers currently see misleading `break_index: 0` on unrelated errors | Tighten CLI JSON envelope stability and semantics | Cleaner CI/wrapper integrations and lower contract ambiguity | `W2-S2` |
+| Propagate cancellation/timeouts through the CLI runtime boundary | Long-running collect/ingest flows still ignore signal-aware command context | Make long-running paths bounded, interruptible, and deterministic | Safer CI automation and better operational reliability | `W2-S2` |
+| Backstop the blocker classes in required lanes | The repo-wide suite was green while these holes remained open | Turn review-discovered failure classes into permanent gating tests | Prevents silent regression and improves release confidence | `W1-S1`, `W1-S2`, `W2-S1`, `W2-S2`, `W3-S1` |
 
 ---
 
@@ -69,409 +69,362 @@ Scope: Axym OSS CLI only. Plan the minimum backlog required to shift Axym from a
 
 Lane definitions:
 
-- Fast lane: `make lint-fast`, targeted package/unit tests, schema/contract tests in `testinfra/contracts`, and docs consistency checks when story scope touches docs.
-- Core CI lane: `make test-fast`, targeted `internal/integration/...` suites, affected CLI contract tests, and docs-storyline checks for any user-visible workflow changes.
-- Acceptance lane: `go test ./testinfra/acceptance -count=1` plus relevant `scenarios/axym/**` suites for runnable end-to-end flows such as collect -> map -> gaps -> bundle -> verify and mixed-source ingest -> bundle -> verify.
-- Cross-platform lane: GitHub Actions matrix validation on Linux, macOS, and Windows for stories that change CLI output contracts, path behavior, sample-pack behavior, or bundle artifact layout.
-- Risk lane: `make prepush-full`, `make codeql`, targeted hardening/determinism checks, and nightly-risk workflow coverage for stories that change schema semantics, bundle completeness, grading, or required evidence rules.
+- Fast lane: `make lint-fast`, targeted package/unit tests, and focused contract tests under `testinfra/contracts` for the story's public surface.
+- Core CI lane: `make test-fast`, targeted `internal/integration/...` and `internal/e2e/...` suites, `make test-contracts`, and `make test-adapter-parity` when adapter boundaries change.
+- Acceptance lane: `go test ./testinfra/acceptance/... -count=1`, affected `internal/e2e/...` suites, and `make test-scenarios` when user-visible workflows or docs storylines change.
+- Cross-platform lane: `.github/workflows/pr.yml` and `.github/workflows/main.yml` matrix coverage on Linux, macOS, and Windows for stories that affect CLI contract shape, path behavior, plugin execution, or bundle layout.
+- Risk lane: `make prepush-full`, `make codeql`, targeted hardening/chaos coverage, and any release-go/no-go checks affected by the story.
 
 Story-to-lane map:
 
 | Story | Fast | Core CI | Acceptance | Cross-platform | Risk |
 |---|---|---|---|---|---|
-| W1-S1 | Yes | Yes | No | No | No |
-| W1-S2 | Yes | Yes | Yes | No | Yes |
-| W2-S1 | Yes | Yes | Yes | No | Yes |
+| W1-S1 | Yes | Yes | Yes | Yes | Yes |
+| W1-S2 | Yes | Yes | Yes | Yes | Yes |
+| W2-S1 | Yes | Yes | Yes | Yes | Yes |
 | W2-S2 | Yes | Yes | Yes | Yes | Yes |
 | W3-S1 | Yes | Yes | Yes | No | No |
-| W3-S2 | Yes | Yes | Yes | Yes | Yes |
 
 Merge/release gating rule:
 
-- Any story touching runtime contract, schema, grading, or bundle semantics must pass its Fast and Core CI lanes before merge.
-- Any story marked `Acceptance: Yes` is incomplete until the documented identity-governed action flow passes end-to-end in `testinfra/acceptance` and relevant `scenarios/axym/**` suites.
-- Any story marked `Cross-platform: Yes` is incomplete until Linux, macOS, and Windows confirm the changed CLI/bundle/path surface.
-- Any story marked `Risk: Yes` is release-blocking until `make prepush-full`, CodeQL, and the targeted identity-governance determinism checks are green.
-- Broad doc repositioning must not ship ahead of runtime truth. At minimum, `W1-S2`, `W2-S1`, and `W2-S2` must be complete before the full public messaging change is treated as done.
+- Wave `W1` and `W2` stories are merge-blocking runtime work. `W3` docs work must not merge ahead of them.
+- Any story marked `Risk: Yes` is release-blocking until its Fast, Core CI, Acceptance, Cross-platform, and Risk lanes are green.
+- Any story that changes CLI JSON envelopes, bundle artifacts, or verification semantics must pass contract tests and cross-platform CLI smoke in the same merge window.
+- Public docs updates are incomplete until `make test-docs-consistency`, `make test-docs-storyline`, `make test-docs-links`, and the relevant docs parity contract tests are green.
 
 ---
 
-## Epic W1: Identity-Governed Action Contract and Normalization
+## Epic W1: Proof Integrity and Fail-Closed Manual Ingress
 
-Objective: lock the additive identity-governance contract first, then normalize one deterministic identity-chain view across Axym-native collection and sibling ingestion before changing scoring or bundle outputs.
+Objective: make record integrity and manual proof ingress trustworthy before touching richer provenance or launch-facing docs.
 
-### Story W1-S1: Rewrite the source-of-truth product contract around identity-governed action
+### Story W1-S1: Add signature-aware chain and bundle verification
 Priority: P0
 Tasks:
-- Update `product/axym.md` Executive Summary, JTBD, one-liner, evidence-surface tables, proof-record example, audit-bundle description, functional requirements, goals, and non-goals so they explicitly state that Axym proves which non-human identity acted, through which delegated chain, under which policy and approval.
-- Add first-class evidence targets for acting identity, downstream execution identity, owner/approver, delegation chain, policy digest, approval-token binding, and identity/privilege drift between runs.
-- Add an explicit boundary note and non-goal that Axym does not replace IAM / PAM / IGA and remains scoped to software-delivery governance proof.
-- Add a PRD-local contract check so the new identity-governed action terminology and non-goals cannot silently regress while later public-doc alignment work is still pending.
-- Call out where the current OSS surface is narrower than long-horizon PRD ambition so the doc stays truthful while the backlog is in flight.
+- Add deterministic per-record signature verification to the chain verification path, using Axym-managed public-key material instead of hash-link checks alone.
+- Introduce an additive, versioned bundle artifact for exported record-signing public keys so `verify --bundle` can validate record signatures offline.
+- Make `bundle` fail closed when source-chain signatures are missing or invalid, not just when previous hashes are broken.
+- Extend machine-readable verification output and stable reason codes to distinguish record-signature failure from chain-link failure without changing exit code vocabulary.
+- Refresh bundle fixtures and contract tests so signature tamper is release-blocking.
 Repo paths:
-- `product/axym.md`
-- `testinfra/contracts/product_identity_contract_test.go`
+- `core/verify/verify.go`
+- `core/verify/bundle/verify.go`
+- `core/bundle/bundle.go`
+- `core/store/store.go`
+- `cmd/axym/verify.go`
+- `cmd/axym/verify_test.go`
+- `cmd/axym/bundle_test.go`
+- `core/verify/verify_test.go`
+- `core/verify/bundle/verify_test.go`
+- `internal/e2e/verify/chain_breakpoint_test.go`
+- `internal/e2e/bundleverify/oscal_schema_validation_test.go`
+- `internal/integration/bundle/context_engineering_bundle_test.go`
+- `testinfra/contracts/verify_contract_test.go`
+- `testinfra/contracts/bundle_contract_test.go`
+- `schemas/v1/bundle/schema.go`
+- `schemas/v1/bundle/executive-summary-v1.schema.json`
+- `fixtures/bundles/good/`
 Run commands:
-- `go test ./testinfra/contracts -run 'ProductIdentity' -count=1`
+- `go build -o ./axym ./cmd/axym`
+- `go test ./core/verify ./core/verify/bundle ./core/bundle ./cmd/axym -count=1`
+- `go test ./internal/e2e/verify ./internal/e2e/bundleverify ./internal/integration/bundle -count=1`
+- `go test ./testinfra/contracts -run 'Verify|Bundle' -count=1`
+- `./axym collect --fixture-dir fixtures/collectors --store-dir ./.axym-sig --json`
+- `./axym verify --chain --store-dir ./.axym-sig --json`
+- `./axym bundle --audit sig-test --store-dir ./.axym-sig --output ./axym-evidence --json`
+- `./axym verify --bundle ./axym-evidence --json`
 Test requirements:
-- Docs/examples changes: PRD-local contract checks for identity-governed action language, non-goals, and boundary wording.
-- Source-of-truth contract checks only; launch-facing doc sync is deferred to `W3-S1`.
+- Determinism/hash/sign/packaging changes: byte-stability repeat-run checks, canonicalization/digest checks, verify determinism checks, and `make test-contracts`.
+- Schema/artifact changes: validation tests and fixture/golden updates for any additive bundle signing-key artifact.
+- CLI behavior changes: `--json` stability and exit-code contract tests for `verify` and `bundle`.
+- Gate/policy/fail-closed changes: explicit signature-tamper fail-closed tests.
 Matrix wiring:
-- Lanes: Fast, Core CI.
+- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
+- Required gates: `make test-contracts`, targeted verify/bundle suites, `make prepush-full`, and release go/no-go checks if bundle artifact layout changes.
 Acceptance criteria:
-- `product/axym.md` explicitly describes Axym as proof of identity-governed action in software delivery, not only proof of AI behavior.
-- The PRD includes the requested identity-bearing evidence signals, proof-record fields, bundle outputs, and IAM/PAM/IGA non-goal.
-- The PRD remains truthful about current shipped scope and does not imply an IAM replacement or a widened wedge.
-- Automated checks fail if the PRD regresses on identity-governed action terminology, boundary wording, or non-goals.
+- A record-signature corruption that leaves chain hashes intact still causes `verify --chain` to fail with exit `2` and a stable verification reason.
+- `bundle` and `verify --bundle` fail closed on invalid or unverifiable record signatures for Axym-authored bundles.
+- Offline bundle verification uses additive bundle key material only and does not introduce network lookups.
+- Repeat bundle builds with identical inputs remain deterministic after the new artifact is added.
 Stable/internal boundary notes:
-- Public: this positioning becomes part of Axym's product contract.
-- Internal: identity-governance scope remains limited to portable software-delivery evidence around upstream identity systems.
+- Public: `verify --chain`, `verify --bundle`, JSON reason codes, and bundle artifact layout are contract surfaces.
+- Internal: helper/package placement for key loading and signature iteration is implementation detail.
 Migration expectations:
-- Narrative update only; no command removals or exit-code changes are allowed in this story.
+- Additive only. The top-level proof-record format and exit code vocabulary must not break.
+- Bundle fixtures and docs must be refreshed in the same backlog so new verification semantics are visible immediately.
 Integration hooks:
-- `W3-S1` will sync launch-facing docs and operator guidance to this contract.
+- CI and release automation using `axym verify --chain --json`, `axym bundle --json`, and `axym verify --bundle --json`.
+- Auditor/operator workflows consuming portable bundle artifacts for offline validation.
 Dependencies:
 - None.
 Risks:
-- PRD-only rewriting without later contract tests will recreate the same mismatch under new language.
+- If key-export semantics are left implicit, bundle verification will remain partially unverifiable and the contract hole will persist under a new name.
 
-### Story W1-S2: Introduce a normalized identity-chain view across native collection and sibling ingest
+### Story W1-S2: Enforce full proof-schema validation on manual append
 Priority: P0
 Tasks:
-- Define Axym's additive normalized identity-governance fields and canonical field placement, including `actor_identity`, `downstream_identity`, `delegation_chain`, `policy_digest`, `approval_token_ref`, and `owner_identity` or an equivalent owner reference.
-- Extend `core/normalize` and `core/record` so Axym-native records can carry the normalized identity view without breaking existing `proof.Record` compatibility.
-- Extend governance-event promotion so `collect --governance-event-file` becomes the in-scope Agnt-compatible path for identity-bearing action evidence.
-- Extend Wrkr ingest and Gait translation to preserve or synthesize the normalized identity view from incoming records, including target touched, delegation lineage, policy binding, and approval binding when present.
-- Preserve backward compatibility: existing records remain valid, but records missing identity linkage will later grade as weaker evidence rather than being rejected outright.
-- Add fixtures, schema validation, and mixed-source integration tests covering Wrkr + Gait + Axym-native evidence in one deterministic chain.
+- Move full proof-record validation into the authoritative append boundary used by `record add`, so unknown record types and type-schema-invalid payloads fail before signing or chain mutation.
+- Keep path/read/decode and missing-input failures separate from schema/record-type failures in the CLI error taxonomy.
+- Preserve deterministic dedupe behavior for valid manual payloads while ensuring rejected payloads do not mutate chain count, head hash, or dedupe state.
+- Add contract tests proving that invalid manual payloads cannot be legitimized later by `verify --chain`, `bundle`, or downstream mapping workflows.
+- Refresh sample/manual proof fixtures if any currently rely on lenient ingress behavior.
 Repo paths:
-- `core/normalize/normalize.go`
-- `core/record/builder.go`
-- `schemas/v1/record/normalized-input.schema.json`
-- `schemas/v1/record/schema.go`
-- `core/collect/governanceevent/collector.go`
-- `core/collect/governanceevent/collector_test.go`
-- `core/ingest/gait/translate/translate.go`
-- `core/ingest/gait/translate/verdict_mapping_test.go`
-- `core/ingest/wrkr/ingest.go`
-- `core/ingest/wrkr/ingest_test.go`
-- `internal/integration/ingest/mixed_source_chain_test.go`
-- `internal/integration/ingest/gait/relationship_preservation_test.go`
-- `fixtures/governance/context_engineering.jsonl`
-- `fixtures/ingest/wrkr/proof_records.jsonl`
-- `fixtures/ingest/gait/native_records.jsonl`
+- `cmd/axym/record.go`
+- `cmd/axym/record_test.go`
+- `core/store/store.go`
+- `core/store/atomic_test.go`
+- `internal/integration/record/normalize_validate_test.go`
+- `testinfra/contracts/record_schema_contract_test.go`
+- `testinfra/contracts/cli_output_contract_test.go`
+- `testinfra/contracts/verify_contract_test.go`
 - `fixtures/records/decision.json`
 Run commands:
 - `go build -o ./axym ./cmd/axym`
-- `go test ./core/normalize ./core/record ./core/collect/governanceevent ./core/ingest/... -count=1`
-- `go test ./internal/integration/ingest/... -count=1`
-- `go test ./testinfra/contracts -run 'Collect|GovernanceEvent|RecordSchema' -count=1`
-- `./axym collect --governance-event-file fixtures/governance/context_engineering.jsonl --json`
-- `./axym ingest --source wrkr --input fixtures/ingest/wrkr/proof_records.jsonl --json`
-- `./axym ingest --source gait --input fixtures/ingest/gait/native_records.jsonl --json`
+- `go test ./cmd/axym ./core/store ./internal/integration/record -count=1`
+- `go test ./testinfra/contracts -run 'Record|CLIOutput|Verify' -count=1`
+- `go test ./testinfra/acceptance/... -count=1`
 - `./axym record add --input fixtures/records/decision.json --json`
+- `./axym verify --chain --json`
 Test requirements:
-- Schema/artifact changes: schema validation tests, fixture/golden updates, compatibility tests for additive fields.
-- SDK/adapter boundary changes: governance-event, Wrkr, and Gait adapter parity/conformance tests.
-- Scenario/context changes: mixed-source chain fixtures validating the unified identity view.
-- Determinism checks: repeat-run normalization and digest stability for synthesized identity fields.
+- Schema/artifact changes: proof-schema validation tests and fixture updates where needed.
+- CLI behavior changes: `record add --json` envelope and exit-code contract tests.
+- Gate/policy/fail-closed changes: rejected payloads must not mutate append-only state.
+- Acceptance checks: operator/manual proof path remains usable with valid payloads.
 Matrix wiring:
-- Lanes: Fast, Core CI, Acceptance, Risk.
+- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
+- Required gates: targeted `record`/`store` suites, contract tests, and acceptance smoke on the manual proof path.
 Acceptance criteria:
-- Axym exposes one normalized identity-governance view across Axym-native, Wrkr, Gait, and Agnt-compatible governance-event/manual inputs.
-- The normalized view can answer: who initiated, which identity executed, which target was touched, which owner/approver was responsible, which delegation chain applied, and which policy/approval bound the action when available.
-- Gait translation and Wrkr ingest preserve or synthesize the needed identity lineage without breaking proof-chain integrity.
-- Existing records without the new fields remain ingestible and verifiable.
+- `record add` rejects unknown record types and typed-schema-invalid payloads deterministically before signing or appending.
+- Invalid manual payloads do not change chain count, head hash, or later verification results.
+- Valid manual payloads continue to append and dedupe deterministically.
+- Machine-readable errors distinguish invalid file/input issues from schema/record-type violations.
 Stable/internal boundary notes:
-- Public: the normalized identity field names and semantics become part of the supported evidence contract.
-- Internal: whether the implementation stores them in `event`, `metadata`, or `relationship` helpers is an internal detail as long as the documented normalized view stays stable.
+- Public: `record add --json`, exit behavior, and accepted proof payload semantics are contract surfaces.
+- Internal: whether validation sits in `cmd/axym/record.go`, `core/store`, or a shared helper is internal as long as future callers cannot bypass it.
 Migration expectations:
-- Additive only. Existing record producers keep working, but incomplete identity linkage will no longer count as full-strength evidence once `W2-S1` lands.
+- Stricter validation may reject previously accepted invalid payloads. That is an intentional fail-closed correction, not a relaxed compatibility surface.
+- Docs and quickstart/manual examples must be updated in `W3-S1`.
 Integration hooks:
-- Agnt compatibility lands via `collect --governance-event-file`, `record add`, and proof-format/manual inputs, not a speculative `ingest --source agnt` flag.
+- Operator and CI workflows using `axym record add --input <record.json> --json` for approvals, risk assessments, and other manual proof records.
+- Sample-pack and quickstart flows that rely on deterministic manual record append.
 Dependencies:
-- `W1-S1`
+- None.
 Risks:
-- If field placement is left ambiguous, later mapping, grading, and bundle work will fork the model and create drift.
+- CLI-only validation is insufficient; this story is incomplete unless the shared append path is safe for future callers too.
 
 ---
 
-## Epic W2: Identity-Aware Compliance Evaluation and Bundle Outputs
+## Epic W2: Collector Boundary Preservation and CLI Runtime Contract Cleanup
 
-Objective: once the identity-chain view exists, make Axym score it deterministically and surface it directly in bundles, gaps, reviews, and verification artifacts.
+Objective: preserve supported provenance at the collect boundary and remove remaining machine-readable/runtime contract drift after proof integrity is hardened.
 
-### Story W2-S1: Downgrade weak identity linkage in mapping, gaps, review, and regression
-Priority: P0
+### Story W2-S1: Preserve relationship envelopes through the collector/plugin path
+Priority: P1
 Tasks:
-- Extend compliance matching so controls that rely on governed action evidence require identity linkage, ownership, delegation, and policy/approval binding where applicable.
-- Add deterministic reason codes for weak identity evidence, for example missing actor linkage, missing owner/approver linkage, missing approval binding, incomplete delegation chain, and unapproved privilege drift.
-- Update `gaps`, auditability-grade derivation, Daily Review, and regression baselines so identity-linkage weakness lowers evidence strength predictably instead of being counted as a normal covered event.
-- Ensure privilege drift without linked approval evidence surfaces as actionable governance weakness in `map`, `gaps`, `review`, and `regress`.
-- Keep behavior additive and deterministic: same inputs still produce same outputs, but incomplete identity linkage must now score weaker.
+- Extend the collector candidate model to carry `*proof.Relationship` without collapsing the adapter-first boundary.
+- Extend plugin output parsing to accept relationship-envelope data while still rejecting malformed or bypass-style payloads that try to skip normalization.
+- Thread candidate relationship data through `core/collect/runner` into normalization/proof emission so stored records preserve `parent_ref`, `entity_refs`, `policy_ref`, `agent_chain`, `edges`, and additive extras when present.
+- Add round-trip tests for plugin-collected relationship envelopes and re-run mixed-source integration coverage to ensure no regressions in existing governance/Wrkr/Gait paths.
+- Keep the normalized identity view additive on top of preserved relationship data; do not replace the relationship envelope with Axym-only flattened fields.
 Repo paths:
-- `core/compliance/match/matcher.go`
-- `core/compliance/match/matcher_test.go`
-- `core/compliance/coverage/coverage.go`
-- `core/gaps/gaps.go`
-- `core/gaps/gaps_test.go`
-- `core/review/grade/grade.go`
-- `core/review/grade/weakest_link_test.go`
-- `core/review/review.go`
-- `core/review/privilegedrift/analyzer.go`
-- `internal/integration/gaps/gaps_workflow_test.go`
-- `internal/integration/regress/exit5_on_drift_test.go`
-- `internal/e2e/review/empty_day_contract_test.go`
-- `testinfra/contracts/map_gaps_contract_test.go`
-- `testinfra/contracts/compliance_exit_contract_test.go`
-- `testinfra/contracts/invalid_evidence_not_counted_test.go`
-- `testinfra/contracts/review_override_replay_contract_test.go`
-- `fixtures/frameworks/regress-minimal.yaml`
+- `core/collector/types.go`
+- `core/collect/plugin/collector.go`
+- `core/collect/plugin/collector_test.go`
+- `core/collect/runner.go`
+- `core/normalize/identity.go`
+- `core/record/builder.go`
+- `cmd/axym/collect_test.go`
+- `internal/e2e/plugin/empty_metadata_roundtrip_test.go`
+- `internal/integration/collect/multi_source_fixture_test.go`
+- `testinfra/contracts/collect_contract_test.go`
 Run commands:
 - `go build -o ./axym ./cmd/axym`
-- `go test ./core/compliance/... ./core/gaps ./core/review/... -count=1`
-- `go test ./internal/integration/gaps ./internal/integration/regress ./internal/e2e/review -count=1`
-- `go test ./testinfra/contracts -run 'Map|Gaps|Compliance|Review|Regress' -count=1`
-- `./axym map --frameworks eu-ai-act,soc2 --json`
-- `./axym gaps --frameworks eu-ai-act,soc2 --json`
-- `./axym review --date 2026-02-28 --json`
-- `./axym regress init --baseline ./.axym/identity-baseline.json --frameworks eu-ai-act,soc2 --json`
-- `./axym regress run --baseline ./.axym/identity-baseline.json --frameworks eu-ai-act,soc2 --json`
+- `go test ./core/collect/... ./core/collector ./core/normalize ./core/record ./cmd/axym -count=1`
+- `go test ./internal/e2e/plugin ./internal/integration/collect -count=1`
+- `go test ./testinfra/contracts -run 'Collect' -count=1`
+- `./axym collect --json --plugin "<cmd>"`
+- `./axym verify --chain --json`
 Test requirements:
-- Gate/policy/fail-closed changes: deterministic `covered` / `partial` / `gap` fixtures, fail-closed undecidable-path checks, and reason-code stability tests.
-- Determinism/hash changes: golden coverage outputs and repeat-run grading checks.
-- Scenario/context changes: scenarios proving that missing identity linkage is weak evidence, not invisible evidence.
-- CLI behavior changes: `--json` stability and exit-code contract tests where regress or threshold outcomes change.
+- SDK/adapter boundary changes: plugin protocol conformance tests and adapter parity coverage.
+- CLI behavior changes: collect JSON summary stability with relationship-bearing plugin inputs.
+- Scenario/context changes: round-trip provenance preservation fixtures.
+- Determinism checks: repeated collection with identical plugin output yields stable stored relationship content.
 Matrix wiring:
-- Lanes: Fast, Core CI, Acceptance, Risk.
+- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
+- Required gates: `make test-adapter-parity`, plugin e2e, collect integration, contract tests, and release-risk suites.
 Acceptance criteria:
-- Controls that require governed identity evidence cannot remain `covered` when the action cannot be tied to the required non-human identity, owner, delegation chain, or approval binding.
-- `map`, `gaps`, `review`, and `regress` surface the weakness with stable reason codes and deterministic outputs.
-- Privilege drift without linked approval evidence is surfaced as an actionable governance weakness rather than only a raw diff.
-- Repeat runs with the same inputs produce identical grades, reason codes, and ranking.
+- A plugin that emits a valid relationship envelope stores that envelope without silent loss.
+- Existing plugins that do not emit `relationship` remain compatible and deterministic.
+- Malformed relationship payloads fail closed with typed collector errors rather than degrading into partially preserved provenance.
+- Axym still uses normalized candidate flow; `collect --plugin` does not become a raw proof-record append backdoor.
 Stable/internal boundary notes:
-- Public: `covered` / `partial` / `gap`, auditability-grade reasoning, and JSON reason codes are contract surfaces.
-- Internal: scoring weights may evolve only through explicit deterministic fixture updates and docs changes.
+- Public: plugin collector protocol fields and stored relationship semantics are supported contract surfaces.
+- Internal: candidate struct shape and helper placement remain implementation detail.
 Migration expectations:
-- Existing regression baselines and golden outputs will need intentional refresh because weak identity linkage is now scored differently.
+- Additive only. Existing plugins remain valid; relationship-bearing plugins gain a supported preservation path after this story.
+- Public protocol docs must be updated in `W3-S1` to match the shipped shape exactly.
 Integration hooks:
-- Bundle, verify, and docs work in later stories must consume these reason codes instead of inventing their own identity-health model.
+- Plugin author workflows built around `axym collect --json --plugin "<cmd>"`.
+- CI/operator collection flows that depend on plugin-provided provenance surviving into the proof chain.
 Dependencies:
 - `W1-S2`
 Risks:
-- If downgrade rules are fuzzy or framework-specific without contract tests, teams will fight nondeterministic coverage churn.
+- If relationship fields are only partially threaded, Axym will keep claiming provenance preservation while continuing to drop critical graph edges.
 
-### Story W2-S2: Add identity-governance artifacts and completeness checks to the audit bundle
-Priority: P0
+### Story W2-S2: Clean up JSON error envelopes and propagate signal-aware cancellation
+Priority: P2
 Tasks:
-- Add deterministic bundle artifacts for identity governance, including an identity-chain summary, ownership/approver register, privilege-drift report, delegated-chain exceptions report, and an updated boundary contract clarifying Axym versus IAM/PAM/IGA responsibility.
-- Extend bundle verification so missing or inconsistent identity-governance artifacts fail completeness checks in a typed, machine-readable way.
-- Keep the bundle additive: existing artifacts remain present, new identity artifacts are layered in without breaking current bundle consumers.
-- Update executive-summary and bundle schemas so the identity-governance outputs are validated, documented, and stable.
-- Ensure bundle generation remains byte-stable for identical inputs and does not introduce hidden nondeterminism.
+- Make verification breakpoint fields verification-only in the JSON envelope, using `omitempty` or a verify-specific error payload shape.
+- Thread signal-aware context from `main` to root and subcommands using `signal.NotifyContext`, `ExecuteContext`, and `cmd.Context()`.
+- Replace `context.Background()` in `collect` and `ingest` with command-scoped context so plugin timeouts, process interrupts, and CI cancellation propagate correctly.
+- Add CLI and hardening tests that prove timeout/cancel paths do not create ambiguous partial behavior and that non-verify errors omit misleading breakpoint fields.
+- Keep help, usage, and exit-code contracts stable while tightening machine-readable semantics.
 Repo paths:
-- `core/bundle/bundle.go`
-- `core/bundle/bundle_test.go`
-- `core/verify/bundle/verify.go`
-- `core/verify/verify.go`
-- `schemas/v1/bundle/executive-summary-v1.schema.json`
-- `schemas/v1/bundle/schema.go`
-- `internal/integration/bundle/context_engineering_bundle_test.go`
-- `internal/e2e/bundleverify/oscal_schema_validation_test.go`
-- `cmd/axym/bundle_test.go`
-- `cmd/axym/verify_test.go`
-- `testinfra/contracts/bundle_contract_test.go`
-- `testinfra/contracts/oscal_schema_contract_test.go`
+- `cmd/axym/output.go`
+- `cmd/axym/root.go`
+- `cmd/axym/main.go`
+- `cmd/axym/collect.go`
+- `cmd/axym/ingest.go`
+- `cmd/axym/root_test.go`
+- `cmd/axym/collect_test.go`
+- `cmd/axym/ingest_test.go`
+- `internal/e2e/cli/command_surface_contract_test.go`
+- `internal/e2e/cli/help_usage_contract_test.go`
+- `internal/e2e/plugin/malformed_jsonl_rejected_test.go`
+- `internal/hardening/sink_unavailable_fail_closed_test.go`
+- `testinfra/contracts/cli_output_contract_test.go`
 - `testinfra/contracts/verify_contract_test.go`
-- `fixtures/bundles/good/manifest.json`
-- `fixtures/bundles/good/evidence.json`
 Run commands:
 - `go build -o ./axym ./cmd/axym`
-- `go test ./core/bundle ./core/verify/... -count=1`
-- `go test ./internal/integration/bundle ./internal/e2e/bundleverify -count=1`
-- `go test ./testinfra/contracts -run 'Bundle|OSCAL|Verify' -count=1`
-- `./axym bundle --audit identity-governance --frameworks eu-ai-act,soc2 --json`
-- `./axym verify --bundle ./axym-evidence --frameworks eu-ai-act,soc2 --json`
-- `./axym verify --chain --json`
+- `go test ./cmd/axym ./internal/e2e/cli ./internal/e2e/plugin -count=1`
+- `go test ./testinfra/contracts -run 'CLIOutput|Verify' -count=1`
+- `make test-hardening`
+- `./axym verify --json`
+- `./axym ingest --source gait --input /tmp/does-not-exist --json`
 Test requirements:
-- Schema/artifact changes: schema validation tests, fixture/golden updates, compatibility checks for additive bundle files.
-- CLI behavior changes: `--json` stability tests and exit-code contract checks for `bundle` and `verify`.
-- Determinism/hash/sign changes: byte-stability repeat-run tests, canonicalization checks, verify determinism tests, and `make test-contracts` coverage.
-- Scenario/context changes: bundle fixtures proving that identity lineage is present, explainable, and portable.
+- CLI behavior changes: help/usage tests, `--json` stability tests, exit-code contract tests.
+- Job runtime/state/concurrency changes: timeout/cancellation propagation checks for long-running workflows.
+- Gate/policy/fail-closed changes: ensure cancellation does not create silent partial success.
+- Cross-platform smoke expectations for signal-aware command execution.
 Matrix wiring:
 - Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
+- Required gates: command-surface contracts, hardening smoke, plugin timeout/cancel tests, and release-risk lane.
 Acceptance criteria:
-- The bundle includes dedicated identity-governance artifacts and preserves existing bundle artifacts.
-- `verify --bundle --json` surfaces identity-governance completeness in a deterministic, typed way and fails closed when required artifacts are missing or inconsistent.
-- The bundle itself explains what Axym proves versus what IAM/PAM/IGA still owns.
-- Repeat bundle builds with the same inputs produce byte-stable identity-governance artifacts.
+- Non-verify errors no longer emit `break_index: 0` or other misleading verification-only fields.
+- `collect` and `ingest` honor command cancellation and configured timeouts end-to-end.
+- Timeout/cancel handling does not introduce silent partial success or unstable JSON envelopes.
+- Help, usage, and exit-code vocabulary remain unchanged unless explicitly versioned.
 Stable/internal boundary notes:
-- Public: artifact names, locations, and schema shapes for identity-governance outputs become supported bundle contract.
-- Internal: implementation helpers may change, but bundle layout and verification semantics must remain stable once published.
+- Public: CLI JSON error envelope, timeout/cancel behavior, and reason-code stability are contract surfaces.
+- Internal: context plumbing and helper layering remain implementation detail.
 Migration expectations:
-- Additive only. Existing bundle consumers can ignore the new files, but removal or rename of those files after publication requires explicit contract versioning.
+- Additive/cleanup only. Existing consumers should see stricter semantics, not new opaque failure classes.
 Integration hooks:
-- Docs and sample flows in `W3-S1` must show these artifacts directly so operators understand the bundle deliverable.
+- CLI automation, wrappers, and CI jobs that parse `--json` output from `collect`, `ingest`, and `verify`.
+- Long-running plugin-backed collection and sibling-ingest workflows that need bounded cancellation semantics.
 Dependencies:
-- `W2-S1`
+- None.
 Risks:
-- Adding identity artifacts without verify-time completeness checks would make the bundle look stronger without actually tightening the contract.
+- Cross-platform cancellation behavior must be validated at smoke level without introducing Unix-only assumptions into merge gates.
 
 ---
 
-## Epic W3: Public Docs, Examples, and CI Enforcement
+## Epic W3: Docs, ADR, and Launch-Facing Contract Sync
 
-Objective: once runtime truth exists, update the public/operator narrative and wire durable acceptance checks so the repo cannot drift back to action-first positioning or incomplete identity evidence.
+Objective: update every public/source-of-truth document only after runtime behavior and tests are stable.
 
-### Story W3-S1: Sync public docs and sample assets to the identity-governed action seam
+### Story W3-S1: Align product, operator, and protocol docs with shipped behavior
 Priority: P1
 Tasks:
-- Update launch-facing and operator docs so they describe Axym as portable proof of identity-governed action in software delivery, with explicit examples of acting identity, downstream identity, owner/approver, delegation chain, policy digest, and approval binding.
-- Update sample-pack and fixture-backed examples so the published first-value flow demonstrates identity-bearing evidence instead of only generic activity events.
-- Keep docs honest to shipped command surfaces and repo scope: no speculative `agnt` CLI source, no IAM replacement language, and no wedge expansion beyond software delivery.
-- Show the Axym-vs-IAM/PAM/IGA boundary in operator docs, docs-site summaries, and sample-bundle walkthroughs.
-- Keep launch-facing docs aligned with the source-of-truth language from `product/axym.md` and the actual bundle outputs from `W2-S2`.
+- Update `product/axym.md`, `README.md`, `docs/commands/axym.md`, `docs/operator/quickstart.md`, `docs/operator/integration-model.md`, `docs/operator/integration-boundary.mmd`, `docs-site/public/llms.txt`, and `docs-site/public/llm/axym.md` to describe the shipped runtime accurately.
+- Update ADRs that now have changed contract semantics: collector/plugin protocol (`ADR-0002`) and bundle/verification behavior (`ADR-0005`).
+- Remove or correct any doc claim that plugin collectors emit raw `[]proof.Record` if the shipped runtime still uses normalized candidate promotion.
+- Document the stricter `record add` contract, the signature-aware verify/bundle behavior, and any additive bundle signing-key artifact introduced by `W1-S1`.
+- Run docs source-of-truth checks so README, docs, docs-site, and command parity remain synchronized.
 Repo paths:
+- `product/axym.md`
 - `README.md`
 - `docs/commands/axym.md`
 - `docs/operator/quickstart.md`
 - `docs/operator/integration-model.md`
 - `docs/operator/integration-boundary.mmd`
+- `docs/adr/ADR-0002-collector-runtime-and-plugin-protocol.md`
+- `docs/adr/ADR-0005-bundle-assembly-and-verification.md`
 - `docs-site/public/llms.txt`
 - `docs-site/public/llm/axym.md`
-- `core/samplepack/pack.go`
-- `fixtures/governance/context_engineering.jsonl`
-- `fixtures/records/decision.json`
-- `scenarios/axym/first_value_sample/contract.json`
-- `product/axym.md`
+- `testinfra/contracts/command_docs_parity_contract_test.go`
+- `testinfra/contracts/product_identity_contract_test.go`
+- `scripts/check_docs_consistency.sh`
+- `scripts/check_docs_storyline.sh`
+- `scripts/check_docs_links.sh`
 Run commands:
-- `go build -o ./axym ./cmd/axym`
 - `make test-docs-consistency`
 - `make test-docs-storyline`
 - `make test-docs-links`
-- `go test ./testinfra/contracts -run 'CommandDocs|Collect|Bundle|Verify' -count=1`
-- `go test ./scenarios/axym/... -count=1`
-- `./axym init --sample-pack ./axym-sample --json`
-- `./axym collect --governance-event-file ./axym-sample/governance/context_engineering.jsonl --json`
-- `./axym bundle --audit docs-identity-sample --frameworks eu-ai-act,soc2 --json`
+- `go test ./testinfra/contracts -run 'CommandDocsParity|ProductIdentity|CLIOutput|Verify' -count=1`
+- `go test ./testinfra/acceptance/... -count=1`
 Test requirements:
-- Docs/examples changes: docs consistency, storyline/smoke checks, README/quickstart/integration coverage checks, and docs-site source-of-truth sync checks.
-- Scenario/context changes: sample-pack and scenario fixtures that assert identity-governance outputs.
-- CLI behavior changes: command-doc parity tests for any updated sample commands.
+- Docs/examples changes: docs consistency checks, storyline/smoke checks, README/quickstart/integration coverage checks, and docs source-of-truth sync tasks for `README.md`, `docs/`, `docs-site/public/llms.txt`, and `docs-site/public/llm/*.md`.
+- Public-surface stories: machine-readable error behavior, integration hooks, and migration notes must be documented explicitly.
 Matrix wiring:
 - Lanes: Fast, Core CI, Acceptance.
+- Required gates: docs consistency, docs storyline, docs links, docs parity contract tests.
 Acceptance criteria:
-- README, operator docs, command docs, and docs-site content all describe the identity-governed action seam consistently.
-- Published examples and sample assets include explicit identity-chain evidence and show the resulting bundle outputs.
-- No public doc positions Axym as an IAM/PAM/IGA replacement or widens the wedge beyond software delivery.
-- Docs remain truthful to the actual command surface and runtime outputs.
+- All public docs describe manual proof ingress as schema-validated and fail-closed.
+- All public docs describe `verify --chain` and `verify --bundle` as signature-aware where shipped.
+- Plugin protocol docs match the actual supported runtime shape and relationship-preservation semantics exactly.
+- No public doc widens Axym beyond its existing CLI/proof scope or implies a raw plugin append path that the runtime does not support.
 Stable/internal boundary notes:
-- Public: launch-facing positioning and example flows are part of the OSS contract.
-- Internal: fixture internals may evolve, but the published story and example semantics must stay aligned with shipped behavior.
+- Public: docs are source-of-truth for supported integration hooks and machine-readable runtime semantics.
+- Internal: helper/package placement and implementation detail remain out of scope for public docs.
 Migration expectations:
-- Existing docs examples should be updated in place; do not keep parallel, conflicting "behavior-only" examples alive.
+- Docs must describe any additive bundle artifact or stricter validation behavior introduced in earlier waves.
+- No undocumented fallback behavior may remain after this story closes.
 Integration hooks:
-- Operators should be able to see exactly where Axym fits relative to Gait, Wrkr, and upstream identity systems.
+- README and quickstart users following install-time verification and manual proof-ingress paths.
+- Plugin authors and operators using command docs, operator docs, and docs-site content as their integration reference.
 Dependencies:
 - `W1-S1`
-- `W2-S2`
-Risks:
-- Public docs that move before sample assets and bundle outputs are real will recreate an expectation gap immediately.
-
-### Story W3-S2: Wire identity-governed action acceptance and CI enforcement
-Priority: P1
-Tasks:
-- Add or formalize an acceptance target for identity-governed action workflows, including sample-pack -> collect -> map -> gaps -> bundle -> verify and mixed-source Wrkr + Gait + Axym-native flows.
-- Extend scenario contracts and goldens so they assert identity-chain summaries, delegated-chain exceptions, privilege-drift reporting, and weak-evidence downgrade behavior.
-- Wire PR, main, and nightly workflows so the new acceptance and risk checks are enforced without weakening existing branch-protection contracts.
-- Update CI contract tests and required-check fixtures whenever workflow names, triggers, or required jobs change.
-- Ensure cross-platform validation covers any CLI/path/bundle contract changes introduced by the identity-governance work.
-Repo paths:
-- `Makefile`
-- `.github/workflows/pr.yml`
-- `.github/workflows/main.yml`
-- `.github/workflows/nightly.yml`
-- `testinfra/acceptance/scenario_contract_test.go`
-- `testinfra/contracts/ci_contract_test.go`
-- `testinfra/contracts/ci_required_checks_test.go`
-- `testinfra/contracts/release_gate_contract_test.go`
-- `scenarios/axym/context_engineering_scenario_test.go`
-- `scenarios/axym/first_value_sample/contract.json`
-- `scenarios/axym/golden/results.json`
-- `internal/scenarios/scenario_suite_test.go`
-- `scripts/check_branch_protection_contract.sh`
-Run commands:
-- `go build -o ./axym ./cmd/axym`
-- `make test-acceptance`
-- `make test-scenarios`
-- `go test ./testinfra/contracts -run 'CI|ReleaseGate' -count=1`
-- `./scripts/check_branch_protection_contract.sh`
-- `make prepush-full`
-Test requirements:
-- Job runtime/state changes: workflow lifecycle tests for the full collect/map/gaps/bundle/verify flow when acceptance wiring changes.
-- Scenario/context changes: acceptance and scenario suites proving identity-governed action outcomes end to end.
-- Docs/examples changes: storyline checks remain wired in CI.
-- Cross-platform and release-gate contract tests for workflow/required-check correctness.
-Matrix wiring:
-- Lanes: Fast, Core CI, Acceptance, Cross-platform, Risk.
-Acceptance criteria:
-- CI has explicit acceptance coverage for the identity-governed action seam and required-check contracts know about it.
-- Scenario and acceptance suites fail if identity-chain artifacts, weak-evidence downgrades, or bundle boundary notes regress.
-- Cross-platform validation covers any changed CLI or bundle path semantics.
-- Branch-protection contract checks stay truthful after workflow updates.
-Stable/internal boundary notes:
-- Public: required checks and release gates become part of the trust baseline for the new seam.
-- Internal: workflow internals may change, but named required checks and enforced contract coverage must stay in sync.
-Migration expectations:
-- Any workflow rename or trigger change must update CI contract tests in the same PR.
-Integration hooks:
-- Acceptance coverage must include Wrkr + Gait interoperability and the generic Agnt-compatible input path, not a new sibling-specific code path.
-Dependencies:
 - `W1-S2`
+- `W2-S1`
 - `W2-S2`
-- `W3-S1`
 Risks:
-- Leaving acceptance wiring as an informal local-only step will let the repo slide back into behavior-first evidence without visible breakage.
+- Shipping docs early recreates the same trust gap under new wording; this story must remain last.
 
 ---
 
 ## Minimum-Now Sequence
 
-1. `W1-S1` and `W1-S2`
-Rationale: lock the source-of-truth language and the normalized identity model before scoring or bundle work hardens the wrong semantics.
-2. `W2-S1`
-Rationale: once the normalized fields exist, weak identity linkage must become weak evidence everywhere Axym calculates compliance.
-3. `W2-S2`
-Rationale: bundle outputs should be built on top of the final grading and normalization model so filenames, schemas, and verify semantics only settle once.
-4. `W3-S1`
-Rationale: public/operator docs should move only after runtime truth and bundle deliverables are real.
-5. `W3-S2`
-Rationale: wire final acceptance and CI gates after the contract is stable so required checks protect the final seam rather than an intermediate state.
+1. `W1-S1` first. Signature-aware verify/bundle behavior is the highest-risk release blocker and defines the offline integrity contract for every later story.
+2. `W1-S2` second. The authoritative append boundary must reject invalid proof payloads before the team broadens or documents any ingress guarantees.
+3. `W2-S1` third. Relationship preservation depends on a trustworthy ingress/append contract and becomes the runtime truth that docs later describe.
+4. `W2-S2` fourth. JSON envelope cleanup and signal-aware cancellation should land after the main integrity surfaces are stable so contract tests can lock the final CLI runtime seam.
+5. `W3-S1` last. Public docs, ADRs, and docs-site content should only change once the runtime and tests are authoritative.
 
-If only the minimum runtime slice can be landed before a broader docs push, stop after `W2-S2`. That is the first point where Axym actually earns the stronger identity-governed action framing.
+Wave rationale:
+
+- `W1` is pure contract/runtime correctness at the proof and append boundaries.
+- `W2` is still runtime work, but it focuses on adapter preservation and CLI execution-boundary hygiene once the core integrity rules are fixed.
+- `W3` is docs/source-of-truth sync and therefore intentionally follows all runtime waves.
 
 ---
 
 ## Explicit Non-Goals
 
-- No repositioning of Axym as a standalone identity product.
-- No replacement of IAM, PAM, or IGA systems.
-- No widening beyond software-delivery governance evidence.
-- No speculative `ingest --source agnt` product integration in this repo.
-- No LLM-based inference in default collect/map/gaps/verify paths.
-- No breaking top-level proof-record format, exit codes, or bundle contracts without explicit versioning.
-- No dashboard-first or hosted-control-plane scope in this backlog.
+- No new product scope beyond Axym's existing OSS CLI and documented `Clyra-AI/proof` interoperability.
+- No new dashboard, service, or default network dependency.
+- No new `ingest --source` surface such as `agnt`; supported generic ingress remains `collect --governance-event-file`, manual proof append, and existing proof-format paths.
+- No top-level proof-record format fork or Axym-only record envelope.
+- No exit-code vocabulary expansion beyond the existing `0,1,2,3,4,5,6,7,8` contract.
+- No docs-only repositioning ahead of runtime truth.
 
 ---
 
 ## Definition of Done
 
-- Every recommendation in this plan maps to merged code/docs/tests or an explicitly accepted follow-up issue.
-- `product/axym.md` and launch-facing docs consistently describe Axym as proof of identity-governed action in software delivery.
-- Axym exposes one additive normalized identity-governance view across native collection, Wrkr ingest, Gait translation, and Agnt-compatible generic inputs.
-- Missing identity linkage lowers evidence quality, control coverage, and auditability grade deterministically with stable reason codes.
-- Bundles and bundle verification include and enforce the new identity-governance artifacts.
-- Existing record producers remain compatible; any scoring or baseline changes are documented with intentional fixture refreshes.
-- Tests are added or updated at the right layers: schema, unit, integration, E2E CLI, acceptance, scenario, contract, cross-product, and CI-contract coverage where touched.
-- CI matrix wiring is updated and green for all required lanes in this plan.
-- Public docs and examples remain truthful and do not position Axym as an IAM/PAM/IGA replacement.
-- `make prepush-full`, targeted acceptance coverage, and CodeQL pass for the completed implementation set before release.
+- Every recommendation in this plan maps to at least one completed story with green required lanes.
+- Signature tamper, schema-invalid manual append, plugin relationship loss, and misleading JSON error-envelope regressions are all covered by blocking tests.
+- `verify`, `bundle`, `record add`, `collect --plugin`, and `ingest` behavior are deterministic, fail-closed where required, and accurately documented.
+- Any additive artifact introduced for offline signature verification is schema-validated, manifest-covered, deterministic across repeated builds, and documented.
+- Public docs and ADRs match shipped runtime behavior across `product/`, `README.md`, `docs/`, and `docs-site`.
+- No new nondeterminism, default exfiltration path, unsafe output-path behavior, or exit-code drift is introduced while closing these blockers.

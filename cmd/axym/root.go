@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -51,9 +52,16 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 }
 
 func execute(args []string, stdout io.Writer, stderr io.Writer) int {
+	return executeContext(context.Background(), args, stdout, stderr)
+}
+
+func executeContext(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) int {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	root := newRootCmd(stdout, stderr)
 	root.SetArgs(args)
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(ctx); err != nil {
 		if codeErr, ok := err.(interface{ ExitCode() int }); ok {
 			return codeErr.ExitCode()
 		}

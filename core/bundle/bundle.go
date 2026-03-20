@@ -2,7 +2,6 @@ package bundle
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +21,7 @@ import (
 	"github.com/Clyra-AI/axym/core/review/grade"
 	"github.com/Clyra-AI/axym/core/store"
 	coreverify "github.com/Clyra-AI/axym/core/verify"
+	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	bundleschema "github.com/Clyra-AI/axym/schemas/v1/bundle"
 	"github.com/Clyra-AI/proof"
 	"gopkg.in/yaml.v3"
@@ -109,6 +109,10 @@ func Build(req BuildRequest) (Result, error) {
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "initialize local store", ExitCode: 1, Err: err}
 	}
+	signingKey, err := verifysupport.LoadStoreSigningKey(req.StoreDir)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load signing key", ExitCode: 1, Err: err}
+	}
 	chain, err := st.LoadChain()
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load chain", ExitCode: 1, Err: err}
@@ -159,6 +163,18 @@ func Build(req BuildRequest) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal chain verification artifact", ExitCode: 1, Err: err}
 	}
 	artifacts["chain-verification.yaml"] = chainYAML
+
+	recordSigningKeyRaw, err := verifysupport.MarshalBundlePublicKey(proof.PublicKey{
+		KeyID:  signingKey.KeyID,
+		Public: signingKey.Public,
+	})
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal record signing key artifact", ExitCode: 1, Err: err}
+	}
+	if err := bundleschema.ValidateRecordSigningKey(recordSigningKeyRaw); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "validate record signing key schema", ExitCode: 3, Err: err}
+	}
+	artifacts[verifysupport.BundlePublicKeyArtifact] = recordSigningKeyRaw
 
 	gradeYAML, err := yaml.Marshal(struct {
 		Version        string       `yaml:"version"`
@@ -272,15 +288,17 @@ func Build(req BuildRequest) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "write manifest", ExitCode: 1, Err: err}
 	}
 
-	signingKey, err := loadSigningKey(filepath.Join(req.StoreDir, "signing-key.json"))
-	if err != nil {
-		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load signing key", ExitCode: 1, Err: err}
-	}
 	signedManifest, err := proof.SignBundleFile(req.OutputDir, signingKey)
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "sign bundle", ExitCode: 2, Err: err}
 	}
-	if _, err := proof.VerifyBundle(req.OutputDir, proof.BundleVerifyOpts{}); err != nil {
+	if _, err := proof.VerifyBundle(req.OutputDir, proof.BundleVerifyOpts{
+		VerifySignatures: true,
+		PublicKey: proof.PublicKey{
+			KeyID:  signingKey.KeyID,
+			Public: signingKey.Public,
+		},
+	}); err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "verify signed bundle", ExitCode: 2, Err: err}
 	}
 
@@ -474,37 +492,6 @@ func defaultRetentionMatrix() map[string]any {
 			{"artifact": "oscal-v1.1/component-definition.json", "retention": "3y", "rationale": "framework interchange"},
 		},
 	}
-}
-
-type signingKeyFile struct {
-	KeyID   string `json:"key_id"`
-	Public  string `json:"public"`
-	Private string `json:"private"`
-}
-
-func loadSigningKey(path string) (proof.SigningKey, error) {
-	// #nosec G304 -- signing key path is derived from the managed local store root.
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return proof.SigningKey{}, err
-	}
-	var serialized signingKeyFile
-	if err := json.Unmarshal(raw, &serialized); err != nil {
-		return proof.SigningKey{}, err
-	}
-	pub, err := base64.StdEncoding.DecodeString(serialized.Public)
-	if err != nil {
-		return proof.SigningKey{}, err
-	}
-	priv, err := base64.StdEncoding.DecodeString(serialized.Private)
-	if err != nil {
-		return proof.SigningKey{}, err
-	}
-	return proof.SigningKey{
-		KeyID:   serialized.KeyID,
-		Public:  pub,
-		Private: priv,
-	}, nil
 }
 
 func cloneChain(in *proof.Chain) (*proof.Chain, error) {

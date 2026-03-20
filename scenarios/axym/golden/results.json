@@ -23,7 +23,7 @@
     "policy_path": "axym-policy.yaml"
   },
   "ac02_bundle_board_summary": {
-    "bundle_files": 13,
+    "bundle_files": 14,
     "pdf_contains": [
       "Axym Executive Summary (Q3-2026)",
       "Frameworks: eu-ai-act, soc2",

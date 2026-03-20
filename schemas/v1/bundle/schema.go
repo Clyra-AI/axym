@@ -21,6 +21,10 @@ var (
 	execOnce sync.Once
 	execDef  *jsonschema.Schema
 	execErr  error
+
+	signingKeyOnce sync.Once
+	signingKeyDef  *jsonschema.Schema
+	signingKeyErr  error
 )
 
 func ValidateOSCAL(data []byte) error {
@@ -53,6 +57,21 @@ func ValidateExecutiveSummary(data []byte) error {
 	return nil
 }
 
+func ValidateRecordSigningKey(data []byte) error {
+	schema, err := compiledRecordSigningKey()
+	if err != nil {
+		return err
+	}
+	var payload any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Errorf("decode record signing key: %w", err)
+	}
+	if err := schema.Validate(payload); err != nil {
+		return fmt.Errorf("validate record signing key: %w", err)
+	}
+	return nil
+}
+
 func compiledOSCAL() (*jsonschema.Schema, error) {
 	oscalOnce.Do(func() {
 		oscalDef, oscalErr = compile("oscal-component-definition-v1_1.schema.json")
@@ -71,6 +90,16 @@ func compiledExecutiveSummary() (*jsonschema.Schema, error) {
 		return nil, execErr
 	}
 	return execDef, nil
+}
+
+func compiledRecordSigningKey() (*jsonschema.Schema, error) {
+	signingKeyOnce.Do(func() {
+		signingKeyDef, signingKeyErr = compile("record-signing-key-v1.schema.json")
+	})
+	if signingKeyErr != nil {
+		return nil, signingKeyErr
+	}
+	return signingKeyDef, nil
 }
 
 func compile(name string) (*jsonschema.Schema, error) {

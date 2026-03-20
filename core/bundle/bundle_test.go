@@ -143,6 +143,7 @@ func TestBuildIncludesIdentityGovernanceArtifacts(t *testing.T) {
 		"ownership-register.json",
 		"privilege-drift-report.json",
 		"delegated-chain-exceptions.json",
+		"record-signing-key.json",
 	}
 	for _, rel := range required {
 		if _, err := os.Stat(filepath.Join(outDir, rel)); err != nil {

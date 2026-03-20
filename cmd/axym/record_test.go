@@ -73,6 +73,84 @@ func TestRecordAddMissingInputExitCode(t *testing.T) {
 	}
 }
 
+func TestRecordAddRejectsUnknownRecordTypeWithSchemaViolationExit(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	recordPath := filepath.Join(root, "record.json")
+	recordPayload := map[string]any{
+		"record_id":      "rec-test-unknown-type",
+		"record_version": "v1",
+		"source":         "axym",
+		"source_product": "axym",
+		"agent_id":       "agent-1",
+		"record_type":    "does_not_exist",
+		"timestamp":      "2026-03-18T00:00:00Z",
+		"event":          map[string]any{"anything": true},
+	}
+	raw, err := json.Marshal(recordPayload)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
+		t.Fatalf("write record fixture: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitPolicyViolation {
+		t.Fatalf("exit mismatch: got %d want %d stderr=%s stdout=%s", exit, exitPolicyViolation, stderr.String(), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "chain.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no chain mutation, got err=%v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode output: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "schema_violation" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
+	}
+}
+
+func TestRecordAddRejectsBuiltInSchemaInvalidPayloadWithoutMutation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	recordPath := filepath.Join(root, "record.json")
+	recordPayload := map[string]any{
+		"record_id":      "rec-test-bad-dynamic-discovery",
+		"record_version": "v1",
+		"source":         "axym",
+		"source_product": "axym",
+		"agent_id":       "agent-1",
+		"record_type":    "dynamic_tool_discovery",
+		"timestamp":      "2026-03-18T00:00:00Z",
+		"event":          map[string]any{},
+	}
+	raw, err := json.Marshal(recordPayload)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
+		t.Fatalf("write record fixture: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitPolicyViolation {
+		t.Fatalf("exit mismatch: got %d want %d stderr=%s stdout=%s", exit, exitPolicyViolation, stderr.String(), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(storeDir, "chain.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no chain mutation, got err=%v", err)
+	}
+}
+
 func TestRecordAddEmptyMetadataRoundTripsVerify(t *testing.T) {
 	t.Parallel()
 

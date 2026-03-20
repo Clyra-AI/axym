@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -122,6 +123,38 @@ func TestIngestGaitNoInputContract(t *testing.T) {
 	reasons, _ := result["reason_codes"].([]any)
 	if len(reasons) != 1 || reasons[0] != "NO_INPUT" {
 		t.Fatalf("reason mismatch: %s", stdout.String())
+	}
+}
+
+func TestIngestUsesCommandContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	inputDir := filepath.Join(root, "gait")
+	if err := os.MkdirAll(inputDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(inputDir, "native_records.jsonl"), []byte("{\"type\":\"trace\",\"timestamp\":\"2026-02-28T23:05:00Z\",\"agent_id\":\"agent://executor\",\"event\":{\"tool_name\":\"planner\"}}\n"), 0o600); err != nil {
+		t.Fatalf("write native records: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := executeContext(ctx, []string{"ingest", "--source", "gait", "--input", inputDir, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitRuntimeFailure {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitRuntimeFailure, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v output=%s", err, stdout.String())
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "GAIT_CONTEXT_CANCELED" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
 	}
 }
 

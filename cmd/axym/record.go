@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,6 +41,10 @@ func newRecordAddCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *c
 			}
 			result, err := st.Append(record, "record-add:"+strings.TrimSpace(record.RecordID))
 			if err != nil {
+				var validationErr *store.ValidationError
+				if errors.As(err, &validationErr) {
+					return emitRecordSchemaViolation(validationErr.Error(), stdout, stderr, global)
+				}
 				return emitRecordError(fmt.Errorf("append record: %w", err), stdout, stderr, global)
 			}
 			data := map[string]any{
@@ -135,4 +140,20 @@ func emitRecordInvalidInput(message string, stdout io.Writer, stderr io.Writer, 
 		_, _ = fmt.Fprintln(stderr, message)
 	}
 	return &cliError{code: exitInvalidInput, msg: message}
+}
+
+func emitRecordSchemaViolation(message string, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
+	if global.JSON {
+		_ = printJSON(stdout, envelope{
+			OK:      false,
+			Command: "record",
+			Error: &errorEnvelope{
+				Reason:  "schema_violation",
+				Message: message,
+			},
+		})
+	} else if !global.Quiet {
+		_, _ = fmt.Fprintln(stderr, message)
+	}
+	return &cliError{code: exitPolicyViolation, msg: message}
 }

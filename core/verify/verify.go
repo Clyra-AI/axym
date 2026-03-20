@@ -8,14 +8,16 @@ import (
 	"path/filepath"
 
 	bundleverify "github.com/Clyra-AI/axym/core/verify/bundle"
+	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	"github.com/Clyra-AI/proof"
 )
 
 const (
-	ReasonChainTamper  = "chain_tamper_detected"
-	ReasonChainRead    = "chain_read_failed"
-	ReasonBundleVerify = "bundle_verify_failed"
-	ReasonUnsafePath   = "unsafe_operation"
+	ReasonChainTamper    = "chain_tamper_detected"
+	ReasonChainSignature = "chain_signature_invalid"
+	ReasonChainRead      = "chain_read_failed"
+	ReasonBundleVerify   = "bundle_verify_failed"
+	ReasonUnsafePath     = "unsafe_operation"
 )
 
 type Error struct {
@@ -87,6 +89,23 @@ func VerifyChainFromStoreDir(storeDir string) (ChainResult, error) {
 			ExitCode:   2,
 			BreakIndex: verification.BreakIndex,
 			BreakPoint: verification.BreakPoint,
+		}
+	}
+	if len(chain.Records) > 0 {
+		publicKey, err := verifysupport.LoadStorePublicKey(storeDir)
+		if err != nil {
+			return ChainResult{}, &Error{ReasonCode: ReasonChainRead, Message: "load signing key", ExitCode: 2, Err: err}
+		}
+		breakIndex, breakPoint, err := verifysupport.VerifyRecords(chain.Records, publicKey)
+		if err != nil {
+			return ChainResult{}, &Error{
+				ReasonCode: ReasonChainSignature,
+				Message:    "record signature verification failed",
+				ExitCode:   2,
+				BreakIndex: breakIndex,
+				BreakPoint: breakPoint,
+				Err:        err,
+			}
 		}
 	}
 	return ChainResult{

@@ -14,6 +14,7 @@ import (
 	"github.com/Clyra-AI/axym/core/compliance/match"
 	"github.com/Clyra-AI/axym/core/identitygovernance"
 	"github.com/Clyra-AI/axym/core/review/grade"
+	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	bundleschema "github.com/Clyra-AI/axym/schemas/v1/bundle"
 	"github.com/Clyra-AI/proof"
 	"gopkg.in/yaml.v3"
@@ -21,6 +22,7 @@ import (
 
 const (
 	ReasonBundleVerify       = "bundle_verify_failed"
+	ReasonBundleSignature    = "bundle_signature_invalid"
 	ReasonBundleCompleteness = "bundle_completeness_failed"
 	ReasonInvalidInput       = "invalid_input"
 	ReasonSchemaViolation    = "schema_violation"
@@ -108,6 +110,29 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "decode executive summary", ExitCode: 6, Err: err}
 	}
 
+	signingKeyPath := filepath.Join(path, verifysupport.BundlePublicKeyArtifact)
+	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
+	signingKeyRaw, err := os.ReadFile(signingKeyPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Result{}, &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing record signing key artifact", ExitCode: 2, Err: err}
+		}
+		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "read record signing key artifact", ExitCode: 6, Err: err}
+	}
+	if err := bundleschema.ValidateRecordSigningKey(signingKeyRaw); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonSchemaViolation, Message: "record signing key schema validation failed", ExitCode: 3, Err: err}
+	}
+	publicKey, err := verifysupport.UnmarshalBundlePublicKey(signingKeyRaw)
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleSignature, Message: "decode record signing key artifact", ExitCode: 2, Err: err}
+	}
+	if _, err := proof.VerifyBundle(path, proof.BundleVerifyOpts{
+		VerifySignatures: true,
+		PublicKey:        publicKey,
+	}); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleSignature, Message: "bundle manifest signature verification failed", ExitCode: 2, Err: err}
+	}
+
 	normalizedFrameworks := normalizeFrameworkIDs(frameworkIDs)
 	if len(normalizedFrameworks) == 0 {
 		normalizedFrameworks = normalizeFrameworkIDs(summary.Frameworks)
@@ -132,6 +157,9 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	}
 	if !chainVerification.Intact {
 		return Result{}, &Error{ReasonCode: ReasonBundleVerify, Message: "chain integrity check failed", ExitCode: 2}
+	}
+	if _, recordID, err := verifysupport.VerifyRecords(chain.Records, publicKey); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleSignature, Message: "record signature verification failed for " + recordID, ExitCode: 2, Err: err}
 	}
 
 	matchResult := match.Evaluate(definitions, chain.Records, match.Options{ExcludeInvalidEvidence: true})
