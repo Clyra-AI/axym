@@ -30,6 +30,8 @@ Release binary:
 ./axym version --json
 ```
 
+If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
+
 ## Smoke test
 
 Use this when you want to confirm the binary and local environment are wired correctly.
@@ -49,6 +51,8 @@ Expected outcome:
 
 Use this when you want a supported offline demo that ends with non-empty evidence and a non-empty compliance result.
 
+First value is evidence + ranked gaps + intact local verification, not full audit completeness.
+
 ```bash
 ./axym init --sample-pack ./axym-sample --json
 ./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl
@@ -62,11 +66,14 @@ Use this when you want a supported offline demo that ends with non-empty evidenc
 
 Expected outcome:
 
-- The sample pack is generated locally with no network fetch and no repo fixture path.
-- The sample flow appends 5 total records to the local chain.
-- `map` reports 5 covered controls out of 6 across `eu-ai-act,soc2`.
+- The sample pack is created locally with no network dependency and no repo fixture dependency.
+- `collect` captures `4` governance events from the bundled sample pack.
+- The local chain ends with `6` total records after the manual approval and risk assessment append.
+- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
 - `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
-- `bundle` emits identity-governance artifacts and `verify --chain --json` succeeds.
+- `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
+- The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
+- `verify --chain --json` reports an intact `6`-record chain.
 
 ## Real integration path
 
@@ -113,11 +120,20 @@ make test-contracts
 Extended local checks:
 
 ```bash
-make lint-go
-make test-security
-make test-docs-links
 make prepush-full
 ```
+
+Required tools for `make prepush-full`: `golangci-lint`, `gosec`, and `codeql`.
+
+Maintainer and release-manager verification:
+
+```bash
+make release-local
+make release-go-nogo-local
+./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+```
+
+Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft` and `cosign`.
 
 Hosted CI remains authoritative for pull-request required checks and GitHub-hosted CodeQL analysis.
 

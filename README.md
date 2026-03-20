@@ -4,17 +4,17 @@ Axym is an open-source Go CLI for deterministic proof of identity-governed actio
 
 ## Who it's for
 
-Axym is built for platform, security, and GRC engineers who need to prove which non-human identity acted, through which delegated chain, under which policy and approval, without shipping evidence to a hosted service by default.
+Axym is built for platform, security, and GRC engineers who need local evidence collection, compliance mapping, and audit-ready bundles without shipping evidence to a hosted service by default.
 
 ## Where Axym fits
 
-Axym sits between your AI runtime and your audit output:
+Axym sits between your runtime and your audit output:
 
 - Your code, CI system, model provider, MCP servers, and sibling systems emit events or records.
 - Axym collects, ingests, or appends that evidence locally.
 - Axym maps the resulting proof chain to frameworks, ranks gaps, and assembles audit bundles.
 
-Axym does not pretend to own every upstream signal. The current OSS surface distinguishes built-in collectors, plugin collectors, manual proof-record append, and sibling ingest. Axym is not an IAM, PAM, or IGA replacement; upstream identity systems remain authoritative for identity lifecycle and access control.
+Axym does not replace IAM, PAM, or IGA systems. The OSS CLI distinguishes built-in collection, plugin collection, manual proof-record append, and sibling ingest.
 
 ## Install
 
@@ -37,6 +37,8 @@ Release binary:
 ```bash
 ./axym version --json
 ```
+
+If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
 
 Requires Go `1.26.1` for source builds.
 
@@ -67,7 +69,9 @@ Expected outcome:
 
 ## Sample proof path
 
-Use this when you want a supported, offline, installed-binary demo that ends in non-empty evidence and non-empty compliance results.
+Use this when you want a supported, offline, installed-binary demo that ends in non-empty evidence and ranked compliance output.
+
+First value is evidence + ranked gaps + intact local verification, not full audit completeness.
 
 ```bash
 ./axym init --sample-pack ./axym-sample --json
@@ -82,11 +86,14 @@ Use this when you want a supported, offline, installed-binary demo that ends in 
 
 Expected outcome:
 
-- The sample pack is created locally with no repo fixture dependency and no network dependency.
-- `collect` appends 3 governance-event-derived records with actor, downstream, owner, policy, and approval linkage.
-- The full sample flow produces 5 covered controls out of 6 across `eu-ai-act,soc2`.
-- `gaps` returns grade `C` for the published sample journey, not grade `F`.
-- `bundle` succeeds, emits identity artifacts (`identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, `delegated-chain-exceptions.json`), and `verify --chain --json` reports an intact 5-record chain.
+- The sample pack is created locally with no network dependency and no repo fixture dependency.
+- `collect` captures `4` governance events from the bundled sample pack.
+- The local chain ends with `6` total records after the manual approval and risk assessment append.
+- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
+- The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
+- `verify --chain --json` reports an intact `6`-record chain.
 
 ## Real integration path
 
@@ -97,9 +104,7 @@ Use this when you are wiring Axym into your actual runtime, CI, or sibling gover
 - Manual record append: `./axym record add --input ./my-record.json --json`.
 - Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --source gait --json --input ./gait-pack`.
 
-Approvals, risk assessments, incidents, guardrail activations, and similar evidence types are not claimed as default built-in clean-room capture today. Those arrive through built-in surfaces only when the corresponding source exists, or through plugin/manual/ingest paths.
-
-The public wedge is software-delivery governance proof, not general-purpose identity management. Axym proves the action-governance seam around upstream systems rather than replacing them.
+Approvals, risk assessments, incidents, guardrail activations, and similar evidence types are not claimed as default built-in clean-room capture. Those arrive through built-in surfaces only when the corresponding source exists, or through plugin, manual, or ingest paths.
 
 Operator detail lives in [docs/operator/quickstart.md](docs/operator/quickstart.md) and [docs/operator/integration-model.md](docs/operator/integration-model.md).
 
@@ -126,13 +131,23 @@ Operator detail lives in [docs/operator/quickstart.md](docs/operator/quickstart.
 ./axym verify --bundle ./axym-evidence --json
 ```
 
+`collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin and governance payloads out of the proof chain.
+
+`ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes.
+
+`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes.
+
+`gaps` ranks `partial` and `gap` controls with deterministic remediation and auditability grade output.
+
+`bundle` assembles deterministic artifact sets, signs the manifest with local proof keys, and enforces managed output path safety.
+
+`verify --chain` reports deterministic local integrity for both append-only chain linkage and Axym-managed record signatures.
+
+`verify --bundle` reports manifest-signature verification, per-record signature verification for Axym-authored bundles, and deterministic compliance-completeness checks without creating store-managed temp artifacts.
+
 ## Context engineering evidence
 
-Axym can capture governance-relevant context engineering events without storing raw prompt bodies by default. The supported additive event types are:
-
-- `instruction_rewrite`
-- `context_reset`
-- `knowledge_import`
+Axym can capture governance-relevant context engineering events without storing raw prompt bodies by default. Supported additive event types include `instruction_rewrite`, `context_reset`, and `knowledge_import`.
 
 Example:
 
@@ -140,12 +155,11 @@ Example:
 ./axym collect --json --governance-event-file ./fixtures/governance/context_engineering.jsonl
 ```
 
-These events are intended to carry digest-first fields such as `previous_hash`, `current_hash`, `artifact_digest`, `artifact_kind`, `source_uri`, and `reason_code`.
-They can also carry identity-bearing fields such as `downstream_identity`, `owner_identity`, `policy_digest`, `approval_token_ref`, and `delegation_chain`.
+These events can carry digest-first fields such as `previous_hash`, `current_hash`, `artifact_digest`, `artifact_kind`, `source_uri`, and `reason_code`.
 
 ## Contributor gate model
 
-Local-fast checks:
+Fast local checks:
 
 ```bash
 make lint-fast
@@ -153,52 +167,34 @@ make test-fast
 make test-contracts
 ```
 
-Local-extended checks:
+Normal contributors can usually stop here unless they are changing public docs, CI contracts, release behavior, or other launch-facing surfaces.
+
+Full local gate for public-surface, CI, or release-adjacent changes:
 
 ```bash
-make lint-go
-make test-security
-make test-docs-links
 make prepush-full
 ```
 
-Hosted CI remains authoritative for pull-request workflow enforcement and CodeQL analysis through GitHub Actions.
+Required tools for `make prepush-full`: `golangci-lint`, `gosec`, and `codeql`.
 
-`collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin/governance payloads out of the proof chain.
-
-Built-in collection is limited to the collectors listed above. Plugin collection, manual record append, and sibling ingest are separate supported paths and should not be described as one default behavior.
-
-`ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip/extracted/explicit-path packs and translates `trace`, `approval_token`, and `delegation_token` native records to proof records while preserving relationship envelopes.
-
-`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`/`partial`/`gap` outcomes.
-
-`init` bootstraps local store material and an `axym-policy.yaml` file with deterministic defaults. `init --sample-pack <dir>` additively materializes a local sample proof path with machine-readable created files and next-step commands.
-
-`record add` appends a user-supplied proof record JSON payload only after Axym validates the proof schema/record type, signs it with the local Axym key, and links it into the append-only chain with deterministic dedupe semantics.
-
-`map`/`gaps` default to frameworks from `axym-policy.yaml` when present, otherwise `eu-ai-act,soc2`. Invalid policy config fails closed with exit `6`.
-
-`regress init` captures deterministic per-control coverage baselines. `regress run` compares current coverage to baseline and exits `5` on drift with stable `regressed_controls` output.
-
-`gaps` ranks `partial`/`gap` controls with deterministic remediation and auditability grade output; `--min-coverage` or `--policy-config` can enforce fail-closed coverage thresholds.
-
-`review` emits deterministic daily exception packs with fixed exception classes (`sod`, `approvals`, `enrichment`, `attach`, `replay`, `freeze`, `identity`, `chain-session-gap`), per-record auditability, replay tier distributions, and attach SLA/status envelopes.
-
-`override create` appends signed override evidence records and append-only override artifacts under `.axym/overrides/`.
-
-`replay` emits `replay_certification` proof records with deterministic tier classification and blast-radius summary fields.
-
-`bundle` assembles deterministic artifact sets (`manifest.json`, `chain-verification.yaml`, `auditability-grade.yaml`, `executive-summary.json`, `executive-summary.pdf`, identity-governance artifacts, OSCAL export, and retention/boundary contracts), signs the manifest with local proof keys, and enforces managed output path safety.
-
-`verify --chain` reports deterministic local integrity for both append-only chain linkage and Axym-managed record signatures.
-
-`verify --bundle` reports manifest-signature verification, per-record signature verification for Axym-authored bundles, and deterministic Axym compliance-completeness checks (required record classes, field-coverage state, identity-governance artifact consistency, grade recomputation, and OSCAL schema validation) without creating store-managed temp artifacts.
-
-Release verification uses:
+Maintainer and release-manager verification:
 
 ```bash
+make release-local
+make release-go-nogo-local
 ./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
 ```
+
+Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft` and `cosign`.
+
+Hosted CI remains authoritative for pull-request workflow enforcement and GitHub-hosted CodeQL analysis.
+
+## Support and security
+
+- Public GitHub issues are the default path for bugs, questions, and feature requests.
+- Security-sensitive reports must use GitHub Security Advisories as the private reporting path described in [SECURITY.md](SECURITY.md).
+- If GitHub Security Advisories are unavailable, open a minimal public issue without exploit details and reference [SECURITY.md](SECURITY.md).
+- Maintainer support for the OSS CLI is best-effort and async.
 
 ## Exit codes
 

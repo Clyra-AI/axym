@@ -2,6 +2,14 @@
 
 Axym is designed for deterministic, local-first evidence handling. Security bugs that could weaken proof integrity, schema validation, output safety, release verification, or secret handling should be reported privately before public disclosure.
 
+## Private reporting path
+
+- Use GitHub Security Advisories as the private reporting path for vulnerability reports in this repository.
+
+## Fallback public path
+
+- If GitHub Security Advisories are unavailable, open a minimal public GitHub issue without exploit details and ask maintainers to continue through the path documented here.
+
 ## Supported security boundaries
 
 Please report issues involving:
@@ -15,8 +23,8 @@ Please report issues involving:
 
 ## How to report
 
-- Prefer GitHub Security Advisories or another private maintainer channel before opening a public issue.
-- If private reporting is not available, open a minimal public issue without exploit details and ask maintainers for a secure handoff path.
+- Prefer GitHub Security Advisories before opening a public issue.
+- If GitHub Security Advisories are unavailable, use the fallback public path above and avoid posting exploit details, raw secrets, or sensitive evidence.
 
 ## What to include
 
