@@ -10,7 +10,7 @@ Homebrew:
 
 ```bash
 brew install Clyra-AI/tap/axym
-./axym version --json
+axym version --json
 ```
 
 Source:
@@ -25,6 +25,8 @@ Release binary:
 ```bash
 ./axym version --json
 ```
+
+If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
 
 ## Smoke test
 
@@ -45,6 +47,8 @@ Expected outcome:
 
 Use this when you want a supported offline path that produces non-empty local evidence and non-empty compliance output on a fresh install.
 
+First value is evidence + ranked gaps + intact local verification, not full audit completeness.
+
 ```bash
 ./axym init --sample-pack ./axym-sample --json
 ./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl
@@ -58,11 +62,14 @@ Use this when you want a supported offline path that produces non-empty local ev
 
 Expected outcome:
 
-- The sample pack is created locally with no network fetch and no repo fixture dependency.
-- The resulting chain contains 5 records: 3 governance-event decisions, 1 approval, and 1 risk assessment, all carrying explicit identity-governance fields.
-- `map` reports 5 covered controls out of 6 across `eu-ai-act,soc2`.
-- `gaps` returns grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
-- `bundle` succeeds, emits identity-governance artifacts, and `verify --chain --json` reports an intact local chain.
+- The sample pack is created locally with no network dependency and no repo fixture dependency.
+- `collect` captures `4` governance events from the bundled sample pack.
+- The local chain ends with `6` total records after the manual approval and risk assessment append.
+- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
+- The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
+- `verify --chain --json` reports an intact `6`-record chain.
 
 ## Real integration path
 
@@ -84,11 +91,4 @@ Use this path when you need to prove which non-human identity acted, which owner
 - `verify --chain --json` validates local append-only integrity plus Axym-managed record signatures.
 - `verify --bundle <path> --json` validates manifest signatures, Axym-authored record signatures, and Axym compliance completeness state, including the identity-chain summary, ownership register, privilege-drift report, and delegated-chain exceptions artifacts.
 
-## Validation
-
-```bash
-make lint-go
-make test-security
-make test-docs-links
-make prepush-full
-```
+Contributor and release validation lives in [../../README.md](../../README.md) and [../../CONTRIBUTING.md](../../CONTRIBUTING.md).

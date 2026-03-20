@@ -8,6 +8,8 @@ body:
     attributes:
       value: |
         Thanks for helping improve Axym. Please share a minimal, deterministic repro when possible.
+        
+        Security note: if this report is vulnerability-related or disclosure-sensitive, do not file it here. Use GitHub Security Advisories as described in [SECURITY.md](../../SECURITY.md). If that path is unavailable, open a minimal public issue without exploit details and reference `SECURITY.md`.
   - type: textarea
     id: summary
     attributes:
@@ -44,4 +46,3 @@ body:
       description: Share the smallest repeatable sequence that triggers the bug.
     validations:
       required: true
-

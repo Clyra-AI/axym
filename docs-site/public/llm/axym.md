@@ -10,9 +10,27 @@ Operator walkthroughs live in [../../../docs/operator/quickstart.md](../../../do
 
 ## Install
 
-- Homebrew: `brew install Clyra-AI/tap/axym` then `./axym version --json`
-- Source: `go build ./cmd/axym` then `./axym version --json`
-- Release binary: `./axym version --json`
+Homebrew:
+
+```bash
+brew install Clyra-AI/tap/axym
+axym version --json
+```
+
+Source:
+
+```bash
+go build ./cmd/axym
+./axym version --json
+```
+
+Release binary:
+
+```bash
+./axym version --json
+```
+
+If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
 
 ## Smoke test
 
@@ -27,6 +45,8 @@ Expected outcome:
 
 ## Sample proof path
 
+First value is evidence + ranked gaps + intact local verification, not full audit completeness.
+
 - `./axym init --sample-pack ./axym-sample --json`
 - `./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl`
 - `./axym record add --input ./axym-sample/records/approval.json --json`
@@ -38,10 +58,14 @@ Expected outcome:
 
 Expected outcome:
 
-- The sample pack is created locally with no network access and no repo fixture dependency.
-- The sample journey yields 5 covered controls out of 6 across `eu-ai-act,soc2`.
-- `gaps` returns grade `C`, not grade `F`.
-- `bundle` emits identity-governance artifacts and `verify --chain --json` succeeds with an intact 5-record chain.
+- The sample pack is created locally with no network dependency and no repo fixture dependency.
+- `collect` captures `4` governance events from the bundled sample pack.
+- The local chain ends with `6` total records after the manual approval and risk assessment append.
+- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
+- The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
+- `verify --chain --json` reports an intact `6`-record chain.
 
 ## Real integration path
 
@@ -80,12 +104,21 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 ## Contributor gates
 
 - Fast local: `make lint-fast`, `make test-fast`, `make test-contracts`
-- Extended local: `make lint-go`, `make test-security`, `make test-docs-links`, `make prepush-full`
+- Full local gate: `make prepush-full`
+- Required tools for `make prepush-full`: `golangci-lint`, `gosec`, `codeql`
+- Maintainer and release-manager verification: `make release-local`, `make release-go-nogo-local`, `./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym`
+- Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft`, `cosign`
 - Hosted CI remains authoritative for required PR checks and GitHub-hosted CodeQL
 
 ## Release verification
 
 - `./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym`
+
+## Support and security
+
+- Public GitHub issues are the default path for bugs, questions, and feature requests.
+- Security-sensitive reports must use GitHub Security Advisories as the private reporting path described in [../../../SECURITY.md](../../../SECURITY.md).
+- If GitHub Security Advisories are unavailable, open a minimal public issue without exploit details and reference [../../../SECURITY.md](../../../SECURITY.md).
 
 ## Exit codes
 

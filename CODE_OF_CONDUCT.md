@@ -36,9 +36,8 @@ This Code of Conduct applies within all project spaces and also applies when an 
 
 ## Reporting
 
-For conduct issues or other community concerns, contact the maintainers through the private path described in [SECURITY.md](SECURITY.md) if the situation is sensitive, or open a normal project issue when a public thread is appropriate.
+For conduct issues or other community concerns, open a normal project issue when a public thread is appropriate. Security-sensitive reports must follow [SECURITY.md](SECURITY.md) and should not use the public bug template.
 
 ## Attribution
 
 This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
-

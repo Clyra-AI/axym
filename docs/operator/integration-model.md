@@ -65,7 +65,7 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 ## Choosing the right path first
 
 - Start with the `smoke test` when you need install and command-surface confidence.
-- Use the `sample proof path` when you need a supported offline first-value demo that ends in non-empty evidence.
+- Use the `sample proof path` when you need a supported offline first-value demo that ends in evidence, ranked gaps, and intact local verification rather than full audit completeness.
 - Move to the `real integration path` once you are ready to connect actual runtime, CI, plugin, manual, or sibling evidence sources.
 
 ## Failure handling

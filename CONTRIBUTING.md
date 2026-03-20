@@ -12,6 +12,8 @@ This repository is licensed under [Apache-2.0](LICENSE). Unless explicitly state
 
 ## Local setup
 
+Fast local path:
+
 ```bash
 go build ./cmd/axym
 ./axym version --json
@@ -20,11 +22,32 @@ make test-fast
 make test-contracts
 ```
 
-For the full local gate:
+Normal contributors can usually stop at the fast local path unless they are changing public docs, release behavior, CI contracts, or other launch-facing surfaces.
+
+Full local gate:
 
 ```bash
 make prepush-full
 ```
+
+Required tools for `make prepush-full`:
+
+- `golangci-lint`
+- `gosec`
+- `codeql`
+
+Maintainer and release-manager verification:
+
+```bash
+make release-local
+make release-go-nogo-local
+./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+```
+
+Additional required tools for `make release-local` and `make release-go-nogo-local`:
+
+- `syft`
+- `cosign`
 
 ## Change expectations
 
@@ -62,7 +85,8 @@ Use the feature request issue template for new ideas or workflow improvements. F
 
 - Maintainer support for the OSS CLI is best-effort and async. There is no guaranteed response SLA.
 - Public GitHub issues are the default path for bugs, questions, and feature requests.
-- Security-sensitive reports must not be filed publicly. Follow [SECURITY.md](SECURITY.md) instead.
+- Security-sensitive reports must use GitHub Security Advisories as the private reporting path described in [SECURITY.md](SECURITY.md).
+- If GitHub Security Advisories are unavailable, open a minimal public issue without exploit details and reference [SECURITY.md](SECURITY.md).
 - Maintainers may close or redirect requests that are out of scope for Axym, duplicate existing work, or require product commitments not available in the OSS CLI.
 - Launch-facing docs and public issue threads should not promise private support channels, hosted services, or enterprise-only workflow commitments.
 

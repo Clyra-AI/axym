@@ -55,24 +55,74 @@ func TestRequiredLaunchAssetsExist(t *testing.T) {
 func TestLaunchFacingDocsReferenceCurrentOSSBoundary(t *testing.T) {
 	t.Parallel()
 
-	readme, err := os.ReadFile(filepath.Join(repoRoot(t), "README.md"))
-	if err != nil {
-		t.Fatalf("read README: %v", err)
-	}
-	commandGuide, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "commands", "axym.md"))
-	if err != nil {
-		t.Fatalf("read command guide: %v", err)
-	}
-	for _, raw := range [][]byte{readme, commandGuide} {
-		content := string(raw)
+	for _, doc := range loadLaunchNarrativeDocs(t) {
 		for _, snippet := range []string{
 			"Smoke test",
 			"Sample proof path",
 			"Real integration path",
+			"First value is evidence + ranked gaps + intact local verification, not full audit completeness.",
 			"./axym init --sample-pack ./axym-sample --json",
 		} {
+			if !strings.Contains(doc.content, snippet) {
+				t.Fatalf("launch-facing docs missing snippet %q in %s", snippet, doc.path)
+			}
+		}
+	}
+}
+
+func TestRepoHygieneContributorDocsListFullGatePrerequisites(t *testing.T) {
+	t.Parallel()
+
+	requiredCommands := []string{
+		"make prepush-full",
+		"make release-local",
+		"make release-go-nogo-local",
+		"./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym",
+	}
+	requiredTools := []string{
+		"golangci-lint",
+		"gosec",
+		"codeql",
+		"syft",
+		"cosign",
+	}
+
+	for _, path := range []string{"README.md", "CONTRIBUTING.md", "docs-site/public/llms.txt"} {
+		content := readRepoFile(t, path)
+		for _, command := range requiredCommands {
+			if !strings.Contains(content, command) {
+				t.Fatalf("%s missing prerequisite command %q", path, command)
+			}
+		}
+		for _, tool := range requiredTools {
+			if !strings.Contains(content, tool) {
+				t.Fatalf("%s missing prerequisite tool %q", path, tool)
+			}
+		}
+	}
+}
+
+func TestRepoHygieneSecurityReportingPathsStayExplicit(t *testing.T) {
+	t.Parallel()
+
+	security := readRepoFile(t, "SECURITY.md")
+	for _, snippet := range []string{
+		"GitHub Security Advisories",
+		"minimal public GitHub issue without exploit details",
+	} {
+		if !strings.Contains(security, snippet) {
+			t.Fatalf("SECURITY.md missing security reporting snippet %q", snippet)
+		}
+	}
+
+	for _, path := range []string{"README.md", "CONTRIBUTING.md", "docs-site/public/llms.txt", ".github/ISSUE_TEMPLATE/bug_report.yml"} {
+		content := readRepoFile(t, path)
+		for _, snippet := range []string{
+			"SECURITY.md",
+			"GitHub Security Advisories",
+		} {
 			if !strings.Contains(content, snippet) {
-				t.Fatalf("launch-facing docs missing snippet %q", snippet)
+				t.Fatalf("%s missing security routing snippet %q", path, snippet)
 			}
 		}
 	}

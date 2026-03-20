@@ -109,11 +109,18 @@ func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
 		t.Fatalf("ReadFile(contract): %v", err)
 	}
 	var contract struct {
-		Frameworks          string   `json:"frameworks"`
-		MinimumCoveredCount int      `json:"minimum_covered_count"`
-		ForbiddenGrade      string   `json:"forbidden_grade"`
-		SamplePackPath      string   `json:"sample_pack_path"`
-		RequiredArtifacts   []string `json:"required_bundle_artifacts"`
+		Frameworks                  string   `json:"frameworks"`
+		SamplePackPath              string   `json:"sample_pack_path"`
+		GovernanceEventCaptureCount int      `json:"governance_event_capture_count"`
+		FinalChainRecordCount       int      `json:"final_chain_record_count"`
+		CoveredControlCount         int      `json:"covered_control_count"`
+		ControlCount                int      `json:"control_count"`
+		Grade                       string   `json:"grade"`
+		BundleComplete              bool     `json:"bundle_complete"`
+		WeakRecordCount             int      `json:"weak_record_count"`
+		ChainIntact                 bool     `json:"chain_intact"`
+		RemainingGapControlIDs      []string `json:"remaining_gap_control_ids"`
+		RequiredArtifacts           []string `json:"required_bundle_artifacts"`
 	}
 	if err := json.Unmarshal(rawContract, &contract); err != nil {
 		t.Fatalf("Unmarshal(contract): %v", err)
@@ -132,22 +139,72 @@ func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
 		t.Fatalf("expected sample_pack data output=%v", initPayload)
 	}
 
-	runAcceptanceJSON(t, binaryPath, workdir, "collect", "--json", "--governance-event-file", filepath.Join(samplePackPath, "governance", "context_engineering.jsonl"))
-	runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "approval.json"), "--json")
-	runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "risk_assessment.json"), "--json")
+	collectPayload := runAcceptanceJSON(t, binaryPath, workdir, "collect", "--json", "--governance-event-file", filepath.Join(samplePackPath, "governance", "context_engineering.jsonl"))
+	collectData, _ := collectPayload["data"].(map[string]any)
+	if got := intValue(t, collectData, "captured"); got != contract.GovernanceEventCaptureCount {
+		t.Fatalf("captured mismatch: got %d want %d output=%v", got, contract.GovernanceEventCaptureCount, collectPayload)
+	}
+	if got := intValue(t, collectData, "record_count"); got != contract.GovernanceEventCaptureCount {
+		t.Fatalf("record_count mismatch after collect: got %d want %d output=%v", got, contract.GovernanceEventCaptureCount, collectPayload)
+	}
+	sources, _ := collectData["sources"].([]any)
+	foundGovernanceSource := false
+	for _, candidate := range sources {
+		source, _ := candidate.(map[string]any)
+		if source["name"] != "governanceevent" {
+			continue
+		}
+		foundGovernanceSource = true
+		if got := intValue(t, source, "captured"); got != contract.GovernanceEventCaptureCount {
+			t.Fatalf("governanceevent source captured mismatch: got %d want %d output=%v", got, contract.GovernanceEventCaptureCount, source)
+		}
+	}
+	if !foundGovernanceSource {
+		t.Fatalf("governanceevent source summary missing output=%v", collectPayload)
+	}
+
+	approvalPayload := runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "approval.json"), "--json")
+	approvalData, _ := approvalPayload["data"].(map[string]any)
+	if got := intValue(t, approvalData, "record_count"); got != contract.GovernanceEventCaptureCount+1 {
+		t.Fatalf("record_count mismatch after approval append: got %d want %d output=%v", got, contract.GovernanceEventCaptureCount+1, approvalPayload)
+	}
+
+	riskPayload := runAcceptanceJSON(t, binaryPath, workdir, "record", "add", "--input", filepath.Join(samplePackPath, "records", "risk_assessment.json"), "--json")
+	riskData, _ := riskPayload["data"].(map[string]any)
+	if got := intValue(t, riskData, "record_count"); got != contract.FinalChainRecordCount {
+		t.Fatalf("record_count mismatch after risk append: got %d want %d output=%v", got, contract.FinalChainRecordCount, riskPayload)
+	}
 
 	mapPayload := runAcceptanceJSON(t, binaryPath, workdir, "map", "--frameworks", contract.Frameworks, "--json")
 	mapData, _ := mapPayload["data"].(map[string]any)
 	mapSummary, _ := mapData["summary"].(map[string]any)
-	if got := int(mapSummary["covered_count"].(float64)); got < contract.MinimumCoveredCount {
-		t.Fatalf("covered_count mismatch: got %d want >= %d output=%v", got, contract.MinimumCoveredCount, mapPayload)
+	if got := intValue(t, mapSummary, "covered_count"); got != contract.CoveredControlCount {
+		t.Fatalf("covered_count mismatch: got %d want %d output=%v", got, contract.CoveredControlCount, mapPayload)
+	}
+	if got := intValue(t, mapSummary, "control_count"); got != contract.ControlCount {
+		t.Fatalf("control_count mismatch: got %d want %d output=%v", got, contract.ControlCount, mapPayload)
 	}
 
 	gapsPayload := runAcceptanceJSON(t, binaryPath, workdir, "gaps", "--frameworks", contract.Frameworks, "--json")
 	gapsData, _ := gapsPayload["data"].(map[string]any)
 	grade, _ := gapsData["grade"].(map[string]any)
-	if letter := grade["letter"]; letter == contract.ForbiddenGrade {
-		t.Fatalf("unexpected grade %v output=%v", letter, gapsPayload)
+	if letter, _ := grade["letter"].(string); letter != contract.Grade {
+		t.Fatalf("grade mismatch: got %q want %q output=%v", letter, contract.Grade, gapsPayload)
+	}
+	gaps, _ := gapsData["gaps"].([]any)
+	if len(contract.RemainingGapControlIDs) > 0 {
+		seenGaps := map[string]struct{}{}
+		for _, candidate := range gaps {
+			gap, _ := candidate.(map[string]any)
+			if controlID, _ := gap["control_id"].(string); controlID != "" {
+				seenGaps[controlID] = struct{}{}
+			}
+		}
+		for _, want := range contract.RemainingGapControlIDs {
+			if _, ok := seenGaps[want]; !ok {
+				t.Fatalf("remaining gap %q missing output=%v", want, gapsPayload)
+			}
+		}
 	}
 
 	bundlePayload := runAcceptanceJSON(t, binaryPath, workdir, "bundle", "--audit", "sample", "--frameworks", contract.Frameworks, "--json")
@@ -167,11 +224,34 @@ func TestInstalledBinaryFirstValueSamplePath(t *testing.T) {
 			t.Fatalf("missing required bundle artifact %s: %v", rel, err)
 		}
 	}
+	compliance, _ := bundleData["compliance"].(map[string]any)
+	if complete := boolValue(t, compliance, "complete"); complete != contract.BundleComplete {
+		t.Fatalf("bundle complete mismatch: got %t want %t output=%v", complete, contract.BundleComplete, bundlePayload)
+	}
+	bundleGrade, _ := compliance["grade"].(map[string]any)
+	if letter, _ := bundleGrade["letter"].(string); letter != contract.Grade {
+		t.Fatalf("bundle grade mismatch: got %q want %q output=%v", letter, contract.Grade, bundlePayload)
+	}
+	identityGovernance, _ := compliance["identity_governance"].(map[string]any)
+	if got := intValue(t, identityGovernance, "weak_record_count"); got != contract.WeakRecordCount {
+		t.Fatalf("weak_record_count mismatch: got %d want %d output=%v", got, contract.WeakRecordCount, bundlePayload)
+	}
+	bundleVerification, _ := bundleData["verification"].(map[string]any)
+	if intact := boolValue(t, bundleVerification, "intact"); intact != contract.ChainIntact {
+		t.Fatalf("bundle verification intact mismatch: got %t want %t output=%v", intact, contract.ChainIntact, bundlePayload)
+	}
+	if got := intValue(t, bundleVerification, "count"); got != contract.FinalChainRecordCount {
+		t.Fatalf("bundle verification count mismatch: got %d want %d output=%v", got, contract.FinalChainRecordCount, bundlePayload)
+	}
+
 	verifyPayload := runAcceptanceJSON(t, binaryPath, workdir, "verify", "--chain", "--json")
 	verifyData, _ := verifyPayload["data"].(map[string]any)
 	verification, _ := verifyData["verification"].(map[string]any)
-	if verification["intact"] != true {
+	if intact := boolValue(t, verification, "intact"); intact != contract.ChainIntact {
 		t.Fatalf("expected intact chain output=%v", verifyPayload)
+	}
+	if got := intValue(t, verification, "count"); got != contract.FinalChainRecordCount {
+		t.Fatalf("verify count mismatch: got %d want %d output=%v", got, contract.FinalChainRecordCount, verifyPayload)
 	}
 }
 
@@ -240,4 +320,32 @@ func runAcceptanceJSON(t *testing.T, binaryPath string, workdir string, args ...
 		t.Fatalf("decode output for %v: %v output=%s", args, err, string(out))
 	}
 	return payload
+}
+
+func intValue(t *testing.T, values map[string]any, key string) int {
+	t.Helper()
+
+	raw, ok := values[key]
+	if !ok {
+		t.Fatalf("missing numeric key %q in %+v", key, values)
+	}
+	number, ok := raw.(float64)
+	if !ok {
+		t.Fatalf("key %q is not numeric in %+v", key, values)
+	}
+	return int(number)
+}
+
+func boolValue(t *testing.T, values map[string]any, key string) bool {
+	t.Helper()
+
+	raw, ok := values[key]
+	if !ok {
+		t.Fatalf("missing bool key %q in %+v", key, values)
+	}
+	flag, ok := raw.(bool)
+	if !ok {
+		t.Fatalf("key %q is not bool in %+v", key, values)
+	}
+	return flag
 }

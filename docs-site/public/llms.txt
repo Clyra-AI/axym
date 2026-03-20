@@ -1,5 +1,111 @@
 Axym local docs index
 
+Install
+
+Homebrew:
+
+```bash
+brew install Clyra-AI/tap/axym
+axym version --json
+```
+
+Source:
+
+```bash
+go build ./cmd/axym
+./axym version --json
+```
+
+Release binary:
+
+```bash
+./axym version --json
+```
+
+If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
+
+Smoke test
+
+```bash
+./axym init --json
+./axym collect --dry-run --json
+```
+
+Expected outcome:
+
+- `init` creates `.axym` and `axym-policy.yaml`.
+- `collect --dry-run` reports what Axym could capture without writing evidence.
+- A fresh environment may still yield `captured: 0` on plain `collect --json`; that is a smoke test, not the supported first-value path.
+
+Sample proof path
+
+First value is evidence + ranked gaps + intact local verification, not full audit completeness.
+
+```bash
+./axym init --sample-pack ./axym-sample --json
+./axym collect --json --governance-event-file ./axym-sample/governance/context_engineering.jsonl
+./axym record add --input ./axym-sample/records/approval.json --json
+./axym record add --input ./axym-sample/records/risk_assessment.json --json
+./axym map --frameworks eu-ai-act,soc2 --json
+./axym gaps --frameworks eu-ai-act,soc2 --json
+./axym bundle --audit sample --frameworks eu-ai-act,soc2 --json
+./axym verify --chain --json
+```
+
+Expected outcome:
+
+- The sample pack is created locally with no network dependency and no repo fixture dependency.
+- `collect` captures `4` governance events from the bundled sample pack.
+- The local chain ends with `6` total records after the manual approval and risk assessment append.
+- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
+- The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
+- `verify --chain --json` reports an intact `6`-record chain.
+
+Real integration path
+
+- Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
+- Plugin collectors: `./axym collect --json --plugin "./my-collector"`.
+- Manual record append: `./axym record add --input ./my-record.json --json`.
+- Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --source gait --json --input ./gait-pack`.
+
+Contributor and release validation
+
+Fast local checks:
+
+```bash
+make lint-fast
+make test-fast
+make test-contracts
+```
+
+Full local gate:
+
+```bash
+make prepush-full
+```
+
+Required tools for `make prepush-full`: `golangci-lint`, `gosec`, and `codeql`.
+
+Maintainer and release-manager verification:
+
+```bash
+make release-local
+make release-go-nogo-local
+./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym
+```
+
+Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft` and `cosign`.
+
+Support and security
+
+- Public GitHub issues are the default path for bugs, questions, and feature requests.
+- Security-sensitive reports must use GitHub Security Advisories as the private reporting path described in SECURITY.md.
+- If GitHub Security Advisories are unavailable, open a minimal public issue without exploit details and reference SECURITY.md.
+
+Source-of-truth files
+
 - LICENSE
 - CHANGELOG.md
 - CODE_OF_CONDUCT.md
