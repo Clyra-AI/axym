@@ -26,7 +26,7 @@ func (Collector) Name() string { return "governanceevent" }
 
 func (Collector) Collect(_ context.Context, req collector.Request) (collector.Result, error) {
 	if len(req.GovernanceEventFiles) == 0 {
-		return collector.Result{}, nil
+		return collector.Result{ReasonCodes: []string{"NO_INPUT"}}, nil
 	}
 
 	candidates := []collector.Candidate{}

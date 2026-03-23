@@ -9,6 +9,8 @@ required_jobs=(
   "test-fast:"
   "test-contracts:"
   "test-acceptance:"
+  "docs-consistency:"
+  "docs-storyline:"
 )
 
 for job in "${required_jobs[@]}"; do

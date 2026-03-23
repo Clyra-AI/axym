@@ -72,7 +72,11 @@ Expected outcome:
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `./axym collect --json --plugin "<cmd>"`.
 - Manual record append: `./axym record add --input <record.json> --json`.
+- Authoritative contract: [../../../schemas/v1/record/README.md](../../../schemas/v1/record/README.md).
 - Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 Public launch docs should not describe approvals, risk assessments, guardrails, incidents, or similar surfaces as default built-in clean-room capture unless that collector ships.
 Public launch docs should also not position Axym as an IAM/PAM/IGA replacement or widen the wedge beyond software delivery.
@@ -83,7 +87,7 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - `./axym init --json`: initializes local store scaffolding and writes `axym-policy.yaml` defaults.
 - `./axym init --sample-pack ./axym-sample --json`: additively materializes a deterministic sample pack with created files and next-step commands.
 - `./axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
-- `./axym record add --input <record.json> --json`: validates a proof record payload, then signs and appends it to the local chain with deterministic dedupe behavior.
+- `./axym record add --input <record.json> --json`: validates the public manual-input contract, normalizes compatibility-only `record_version: "1.0"` payloads to `v1`, then signs and appends it to the local chain with deterministic dedupe behavior. Shared proof-record semantics remain owned by `Clyra-AI/proof`; see [../../../schemas/v1/record/README.md](../../../schemas/v1/record/README.md).
 - `./axym collect --json --plugin "<cmd>"`: runs third-party collector protocol (`stdin` config, `stdout` normalized collector JSONL with optional `relationship`).
 - `./axym collect --json --governance-event-file <file.jsonl>`: ingests governance events and promotes valid events to proof records with actor/downstream/owner/policy/approval linkage when present.
 - `./axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls and emits explainable match rationale.
@@ -106,6 +110,7 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - Fast local: `make lint-fast`, `make test-fast`, `make test-contracts`
 - Full local gate: `make prepush-full`
 - Required tools for `make prepush-full`: `golangci-lint`, `gosec`, `codeql`
+- `make codeql` is the local contributor verification path; GitHub Actions uploads hosted CodeQL analysis results for `pull_request` and `main`
 - Maintainer and release-manager verification: `make release-local`, `make release-go-nogo-local`, `./scripts/release_go_nogo.sh --dist-dir dist --binary-name axym`
 - Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft`, `cosign`
 - Hosted CI remains authoritative for required PR checks and GitHub-hosted CodeQL

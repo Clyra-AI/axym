@@ -73,3 +73,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: make test-docs-links
+
+  docs-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: make test-docs-consistency
+
+  docs-storyline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: make test-docs-storyline

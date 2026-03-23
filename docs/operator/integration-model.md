@@ -42,11 +42,18 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 
 - Invoked with `./axym record add --input <record.json> --json`.
 - Best for explicit approvals, risk assessments, or other high-signal records that already exist in a structured form and already know actor/downstream/owner/policy linkage.
+- Authoritative contract: [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 
 ### Sibling ingest
 
 - Invoked with `./axym ingest --source wrkr --input <path> --json` or `./axym ingest --source gait --input <path> --json`.
 - Best when you already have compatible evidence or translated packs from other Clyra products and need one normalized identity-chain view across them.
+
+## Public surface notes
+
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 ## Sync vs async operator flows
 
@@ -55,6 +62,7 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - `collect --dry-run` for immediate environment and would-capture validation.
 - `collect` against local or mounted artifacts that are available at command time.
 - `record add` when an operator or workflow already has the exact proof payload to append and wants Axym to validate/sign/link it locally.
+- `record add` uses Axym's public manual-input envelope while `Clyra-AI/proof` owns the shared proof-record semantics and record-type-specific validation rules.
 
 ### Async paths
 

@@ -62,6 +62,7 @@ func TestLaunchFacingDocsReferenceCurrentOSSBoundary(t *testing.T) {
 			"Real integration path",
 			"First value is evidence + ranked gaps + intact local verification, not full audit completeness.",
 			"./axym init --sample-pack ./axym-sample --json",
+			"Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.",
 		} {
 			if !strings.Contains(doc.content, snippet) {
 				t.Fatalf("launch-facing docs missing snippet %q in %s", snippet, doc.path)

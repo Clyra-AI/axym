@@ -24,7 +24,7 @@ func TestRequiredChecksMapToPRTriggeredWorkflow(t *testing.T) {
 		t.Fatal("required checks must be emitted by pull_request workflows")
 	}
 
-	requiredJobs := []string{"lint-fast:", "test-fast:", "test-contracts:", "test-acceptance:", "golangci-lint:", "gosec:", "docs-links:"}
+	requiredJobs := []string{"lint-fast:", "test-fast:", "test-contracts:", "test-acceptance:", "golangci-lint:", "gosec:", "docs-links:", "docs-consistency:", "docs-storyline:"}
 	for _, job := range requiredJobs {
 		if !strings.Contains(pr, job) {
 			t.Fatalf("pr workflow missing required check job: %s", job)

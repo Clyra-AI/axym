@@ -139,6 +139,8 @@ Every first-class evidence surface is evaluated against one additive identity-go
 
 > Truth-in-scope note: the OSS product ships the identity-governed action seam today through Axym-native collection, `collect --governance-event-file`, `record add`, Wrkr ingest, Gait ingest, and bundle/export/verify surfaces. This PRD also describes longer-horizon expansion of collectors and evidence types. Public launch docs must stay aligned to the shipped surfaces, not the full ambition of this document.
 
+> Public surface note: stable launch-facing surfaces today are built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`. Package names, workflow step ordering, and helper placement are internal details rather than public extension points.
+
 These surfaces are ingested through Axym's collector plugin architecture (FR12). Each collector reads existing outputs from the external tool — Axym never requires modifications to the source system. The records produced are standard proof records (`test_result`, `model_change`, `deployment`, `risk_assessment`) that flow into the same compliance mapping and evidence chain as all other Axym evidence. Eval results map to EU AI Act Article 15 (accuracy/robustness). Model provenance maps to Article 12 (record-keeping) and Article 13 (transparency). Red team results map to Article 9 (risk management) and Article 15.
 
 **Layer 5: Organizational Controls Evidence (tertiary — compliance completeness)**
@@ -159,7 +161,7 @@ Every captured signal becomes a structured, signed proof record via `Clyra-AI/pr
 ```yaml
 # Example: Single proof record produced by Axym
 record_id: "prf-2026-09-15T10:30:00Z-a7f3b2c1"
-record_version: "1.0"
+record_version: "v1"
 timestamp: "2026-09-15T10:30:00Z"
 source: "axym-mcp-collector"
 source_product: "axym"
@@ -722,7 +724,7 @@ Deepa audits 15+ clients per year. Since Q2 2026, her control matrix includes AI
 - `axym review --date [date]` — generate Daily Review Pack for the specified date (default: yesterday)
 - `axym verify --chain` — verify proof chain integrity: append-only linkage plus Axym-managed record signatures
 - `axym verify --bundle [path]` — verify audit bundle integrity: manifest signatures, Axym-managed record signatures, hashes, chain, and compliance completeness checks (required record types present per framework, field coverage, auditability grade recalculation). `proof verify --bundle` performs proof-level manifest/hash verification only — no Axym compliance opinions. Auditors use `proof verify`; GRC analysts use `axym verify` for the full picture
-- `axym record add --input [path]` — validate, sign, and append a manual proof record payload (for non-automated controls)
+- `axym record add --input [path]` — validate, sign, and append a manual proof record payload (for non-automated controls). Public contract: `schemas/v1/record/README.md`
 - `axym override create --bundle [id] --reason [text] --signer [key]` — create signed exception
 - `axym ingest --source [wrkr|gait|path]` — ingest proof records from sibling products or external sources. For `gait`: accepts PackSpec v1 ZIP files (extracted automatically), directories of extracted pack files, or individual pack paths; Gait's `gait.gate.trace` and token types are translated to proof record format at ingestion time. For `wrkr`: reads wrkr's proof record output directory. For `path`: reads JSONL files containing proof-format records
 - `axym replay --model [name] --tier [A|B|C]` — run replay certification for a specific pipeline model

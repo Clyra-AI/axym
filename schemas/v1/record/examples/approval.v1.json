@@ -1,0 +1,28 @@
+{
+  "record_version": "v1",
+  "record_id": "manual-approval-001",
+  "source": "manual",
+  "source_product": "axym",
+  "agent_id": "ops-reviewer",
+  "record_type": "approval",
+  "timestamp": "2026-03-18T12:15:00Z",
+  "event": {
+    "decision": "allow",
+    "approver": "ops-reviewer",
+    "scope": "context-pack-change",
+    "actor_identity": "agent://requester",
+    "downstream_identity": "agent://context-engineer",
+    "owner_identity": "owner://platform-governance",
+    "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "approval_token_ref": "approval://manual-approval-001",
+    "target_kind": "knowledge_artifact",
+    "target_id": "kb:policy-pack"
+  },
+  "metadata": {
+    "reason_code": "HUMAN_APPROVED"
+  },
+  "controls": {
+    "permissions_enforced": true,
+    "approved_scope": "manual:operator"
+  }
+}

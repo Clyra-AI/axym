@@ -68,7 +68,11 @@ Real integration path
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `./axym collect --json --plugin "./my-collector"`.
 - Manual record append: `./axym record add --input ./my-record.json --json`.
+- Authoritative contract: `schemas/v1/record/README.md`.
 - Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --source gait --json --input ./gait-pack`.
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 Contributor and release validation
 
@@ -114,6 +118,7 @@ Source-of-truth files
 - README.md — install, smoke test, sample proof path, real integration path
 - docs/commands/axym.md — command guide and supported surfaces
 - docs-site/public/llm/axym.md — launch-facing identity-governed action summary for LLM and search consumers
+- schemas/v1/record/README.md — authoritative manual record append contract and canonical examples
 - docs/operator/quickstart.md — operator walkthrough for smoke, sample, and real integration paths
 - docs/operator/integration-model.md — runtime ownership model and sync/async evidence flow
 - docs/operator/integration-boundary.mmd — Mermaid source for the integration-boundary diagram

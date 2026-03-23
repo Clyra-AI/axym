@@ -46,6 +46,21 @@ func TestGovernanceEventPromotion(t *testing.T) {
 	}
 }
 
+func TestGovernanceEventNoInputReturnsReasonCode(t *testing.T) {
+	t.Parallel()
+
+	result, err := Collector{}.Collect(context.Background(), collector.Request{})
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if len(result.Candidates) != 0 {
+		t.Fatalf("expected no candidates, got %+v", result.Candidates)
+	}
+	if len(result.ReasonCodes) != 1 || result.ReasonCodes[0] != "NO_INPUT" {
+		t.Fatalf("reason codes mismatch: %+v", result.ReasonCodes)
+	}
+}
+
 func TestGovernanceEventRejectsMalformedSchema(t *testing.T) {
 	t.Parallel()
 

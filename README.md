@@ -102,7 +102,11 @@ Use this when you are wiring Axym into your actual runtime, CI, or sibling gover
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `./axym collect --json --plugin "./my-collector"`.
 - Manual record append: `./axym record add --input ./my-record.json --json`.
+- Authoritative contract: [schemas/v1/record/README.md](schemas/v1/record/README.md).
 - Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --source gait --json --input ./gait-pack`.
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 Approvals, risk assessments, incidents, guardrail activations, and similar evidence types are not claimed as default built-in clean-room capture. Those arrive through built-in surfaces only when the corresponding source exists, or through plugin, manual, or ingest paths.
 
@@ -131,7 +135,9 @@ Operator detail lives in [docs/operator/quickstart.md](docs/operator/quickstart.
 ./axym verify --bundle ./axym-evidence --json
 ```
 
-`collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, supports non-blocking collector failures, and keeps malformed plugin and governance payloads out of the proof chain.
+Axym validates the manual input envelope locally, normalizes compatibility-only `record_version: "1.0"` payloads to canonical `record_version: "v1"`, then signs and appends the record. Shared proof-record semantics and record-type-specific validation remain owned by `Clyra-AI/proof`. The authoritative schema and examples live in [schemas/v1/record/README.md](schemas/v1/record/README.md).
+
+`collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, reports `governanceevent` as `NO_INPUT` on clean-room dry runs with no event files, supports non-blocking collector failures, and keeps malformed plugin and governance payloads out of the proof chain.
 
 `ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes.
 
@@ -177,6 +183,8 @@ make prepush-full
 
 Required tools for `make prepush-full`: `golangci-lint`, `gosec`, and `codeql`.
 
+`make codeql` is the local contributor gate for CodeQL-compatible verification in your environment. The GitHub Actions `codeql` workflow separately uploads hosted CodeQL results for `pull_request` and `main` so PR security visibility stays truthful.
+
 Maintainer and release-manager verification:
 
 ```bash
@@ -187,7 +195,11 @@ make release-go-nogo-local
 
 Additional required tools for `make release-local` and `make release-go-nogo-local`: `syft` and `cosign`.
 
-Hosted CI remains authoritative for pull-request workflow enforcement and GitHub-hosted CodeQL analysis.
+`make release-local` builds a local `dist/` set with checksums, SPDX SBOM output, a local cosign keypair, and a local provenance receipt for maintainer verification. `make release-go-nogo-local` validates that local artifact set with `dist/local-cosign.pub`.
+
+The hosted tag-release workflow is different on purpose: it uses `goreleaser/goreleaser-action@v7` with GoReleaser `v2.14.1`, GitHub OIDC keyless signing that emits `dist/checksums.txt.pem`, GitHub build attestation, and then runs the same `./scripts/release_go_nogo.sh` integrity gate against the hosted artifacts.
+
+Hosted CI remains authoritative for pull-request workflow enforcement and the uploaded GitHub-hosted CodeQL analysis visible on PRs and `main`.
 
 ## Support and security
 

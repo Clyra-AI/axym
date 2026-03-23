@@ -75,6 +75,44 @@ func TestCollectGovernanceContextEngineeringContract(t *testing.T) {
 	t.Fatalf("governanceevent source summary missing: %s", stdout)
 }
 
+func TestCollectGovernanceEventNoInputReasonCodeContract(t *testing.T) {
+	t.Parallel()
+
+	storeDir := filepath.Join(t.TempDir(), "store")
+	stdout, exit := runAxymContract(t, "collect", "--dry-run", "--store-dir", storeDir, "--json")
+	if exit != 0 {
+		t.Fatalf("unexpected exit %d output=%s", exit, stdout)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing data envelope: %s", stdout)
+	}
+	sources, ok := data["sources"].([]any)
+	if !ok {
+		t.Fatalf("missing sources summary: %s", stdout)
+	}
+	for _, candidate := range sources {
+		source, _ := candidate.(map[string]any)
+		if source["name"] != "governanceevent" {
+			continue
+		}
+		if source["status"] != "empty" {
+			t.Fatalf("governanceevent source status mismatch: %v", source)
+		}
+		reasons, _ := source["reason_codes"].([]any)
+		if len(reasons) != 1 || reasons[0] != "NO_INPUT" {
+			t.Fatalf("governanceevent reason codes mismatch: %v", source)
+		}
+		return
+	}
+	t.Fatalf("governanceevent source summary missing: %s", stdout)
+}
+
 func TestCollectPluginEmptyMetadataRoundTripContract(t *testing.T) {
 	t.Parallel()
 

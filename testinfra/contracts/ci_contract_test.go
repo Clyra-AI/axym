@@ -109,6 +109,9 @@ func TestCodeQLWorkflowTriggersOnPullRequestAndMain(t *testing.T) {
 			t.Fatalf("codeql workflow missing snippet %q", snippet)
 		}
 	}
+	if strings.Contains(content, "upload: never") {
+		t.Fatal("codeql workflow must upload hosted analysis results on pull_request and main")
+	}
 }
 
 func TestWorkflowsDoNotOptIntoInsecureNodeFallback(t *testing.T) {

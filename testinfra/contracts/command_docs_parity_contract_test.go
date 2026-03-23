@@ -101,6 +101,20 @@ func TestCommandInstallSurfaceDocsParity(t *testing.T) {
 	}
 }
 
+func TestLaunchDocsClassifyPublicSurfaces(t *testing.T) {
+	t.Parallel()
+
+	required := []string{
+		"Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.",
+		"Internal detail: package names, workflow step ordering, and helper placement are not public extension points.",
+		"Deprecated surface: none documented in launch docs today.",
+		"schemas/v1/record/README.md",
+	}
+	for _, doc := range loadLaunchNarrativeDocs(t) {
+		requireDocContainsAll(t, doc, required)
+	}
+}
+
 func TestLaunchStoryDocsSequence(t *testing.T) {
 	t.Parallel()
 
@@ -123,6 +137,7 @@ func TestLaunchDocsIndexReferencesSourceOfTruth(t *testing.T) {
 		"README.md",
 		"docs/commands/axym.md",
 		"docs-site/public/llm/axym.md",
+		"schemas/v1/record/README.md",
 		"docs/operator/quickstart.md",
 		"docs/operator/integration-model.md",
 		"docs/operator/integration-boundary.mmd",
