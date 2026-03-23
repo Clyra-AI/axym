@@ -227,12 +227,14 @@ Rules:
 
 - Required checks must never reference non-PR jobs.
 - Workflow renames/trigger changes must update contract tests in same PR.
+- Docs parity checks must be emitted on `pull_request` as stable jobs `docs-links`, `docs-consistency`, and `docs-storyline`.
 
 ## 10) Security Scanning
 
 ### 10.1 Static and dependency security
 
 - CodeQL for Go/Python on PR + protected branch.
+- Local `make codeql` is the contributor verification path; the GitHub-hosted `codeql` workflow uploads the repository's PR and `main` analysis results.
 - `gosec`, `bandit`, `govulncheck` in CI lanes.
 - Secret detection in pre-commit and CI fallback checks.
 
@@ -251,14 +253,18 @@ Rules:
 sha256sum -c dist/checksums.txt
 cosign verify-blob --certificate dist/checksums.txt.pem \
   --signature dist/checksums.txt.sig dist/checksums.txt
+cosign verify-blob --key dist/local-cosign.pub \
+  --signature dist/checksums.txt.sig --insecure-ignore-tlog=true dist/checksums.txt
 ```
 
 ## 11) Release Integrity
 
-- Tooling: GoReleaser `v2.13.3`.
+- Tooling: GoReleaser `v2.14.1`.
 - Platforms: linux/darwin/windows x amd64/arm64.
 - Artifacts: static binaries + archives + checksums + signatures + SBOM + provenance.
 - Versioning: semver tags `vX.Y.Z` with build-time version injection.
+- Local maintainer path: `make release-local` generates a local signature with `dist/local-cosign.pub` plus a local provenance receipt, then `make release-go-nogo-local` verifies that local artifact set.
+- Hosted tag-release path: GitHub Actions uses OIDC keyless signing, emits `dist/checksums.txt.pem`, records GitHub build attestation, and then runs `./scripts/release_go_nogo.sh` against the hosted artifacts.
 
 ## 12) Performance Budget Framework
 

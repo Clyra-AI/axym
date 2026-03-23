@@ -7,12 +7,31 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Clyra-AI/axym/core/store"
+	recordschema "github.com/Clyra-AI/axym/schemas/v1/record"
 	"github.com/Clyra-AI/proof"
 	"github.com/spf13/cobra"
 )
+
+type recordInputError struct {
+	kind string
+	err  error
+}
+
+func (e *recordInputError) Error() string {
+	if e == nil || e.err == nil {
+		return ""
+	}
+	return e.err.Error()
+}
+
+func (e *recordInputError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.err
+}
 
 func newRecordCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.Command {
 	cmd := &cobra.Command{
@@ -33,6 +52,10 @@ func newRecordAddCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *c
 		RunE: func(cmd *cobra.Command, args []string) error {
 			record, err := decodeRecord(inputPath)
 			if err != nil {
+				var inputErr *recordInputError
+				if errors.As(err, &inputErr) && inputErr.kind == "schema_violation" {
+					return emitRecordSchemaViolation(err.Error(), stdout, stderr, global)
+				}
 				return emitRecordInvalidInput(err.Error(), stdout, stderr, global)
 			}
 			st, err := store.New(store.Config{RootDir: storeDir})
@@ -69,37 +92,23 @@ func newRecordAddCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *c
 func decodeRecord(path string) (*proof.Record, error) {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
-		return nil, fmt.Errorf("input is required")
+		return nil, &recordInputError{kind: "invalid_input", err: fmt.Errorf("input is required")}
 	}
 	// #nosec G304 -- record input path is explicit user input.
 	raw, err := os.ReadFile(trimmed)
 	if err != nil {
-		return nil, fmt.Errorf("read input file: %w", err)
+		return nil, &recordInputError{kind: "invalid_input", err: fmt.Errorf("read input file: %w", err)}
+	}
+	normalizedRaw, err := recordschema.NormalizeManualInput(raw)
+	if err != nil {
+		return nil, &recordInputError{kind: "invalid_input", err: err}
+	}
+	if err := recordschema.ValidateManualInput(normalizedRaw); err != nil {
+		return nil, &recordInputError{kind: "schema_violation", err: fmt.Errorf("manual record contract validation failed: %w", err)}
 	}
 	var record proof.Record
-	if err := json.Unmarshal(raw, &record); err != nil {
-		return nil, fmt.Errorf("decode input json: %w", err)
-	}
-	if strings.TrimSpace(record.RecordID) == "" {
-		return nil, fmt.Errorf("record_id is required")
-	}
-	if strings.TrimSpace(record.RecordVersion) == "" {
-		record.RecordVersion = "v1"
-	}
-	if strings.TrimSpace(record.Source) == "" {
-		return nil, fmt.Errorf("source is required")
-	}
-	if strings.TrimSpace(record.SourceProduct) == "" {
-		return nil, fmt.Errorf("source_product is required")
-	}
-	if strings.TrimSpace(record.RecordType) == "" {
-		return nil, fmt.Errorf("record_type is required")
-	}
-	if strings.TrimSpace(record.AgentID) == "" {
-		return nil, fmt.Errorf("agent_id is required")
-	}
-	if record.Timestamp.IsZero() || record.Timestamp.Equal(time.Time{}) {
-		return nil, fmt.Errorf("timestamp is required")
+	if err := json.Unmarshal(normalizedRaw, &record); err != nil {
+		return nil, &recordInputError{kind: "schema_violation", err: fmt.Errorf("decode validated input json: %w", err)}
 	}
 	if record.Event == nil {
 		record.Event = map[string]any{}

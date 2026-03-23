@@ -22,6 +22,8 @@ func TestReleaseGoNoGoScriptSyntaxAndCoverage(t *testing.T) {
 		"brew install Clyra-AI/tap/axym",
 		"go build -o",
 		"version --json",
+		"checksums.txt.pem",
+		"local-cosign.pub",
 	}
 	for _, snippet := range required {
 		if !strings.Contains(script, snippet) {
@@ -61,5 +63,23 @@ func TestReleaseWorkflowSmokeBinaryStaysOutOfDistRoot(t *testing.T) {
 	}
 	if strings.Contains(release, "go build -o dist/axym ./cmd/axym") {
 		t.Fatal("release workflow must not build the smoke binary into dist/")
+	}
+}
+
+func TestReleaseWorkflowUsesPinnedToolingAndHostedVerificationPaths(t *testing.T) {
+	t.Parallel()
+
+	release := readRepoFile(t, ".github/workflows/release.yml")
+	required := []string{
+		"version: v2.14.1",
+		"id-token: write",
+		"cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt",
+		"actions/attest-build-provenance@v4",
+		"dist/github-attestation.provenance.json",
+	}
+	for _, snippet := range required {
+		if !strings.Contains(release, snippet) {
+			t.Fatalf("release workflow missing hosted verification snippet %q", snippet)
+		}
 	}
 }

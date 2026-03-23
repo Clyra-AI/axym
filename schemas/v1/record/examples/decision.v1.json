@@ -1,0 +1,30 @@
+{
+  "record_version": "v1",
+  "record_id": "manual-decision-001",
+  "source": "manual",
+  "source_product": "axym",
+  "agent_id": "ops-reviewer",
+  "record_type": "decision",
+  "timestamp": "2026-03-18T12:25:00Z",
+  "event": {
+    "action": "allow",
+    "actor_identity": "agent://requester",
+    "downstream_identity": "agent://executor",
+    "owner_identity": "owner://platform-governance",
+    "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "target_kind": "workflow",
+    "target_id": "payments-approval"
+  },
+  "metadata": {
+    "reason_code": "MANUAL_APPROVED"
+  },
+  "relationship": {
+    "policy_ref": {
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "controls": {
+    "permissions_enforced": true,
+    "approved_scope": "manual:operator"
+  }
+}

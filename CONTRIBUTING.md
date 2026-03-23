@@ -24,6 +24,8 @@ make test-contracts
 
 Normal contributors can usually stop at the fast local path unless they are changing public docs, release behavior, CI contracts, or other launch-facing surfaces.
 
+The `pull_request` workflow emits `docs-links`, `docs-consistency`, and `docs-storyline` as merge-blocking docs checks, so launch-facing docs changes should be validated locally before push.
+
 Full local gate:
 
 ```bash
@@ -35,6 +37,8 @@ Required tools for `make prepush-full`:
 - `golangci-lint`
 - `gosec`
 - `codeql`
+
+`make codeql` validates the local CodeQL path for contributors. GitHub Actions also runs a hosted `codeql` workflow that uploads analysis results on `pull_request` and `main` for repository security visibility.
 
 Maintainer and release-manager verification:
 
@@ -48,6 +52,10 @@ Additional required tools for `make release-local` and `make release-go-nogo-loc
 
 - `syft`
 - `cosign`
+
+`make release-local` produces a local `dist/` tree with checksums, SPDX SBOM output, a locally generated cosign keypair, and a local provenance receipt. `make release-go-nogo-local` verifies that local artifact set with `dist/local-cosign.pub`.
+
+The hosted tag-release workflow is intentionally different: it uses GoReleaser `v2.14.1`, GitHub OIDC keyless signing that emits `dist/checksums.txt.pem`, GitHub build attestation, and the same `./scripts/release_go_nogo.sh` gate against the hosted artifacts.
 
 ## Change expectations
 

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/record/manual-input.schema.json",
+  "title": "Axym manual record add input",
+  "description": "Public input contract for `axym record add --input <record.json> --json` before Axym signs and appends the record locally.",
+  "type": "object",
+  "required": [
+    "record_id",
+    "timestamp",
+    "source",
+    "source_product",
+    "agent_id",
+    "record_type",
+    "event",
+    "controls"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "record_version": {
+      "type": "string",
+      "enum": [
+        "v1",
+        "1.0"
+      ],
+      "default": "v1",
+      "description": "Canonical Axym-authored payloads use `v1`. Legacy `1.0` inputs are accepted for compatibility and normalized to `v1` before append."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "source_product": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "record_type": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "event": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "relationship": {
+      "type": "object"
+    },
+    "controls": {
+      "type": "object",
+      "required": [
+        "permissions_enforced"
+      ],
+      "properties": {
+        "permissions_enforced": {
+          "type": "boolean"
+        },
+        "approved_scope": {
+          "type": "string"
+        },
+        "within_scope": {
+          "type": "boolean"
+        },
+        "guardrails_active": {
+          "type": "array"
+        },
+        "human_oversight": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

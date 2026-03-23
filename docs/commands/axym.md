@@ -80,7 +80,11 @@ Expected outcome:
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `axym collect --json --plugin "<cmd>"`.
 - Manual record append: `axym record add --input <record.json> --json`.
+- Authoritative contract: [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --source gait --json --input <path>`.
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 Public docs should not describe approvals, risk assessments, incidents, guardrails, or broader enterprise surfaces as default built-in clean-room capture unless that collector actually ships.
 Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen the wedge beyond software delivery.
@@ -89,11 +93,11 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 
 - `axym init --json`: creates local store scaffolding and policy defaults.
 - `axym init --sample-pack ./axym-sample --json`: creates the local store plus a deterministic sample pack with machine-readable created files and next steps.
-- `axym collect --dry-run --json`: validates fixture and environment readiness without writes.
+- `axym collect --dry-run --json`: validates fixture and environment readiness without writes and preserves per-source `reason_codes`, including `governanceevent: ["NO_INPUT"]` when no governance-event files are supplied.
 - `axym collect --json`: runs built-in collectors and appends signed proof records from configured sources.
 - `axym collect --json --plugin "<cmd>"`: runs a third-party collector protocol and promotes normalized collector JSONL (`source_type`, `source`, `source_product`, `record_type`, `agent_id`, `timestamp`, `event`, `metadata`, optional `relationship`, `controls`) into signed proof records while rejecting malformed payloads deterministically.
 - `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records with actor, downstream, owner, delegation, policy, and approval linkage when present.
-- `axym record add --input <record.json> --json`: validates a user-supplied proof record payload, then signs and appends it to the local chain.
+- `axym record add --input <record.json> --json`: validates the public manual-input contract, normalizes compatibility-only `record_version: "1.0"` payloads to `v1`, then signs and appends the record to the local chain. Shared proof-record semantics remain owned by `Clyra-AI/proof`; see [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --source gait --json --input <path>`: ingests Gait native/proof pack artifacts with translation.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.

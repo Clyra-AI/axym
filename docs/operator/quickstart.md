@@ -78,7 +78,11 @@ Use this when you are connecting Axym to your actual runtime, CI, or sibling sys
 - Built-in collectors: `mcp`, `llmapi`, `webhook`, `githubactions`, `gitmeta`, `dbt`, `snowflake`, and `governanceevent`.
 - Plugin collectors: `./axym collect --json --plugin "<cmd>"`.
 - Manual record append: `./axym record add --input <record.json> --json` after Axym validates the proof payload and signs/links it locally.
+- Authoritative contract: [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
+- Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
+- Deprecated surface: none documented in launch docs today.
 
 This is the path to use when you want evidence from your own CI, runtime, provider, or sibling governance systems. Approvals, risk assessments, incidents, and similar evidence classes are not claimed as default built-in clean-room capture unless that collector ships.
 Use this path when you need to prove which non-human identity acted, which owner approved it, which target was touched, and which policy or approval bound the action.
