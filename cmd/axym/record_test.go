@@ -158,6 +158,48 @@ func TestRecordAddRejectsMissingRequiredFieldWithSchemaViolationExit(t *testing.
 	}
 }
 
+func TestRecordAddRejectsWhitespaceOnlyAgentIDWithSchemaViolationExit(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	recordPath := filepath.Join(root, "record.json")
+	recordPayload := map[string]any{
+		"record_version": "v1",
+		"record_id":      "rec-test-whitespace-agent",
+		"source":         "manual",
+		"source_product": "axym",
+		"agent_id":       "   ",
+		"record_type":    "decision",
+		"timestamp":      "2026-03-18T00:00:00Z",
+		"event":          map[string]any{"action": "allow"},
+		"controls":       map[string]any{"permissions_enforced": true},
+	}
+	raw, err := json.Marshal(recordPayload)
+	if err != nil {
+		t.Fatalf("marshal record: %v", err)
+	}
+	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
+		t.Fatalf("write record fixture: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"record", "add", "--input", recordPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitPolicyViolation {
+		t.Fatalf("exit mismatch: got %d want %d stderr=%s stdout=%s", exit, exitPolicyViolation, stderr.String(), stdout.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode output: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "schema_violation" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
+	}
+}
+
 func TestRecordAddNormalizesLegacyRecordVersionToV1(t *testing.T) {
 	t.Parallel()
 

@@ -153,6 +153,21 @@ func TestManualRecordSchemaContract(t *testing.T) {
 	if err := recordschema.ValidateManualInput(missingRequired); err == nil {
 		t.Fatal("manual payload missing required source_product was accepted")
 	}
+
+	whitespaceAgent := []byte(`{
+		"record_version": "v1",
+		"record_id": "contract-whitespace-agent",
+		"timestamp": "2026-03-18T00:00:00Z",
+		"source": "manual",
+		"source_product": "axym",
+		"agent_id": "   ",
+		"record_type": "decision",
+		"event": {"action": "allow"},
+		"controls": {"permissions_enforced": true}
+	}`)
+	if err := recordschema.ValidateManualInput(whitespaceAgent); err == nil {
+		t.Fatal("manual payload with whitespace-only agent_id was accepted")
+	}
 }
 
 func TestManualRecordContractDocsAreLinkedFromLaunchSurfaces(t *testing.T) {
