@@ -178,7 +178,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	if err := verifyIdentityArtifacts(path, chain.Records); err != nil {
 		return Result{}, err
 	}
-	derivedArtifacts, err := verifyDerivedArtifacts(path, chain.Records)
+	derivedArtifacts, err := verifyDerivedArtifacts(path, *manifest, chain.Records)
 	if err != nil {
 		return Result{}, err
 	}
@@ -344,7 +344,7 @@ func normalizeFrameworkIDs(in []string) []string {
 	return out
 }
 
-func verifyDerivedArtifacts(path string, records []proof.Record) ([]DerivedArtifactVerification, error) {
+func verifyDerivedArtifacts(path string, manifest proof.BundleManifest, records []proof.Record) ([]DerivedArtifactVerification, error) {
 	files, err := bundleartifacts.Build(records).Files()
 	if err != nil {
 		return nil, &Error{ReasonCode: ReasonBundleVerify, Message: "marshal derived artifacts", ExitCode: 2, Err: err}
@@ -359,19 +359,20 @@ func verifyDerivedArtifacts(path string, records []proof.Record) ([]DerivedArtif
 		bundleartifacts.FileSandboxCoverage,
 		bundleartifacts.FileControlMaturity,
 	}
+	declared := make(map[string]struct{}, len(manifest.Files))
+	for _, file := range manifest.Files {
+		declared[strings.TrimSpace(file.Path)] = struct{}{}
+	}
 	statuses := make([]DerivedArtifactVerification, 0, len(files))
 	for _, rel := range known {
 		wantRaw, expected := files[rel]
+		if _, ok := declared[rel]; !ok {
+			continue
+		}
 		// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 		gotRaw, err := os.ReadFile(filepath.Join(path, rel))
 		if !expected {
-			if err == nil {
-				return nil, &Error{ReasonCode: ReasonBundleCompleteness, Message: "unexpected derived artifact declared in bundle: " + rel, ExitCode: 2}
-			}
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			return nil, &Error{ReasonCode: ReasonInvalidInput, Message: "read derived artifact " + rel, ExitCode: 6, Err: err}
+			return nil, &Error{ReasonCode: ReasonBundleCompleteness, Message: "derived artifact declared in bundle but not recomputed from source evidence: " + rel, ExitCode: 2}
 		}
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
