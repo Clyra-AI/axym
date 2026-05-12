@@ -1,6 +1,8 @@
 # Axym Integration Model
 
 Axym does not replace your runtime, CI, provider, or upstream identity systems. It sits at the evidence boundary: reading existing signals, translating them into proof records, and then producing compliance views and audit bundles for identity-governed action in software delivery.
+Gait enforces runtime controls. Wrkr inventories ownership and posture. Proof verifies signatures and chain integrity. Axym correlates, maps, and packages that evidence.
+Axym does not block, freeze, broker, or sandbox execution.
 
 See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 
@@ -46,8 +48,9 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 
 ### Sibling ingest
 
-- Invoked with `./axym ingest --source wrkr --input <path> --json` or `./axym ingest --source gait --input <path> --json`.
+- Invoked with `./axym ingest --source wrkr --input <path> --json` or `./axym ingest --gait-pack <path> --json`.
 - Best when you already have compatible evidence or translated packs from other Clyra products and need one normalized identity-chain view across them.
+- `--gait-pack` is the source-of-truth path for Gait authorization bundles and structured control artifacts.
 
 ## Public surface notes
 
@@ -83,3 +86,4 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - `map` and `gaps` stay deterministic even when the result is incomplete.
 - `verify --chain` validates append-only local integrity and Axym-managed record signatures.
 - `verify --bundle` validates portable bundle manifest signatures, Axym-authored record signatures, and reports compliance completeness explicitly, including identity-governance artifact consistency.
+- When present, it recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json`.

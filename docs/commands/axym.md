@@ -5,6 +5,8 @@ Axym is a deterministic CLI for proving identity-governed action in software del
 ## Runtime boundary
 
 Axym collects or ingests evidence from systems you already operate. Customer code, CI, MCP servers, model providers, sibling systems, and IAM/PAM/IGA systems stay upstream. Axym turns the resulting structured evidence into local proof records, compliance maps, gaps, and bundles that answer who acted, through which chain, against which target, under which policy and approval.
+Gait enforces runtime controls. Wrkr inventories ownership and posture. Proof verifies signatures and chain integrity. Axym correlates, maps, and packages that evidence.
+Axym does not block, freeze, broker, or sandbox execution.
 
 Operator walkthroughs live in [../operator/quickstart.md](../operator/quickstart.md) and [../operator/integration-model.md](../operator/integration-model.md).
 
@@ -81,7 +83,7 @@ Expected outcome:
 - Plugin collectors: `axym collect --json --plugin "<cmd>"`.
 - Manual record append: `axym record add --input <record.json> --json`.
 - Authoritative contract: [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
-- Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --source gait --json --input <path>`.
+- Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --gait-pack <path> --json`.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
@@ -99,17 +101,18 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym collect --json --governance-event-file ./events.jsonl`: promotes valid governance events to proof records with actor, downstream, owner, delegation, policy, and approval linkage when present.
 - `axym record add --input <record.json> --json`: validates the public manual-input contract, normalizes compatibility-only `record_version: "1.0"` payloads to `v1`, then signs and appends the record to the local chain. Shared proof-record semantics remain owned by `Clyra-AI/proof`; see [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
-- `axym ingest --source gait --json --input <path>`: ingests Gait native/proof pack artifacts with translation.
+- `axym ingest --gait-pack <path> --json`: ingests Gait native/proof packs plus authorization bundles and structured control artifacts with deterministic translation and bundle counts.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.
 - `axym gaps --frameworks eu-ai-act,soc2 --json`: ranks `covered`, `partial`, and `gap` outcomes with remediation and effort.
 - `axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: captures deterministic baseline coverage.
-- `axym regress run --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: exits `5` on coverage drift with stable control output.
+- `axym regress run --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: exits `5` on coverage drift or control-maturity regression with stable output.
 - `axym review --date 2026-09-15 --json`: emits a deterministic Daily Review Pack.
 - `axym override create --bundle Q3-2026 --reason "fixture" --signer ops-key --json`: appends signed override evidence and artifacts.
 - `axym replay --model payments-agent --tier A --json`: emits replay-certification evidence with deterministic blast-radius summaries.
-- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, identity-governance artifacts, OSCAL, and portable raw records.
+- `axym bundle --audit Q3-2026 --frameworks eu-ai-act,soc2 --json`: assembles signed audit bundles with executive summary, identity-governance artifacts, OSCAL, portable raw records, and when Gait control evidence exists: `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json`.
 - `axym verify --chain --json`: verifies append-only chain integrity plus Axym-managed record signatures.
 - `axym verify --bundle ./axym-evidence --json`: verifies bundle manifest signatures, Axym-authored record signatures, and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
+  It recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` when they are declared in the bundle.
 
 ## Contributor checks
 

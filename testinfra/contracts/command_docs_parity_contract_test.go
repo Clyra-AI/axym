@@ -151,3 +151,38 @@ func TestLaunchDocsIndexReferencesSourceOfTruth(t *testing.T) {
 		}
 	}
 }
+
+func TestDocsMentionDerivedArtifactVerification(t *testing.T) {
+	t.Parallel()
+
+	readme := readRepoFile(t, "README.md")
+	commandGuide := readRepoFile(t, "docs/commands/axym.md")
+	operatorGuide := readRepoFile(t, "docs/operator/integration-model.md")
+	required := []string{
+		"--gait-pack",
+		"authorization-register.json",
+		"insurance-evidence-profile.json",
+		"credential-posture-register.json",
+		"freeze-window-coverage.json",
+		"kill-switch-coverage.json",
+		"enforcement-explain-register.json",
+		"sandbox-coverage.json",
+		"control-maturity.json",
+		"Gait enforces",
+		"Wrkr inventories",
+		"Proof verifies",
+		"Axym correlates",
+		"does not block, freeze, broker, or sandbox execution",
+	}
+	for _, snippet := range required {
+		if !strings.Contains(readme, snippet) {
+			t.Fatalf("README missing snippet %q", snippet)
+		}
+		if !strings.Contains(commandGuide, snippet) {
+			t.Fatalf("docs/commands/axym.md missing snippet %q", snippet)
+		}
+		if !strings.Contains(operatorGuide, snippet) {
+			t.Fatalf("docs/operator/integration-model.md missing snippet %q", snippet)
+		}
+	}
+}

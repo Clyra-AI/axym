@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/bundleartifacts"
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
 	"github.com/Clyra-AI/axym/core/store"
 	regressschema "github.com/Clyra-AI/axym/schemas/v1/regress"
@@ -50,9 +51,10 @@ func (e *Error) Unwrap() error {
 }
 
 type Baseline struct {
-	Version    string              `json:"version"`
-	CapturedAt string              `json:"captured_at,omitempty"`
-	Frameworks []FrameworkBaseline `json:"frameworks"`
+	Version         string              `json:"version"`
+	CapturedAt      string              `json:"captured_at,omitempty"`
+	Frameworks      []FrameworkBaseline `json:"frameworks"`
+	ControlMaturity []MaturityBaseline  `json:"control_maturity,omitempty"`
 }
 
 type FrameworkBaseline struct {
@@ -67,10 +69,17 @@ type ControlBaseline struct {
 	ReasonCodes []string `json:"reason_codes,omitempty"`
 }
 
+type MaturityBaseline struct {
+	Path                    string   `json:"path"`
+	CurrentStage            string   `json:"current_stage,omitempty"`
+	RemainingGapReasonCodes []string `json:"remaining_gap_reason_codes,omitempty"`
+}
+
 type InitRequest struct {
-	BaselinePath   string
-	CoverageReport coverage.Report
-	Now            time.Time
+	BaselinePath    string
+	CoverageReport  coverage.Report
+	ControlMaturity *bundleartifacts.ControlMaturity
+	Now             time.Time
 }
 
 type InitResult struct {
@@ -80,8 +89,9 @@ type InitResult struct {
 }
 
 type RunRequest struct {
-	BaselinePath   string
-	CoverageReport coverage.Report
+	BaselinePath    string
+	CoverageReport  coverage.Report
+	ControlMaturity *bundleartifacts.ControlMaturity
 }
 
 type Drift struct {
@@ -95,9 +105,18 @@ type Drift struct {
 }
 
 type RunResult struct {
-	BaselinePath      string  `json:"baseline_path"`
-	DriftDetected     bool    `json:"drift_detected"`
-	RegressedControls []Drift `json:"regressed_controls,omitempty"`
+	BaselinePath        string          `json:"baseline_path"`
+	DriftDetected       bool            `json:"drift_detected"`
+	RegressedControls   []Drift         `json:"regressed_controls,omitempty"`
+	MaturityRegressions []MaturityDrift `json:"maturity_regressions,omitempty"`
+}
+
+type MaturityDrift struct {
+	Path          string   `json:"path"`
+	BaselineStage string   `json:"baseline_stage,omitempty"`
+	CurrentStage  string   `json:"current_stage,omitempty"`
+	Reason        string   `json:"reason"`
+	ReasonCodes   []string `json:"reason_codes,omitempty"`
 }
 
 func Init(req InitRequest) (InitResult, error) {
@@ -105,7 +124,7 @@ func Init(req InitRequest) (InitResult, error) {
 	if err != nil {
 		return InitResult{}, wrapInvalidInput("resolve baseline path", err)
 	}
-	baseline := buildBaseline(req.CoverageReport, req.Now)
+	baseline := buildBaseline(req.CoverageReport, req.Now, req.ControlMaturity)
 	raw, err := json.MarshalIndent(baseline, "", "  ")
 	if err != nil {
 		return InitResult{}, &Error{ReasonCode: ReasonBaselineWrite, Message: "marshal baseline", ExitCode: 1, Err: err}
@@ -133,12 +152,14 @@ func Run(req RunRequest) (RunResult, error) {
 		return RunResult{}, err
 	}
 
-	current := buildBaseline(req.CoverageReport, time.Time{})
-	drift := diff(baseline, current)
+	current := buildBaseline(req.CoverageReport, time.Time{}, req.ControlMaturity)
+	drift := diffControls(baseline, current)
+	maturityDrift := diffMaturity(baseline.ControlMaturity, current.ControlMaturity)
 	return RunResult{
-		BaselinePath:      path,
-		DriftDetected:     len(drift) > 0,
-		RegressedControls: drift,
+		BaselinePath:        path,
+		DriftDetected:       len(drift) > 0 || len(maturityDrift) > 0,
+		RegressedControls:   drift,
+		MaturityRegressions: maturityDrift,
 	}, nil
 }
 
@@ -158,7 +179,7 @@ func readBaseline(path string) (Baseline, error) {
 	return baseline, nil
 }
 
-func buildBaseline(report coverage.Report, now time.Time) Baseline {
+func buildBaseline(report coverage.Report, now time.Time, maturity *bundleartifacts.ControlMaturity) Baseline {
 	frameworks := make([]FrameworkBaseline, 0, len(report.Frameworks))
 	for _, frameworkCoverage := range report.Frameworks {
 		controls := make([]ControlBaseline, 0, len(frameworkCoverage.Controls))
@@ -182,9 +203,10 @@ func buildBaseline(report coverage.Report, now time.Time) Baseline {
 		return frameworks[i].FrameworkID < frameworks[j].FrameworkID
 	})
 	baseline := Baseline{
-		Version:    BaselineVersion,
-		CapturedAt: now.UTC().Format(time.RFC3339),
-		Frameworks: frameworks,
+		Version:         BaselineVersion,
+		CapturedAt:      now.UTC().Format(time.RFC3339),
+		Frameworks:      frameworks,
+		ControlMaturity: buildMaturityBaseline(maturity),
 	}
 	if now.IsZero() {
 		baseline.CapturedAt = ""
@@ -192,7 +214,7 @@ func buildBaseline(report coverage.Report, now time.Time) Baseline {
 	return baseline
 }
 
-func diff(baseline Baseline, current Baseline) []Drift {
+func diffControls(baseline Baseline, current Baseline) []Drift {
 	currentFrameworks := make(map[string]FrameworkBaseline, len(current.Frameworks))
 	for _, framework := range current.Frameworks {
 		currentFrameworks[framework.FrameworkID] = framework
@@ -253,6 +275,71 @@ func diff(baseline Baseline, current Baseline) []Drift {
 	return out
 }
 
+func buildMaturityBaseline(maturity *bundleartifacts.ControlMaturity) []MaturityBaseline {
+	if maturity == nil || len(maturity.Entries) == 0 {
+		return nil
+	}
+	out := make([]MaturityBaseline, 0, len(maturity.Entries))
+	for _, entry := range maturity.Entries {
+		out = append(out, MaturityBaseline{
+			Path:                    strings.TrimSpace(entry.Path),
+			CurrentStage:            strings.TrimSpace(entry.CurrentStage),
+			RemainingGapReasonCodes: uniqueSorted(entry.RemainingGapReasonCodes),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+func diffMaturity(baseline []MaturityBaseline, current []MaturityBaseline) []MaturityDrift {
+	if len(baseline) == 0 {
+		return nil
+	}
+	currentByPath := make(map[string]MaturityBaseline, len(current))
+	for _, entry := range current {
+		currentByPath[entry.Path] = entry
+	}
+	out := make([]MaturityDrift, 0)
+	for _, entry := range baseline {
+		currentEntry, ok := currentByPath[entry.Path]
+		if !ok {
+			out = append(out, MaturityDrift{
+				Path:          entry.Path,
+				BaselineStage: entry.CurrentStage,
+				CurrentStage:  "",
+				Reason:        "path_missing_from_current",
+				ReasonCodes:   append([]string(nil), entry.RemainingGapReasonCodes...),
+			})
+			continue
+		}
+		if maturityStageRank(currentEntry.CurrentStage) < maturityStageRank(entry.CurrentStage) {
+			out = append(out, MaturityDrift{
+				Path:          entry.Path,
+				BaselineStage: entry.CurrentStage,
+				CurrentStage:  currentEntry.CurrentStage,
+				Reason:        "control_maturity_regressed",
+				ReasonCodes:   append([]string(nil), currentEntry.RemainingGapReasonCodes...),
+			})
+			continue
+		}
+		if len(currentEntry.RemainingGapReasonCodes) > len(entry.RemainingGapReasonCodes) {
+			out = append(out, MaturityDrift{
+				Path:          entry.Path,
+				BaselineStage: entry.CurrentStage,
+				CurrentStage:  currentEntry.CurrentStage,
+				Reason:        "control_maturity_gap_increased",
+				ReasonCodes:   append([]string(nil), currentEntry.RemainingGapReasonCodes...),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
 func resolveBaselinePath(path string) (string, error) {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
@@ -296,6 +383,25 @@ func statusRank(status string) int {
 		return 1
 	default:
 		return 2
+	}
+}
+
+func maturityStageRank(stage string) int {
+	switch strings.TrimSpace(stage) {
+	case "observe":
+		return 0
+	case "dry_run":
+		return 1
+	case "read_only_allow":
+		return 2
+	case "approval_gated_write":
+		return 3
+	case "brokered_write":
+		return 4
+	case "blocked_destructive":
+		return 5
+	default:
+		return -1
 	}
 }
 

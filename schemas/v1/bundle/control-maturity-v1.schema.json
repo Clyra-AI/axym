@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://axym.dev/schemas/v1/bundle/control-maturity-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "type": "string", "const": "v1" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "bundle_id", "artifact_id", "drift", "source_product", "source_artifact_path", "proof_refs"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "bundle_id": { "type": "string", "minLength": 1 },
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "current_stage": { "type": "string" },
+          "prior_stage": { "type": "string" },
+          "drift": { "type": "string", "enum": ["introduced", "regressed", "advanced", "unchanged"] },
+          "source_product": { "type": "string", "minLength": 1 },
+          "source_artifact_path": { "type": "string", "minLength": 1 },
+          "proof_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id"],
+              "properties": {
+                "record_id": { "type": "string", "minLength": 1 },
+                "record_hash": { "type": "string" },
+                "record_type": { "type": "string" }
+              }
+            }
+          },
+          "remaining_gap_reason_codes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "approval_fatigue_signals": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

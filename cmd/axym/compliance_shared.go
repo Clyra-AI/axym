@@ -10,6 +10,7 @@ import (
 	"github.com/Clyra-AI/axym/core/compliance/threshold"
 	"github.com/Clyra-AI/axym/core/config"
 	"github.com/Clyra-AI/axym/core/store"
+	"github.com/Clyra-AI/proof"
 )
 
 type complianceRun struct {
@@ -17,6 +18,7 @@ type complianceRun struct {
 	matchResult    match.Result
 	coverageReport coverage.Report
 	thresholdEval  threshold.Evaluation
+	records        []proof.Record
 }
 
 func runCompliance(frameworkIDs []string, storeDir string, policy threshold.PolicyConfig, thresholdOverride *float64) (complianceRun, error) {
@@ -41,6 +43,7 @@ func runCompliance(frameworkIDs []string, storeDir string, policy threshold.Poli
 		matchResult:    matchResult,
 		coverageReport: coverageReport,
 		thresholdEval:  thresholdEval,
+		records:        append([]proof.Record(nil), chain.Records...),
 	}, nil
 }
 

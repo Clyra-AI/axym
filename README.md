@@ -14,6 +14,9 @@ Axym sits between your runtime and your audit output:
 - Axym collects, ingests, or appends that evidence locally.
 - Axym maps the resulting proof chain to frameworks, ranks gaps, and assembles audit bundles.
 
+Gait enforces runtime controls. Wrkr inventories ownership and posture. Proof verifies signatures and chain integrity. Axym correlates, maps, and packages that evidence into deterministic auditor and insurer artifacts.
+Axym does not block, freeze, broker, or sandbox execution.
+
 Axym does not replace IAM, PAM, or IGA systems. The OSS CLI distinguishes built-in collection, plugin collection, manual proof-record append, and sibling ingest.
 
 ## Install
@@ -103,7 +106,7 @@ Use this when you are wiring Axym into your actual runtime, CI, or sibling gover
 - Plugin collectors: `./axym collect --json --plugin "./my-collector"`.
 - Manual record append: `./axym record add --input ./my-record.json --json`.
 - Authoritative contract: [schemas/v1/record/README.md](schemas/v1/record/README.md).
-- Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --source gait --json --input ./gait-pack`.
+- Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --gait-pack ./gait-pack --json`.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
@@ -121,7 +124,7 @@ Operator detail lives in [docs/operator/quickstart.md](docs/operator/quickstart.
 ./axym collect --json --governance-event-file ./events.jsonl
 ./axym record add --input ./my-record.json --json
 ./axym ingest --source wrkr --json --input ./wrkr-records.jsonl
-./axym ingest --source gait --json --input ./gait-pack
+./axym ingest --gait-pack ./gait-pack --json
 ./axym map --frameworks eu-ai-act,soc2 --json
 ./axym gaps --frameworks eu-ai-act,soc2 --json
 ./axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json
@@ -139,17 +142,19 @@ Axym validates the manual input envelope locally, normalizes compatibility-only 
 
 `collect` emits deterministic per-source summaries (`sources[]`) with `reason_codes`, reports `governanceevent` as `NO_INPUT` on clean-room dry runs with no event files, supports non-blocking collector failures, and keeps malformed plugin and governance payloads out of the proof chain.
 
-`ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes.
+`ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes, authorization bundles, and structured control artifacts through `--gait-pack`.
 
 `map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes.
 
 `gaps` ranks `partial` and `gap` controls with deterministic remediation and auditability grade output.
 
 `bundle` assembles deterministic artifact sets, signs the manifest with local proof keys, and enforces managed output path safety.
+When Gait runtime-control evidence is present, bundles add `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json`.
 
 `verify --chain` reports deterministic local integrity for both append-only chain linkage and Axym-managed record signatures.
 
 `verify --bundle` reports manifest-signature verification, per-record signature verification for Axym-authored bundles, and deterministic compliance-completeness checks without creating store-managed temp artifacts.
+For bundles that declare runtime-control artifacts, `verify --bundle` recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` from the bundled proof evidence and fails closed on drift or schema violations.
 
 ## Context engineering evidence
 

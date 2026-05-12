@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://axym.dev/schemas/v1/bundle/enforcement-explain-register-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "type": "string", "const": "v1" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bundle_id", "artifact_id", "status", "source_product", "source_artifact_path", "proof_refs"],
+        "properties": {
+          "bundle_id": { "type": "string", "minLength": 1 },
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["verified", "partial"] },
+          "decision": { "type": "string" },
+          "missing_fields": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "credential_posture": { "type": "string" },
+          "freeze_state": { "type": "string" },
+          "kill_switch_state": { "type": "string" },
+          "sandbox_state": { "type": "string" },
+          "source_product": { "type": "string", "minLength": 1 },
+          "source_artifact_path": { "type": "string", "minLength": 1 },
+          "proof_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id"],
+              "properties": {
+                "record_id": { "type": "string", "minLength": 1 },
+                "record_hash": { "type": "string" },
+                "record_type": { "type": "string" }
+              }
+            }
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

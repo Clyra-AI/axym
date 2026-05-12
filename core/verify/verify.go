@@ -55,13 +55,14 @@ type ChainResult struct {
 }
 
 type BundleResult struct {
-	Path               string         `json:"path"`
-	Files              int            `json:"files"`
-	Algo               string         `json:"algo"`
-	Cryptographic      bool           `json:"cryptographic"`
-	ComplianceVerified bool           `json:"compliance_verified"`
-	OSCALValid         bool           `json:"oscal_valid"`
-	Compliance         map[string]any `json:"compliance,omitempty"`
+	Path               string           `json:"path"`
+	Files              int              `json:"files"`
+	Algo               string           `json:"algo"`
+	Cryptographic      bool             `json:"cryptographic"`
+	ComplianceVerified bool             `json:"compliance_verified"`
+	OSCALValid         bool             `json:"oscal_valid"`
+	DerivedArtifacts   []map[string]any `json:"derived_artifacts,omitempty"`
+	Compliance         map[string]any   `json:"compliance,omitempty"`
 }
 
 func VerifyChainFromStoreDir(storeDir string) (ChainResult, error) {
@@ -143,6 +144,13 @@ func VerifyBundle(path string, frameworkIDs []string) (BundleResult, error) {
 	if !result.ComplianceVerified {
 		compliance = nil
 	}
+	derivedArtifacts := make([]map[string]any, 0, len(result.DerivedArtifacts))
+	for _, item := range result.DerivedArtifacts {
+		derivedArtifacts = append(derivedArtifacts, map[string]any{
+			"name":     item.Name,
+			"verified": item.Verified,
+		})
+	}
 	return BundleResult{
 		Path:               result.Path,
 		Files:              result.Files,
@@ -150,6 +158,7 @@ func VerifyBundle(path string, frameworkIDs []string) (BundleResult, error) {
 		Cryptographic:      result.Cryptographic,
 		ComplianceVerified: result.ComplianceVerified,
 		OSCALValid:         result.OSCALValid,
+		DerivedArtifacts:   derivedArtifacts,
 		Compliance:         compliance,
 	}, nil
 }

@@ -126,6 +126,54 @@ func TestIngestGaitNoInputContract(t *testing.T) {
 	}
 }
 
+func TestIngestGaitPackAliasReportsAuthorizationBundleCounts(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	inputDir := filepath.Join(root, "gait")
+	if err := os.MkdirAll(inputDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(inputDir, "authorization-bundle.json"), []byte(`{
+  "artifact_type": "gate_authorization_bundle",
+  "artifact_id": "artifact-1",
+  "bundle_id": "bundle-1",
+  "timestamp": "2026-05-12T17:00:00Z",
+  "decision": "allow",
+  "credential_posture": {
+    "standing_credential_blocked": true,
+    "jit_required": true,
+    "broker_source": "gait-broker",
+    "issuer": "issuer-a",
+    "ttl_seconds": 600,
+    "scope": "payments.write",
+    "binding_proof_ref": "binding://proof-1"
+  }
+}`), 0o600); err != nil {
+		t.Fatalf("write auth artifact: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--gait-pack", inputDir, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	result, _ := data["result"].(map[string]any)
+	if result["authorization_bundles"] != float64(1) {
+		t.Fatalf("expected authorization_bundles=1 output=%s", stdout.String())
+	}
+	if result["control_artifacts"] != float64(1) {
+		t.Fatalf("expected control_artifacts=1 output=%s", stdout.String())
+	}
+}
+
 func TestIngestUsesCommandContextCancellation(t *testing.T) {
 	t.Parallel()
 
