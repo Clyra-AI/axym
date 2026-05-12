@@ -53,7 +53,10 @@ func Read(path string) (Result, error) {
 			return Result{}, err
 		}
 		if len(artifacts) == 0 {
-			return Result{}, fmt.Errorf("unsupported gait source artifact file %s", cleaned)
+			return Result{}, &translate.Error{
+				ReasonCode: translate.ReasonInvalidAuthorizationArtifact,
+				Message:    fmt.Sprintf("unsupported gait source artifact file %s", cleaned),
+			}
 		}
 		return Result{Artifacts: artifacts}, nil
 	}

@@ -276,6 +276,25 @@ func TestVerifyFailsDerivedArtifactDrift(t *testing.T) {
 	}
 }
 
+func TestVerifySkipsUndeclaredDerivedArtifacts(t *testing.T) {
+	t.Parallel()
+
+	storeDir, outDir := setupDerivedBundleFixture(t)
+	if err := os.Remove(filepath.Join(outDir, "control-maturity.json")); err != nil {
+		t.Fatalf("remove control-maturity artifact: %v", err)
+	}
+	if err := removeManifestEntry(outDir, "control-maturity.json"); err != nil {
+		t.Fatalf("remove manifest entry: %v", err)
+	}
+	if err := resignManifest(storeDir, outDir); err != nil {
+		t.Fatalf("resign manifest: %v", err)
+	}
+
+	if _, err := verifybundle.Verify(outDir, []string{"eu-ai-act", "soc2"}); err != nil {
+		t.Fatalf("Verify should ignore undeclared derived artifact: %v", err)
+	}
+}
+
 func updateManifestHash(bundleDir string, relPath string) error {
 	payload, err := os.ReadFile(filepath.Join(bundleDir, filepath.FromSlash(relPath)))
 	if err != nil {
@@ -306,6 +325,38 @@ func updateManifestHash(bundleDir string, relPath string) error {
 			entry["sha256"] = want
 		}
 	}
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(manifestPath, out, 0o600)
+}
+
+func removeManifestEntry(bundleDir string, relPath string) error {
+	manifestPath := filepath.Join(bundleDir, "manifest.json")
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return err
+	}
+	var manifest struct {
+		Files []struct {
+			Path   string `json:"path"`
+			SHA256 string `json:"sha256"`
+		} `json:"files"`
+		Signatures []any  `json:"signatures,omitempty"`
+		AlgoID     string `json:"algo_id,omitempty"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return err
+	}
+	filtered := manifest.Files[:0]
+	for _, file := range manifest.Files {
+		if file.Path == relPath {
+			continue
+		}
+		filtered = append(filtered, file)
+	}
+	manifest.Files = filtered
 	out, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err

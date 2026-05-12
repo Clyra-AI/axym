@@ -174,6 +174,32 @@ func TestIngestGaitPackAliasReportsAuthorizationBundleCounts(t *testing.T) {
 	}
 }
 
+func TestIngestGaitPackRejectsUnsupportedStandaloneJSONAsInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	storeDir := filepath.Join(root, "store")
+	inputPath := filepath.Join(root, "unsupported.json")
+	if err := os.WriteFile(inputPath, []byte(`{"hello":"world"}`), 0o600); err != nil {
+		t.Fatalf("write unsupported input: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--gait-pack", inputPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d stderr=%s stdout=%s", exit, exitInvalidInput, stderr.String(), stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode json: %v output=%s", err, stdout.String())
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != "GAIT_INVALID_AUTHORIZATION_ARTIFACT" {
+		t.Fatalf("reason mismatch: got %v output=%s", errObj["reason"], stdout.String())
+	}
+}
+
 func TestIngestUsesCommandContextCancellation(t *testing.T) {
 	t.Parallel()
 
