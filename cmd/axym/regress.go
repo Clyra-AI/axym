@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/bundleartifacts"
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/regress"
 	"github.com/spf13/cobra"
@@ -48,9 +49,10 @@ func newRegressInitCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) 
 				return emitRegressError(err, "regress", stdout, stderr, global)
 			}
 			result, err := regress.Init(regress.InitRequest{
-				BaselinePath:   baselinePath,
-				CoverageReport: run.coverageReport,
-				Now:            time.Now().UTC().Truncate(time.Second),
+				BaselinePath:    baselinePath,
+				CoverageReport:  run.coverageReport,
+				ControlMaturity: bundleartifacts.Build(run.records).ControlMaturity,
+				Now:             time.Now().UTC().Truncate(time.Second),
 			})
 			if err != nil {
 				return emitRegressError(err, "regress", stdout, stderr, global)
@@ -95,8 +97,9 @@ func newRegressRunCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 				return emitRegressError(err, "regress", stdout, stderr, global)
 			}
 			result, err := regress.Run(regress.RunRequest{
-				BaselinePath:   baselinePath,
-				CoverageReport: run.coverageReport,
+				BaselinePath:    baselinePath,
+				CoverageReport:  run.coverageReport,
+				ControlMaturity: bundleartifacts.Build(run.records).ControlMaturity,
 			})
 			if err != nil {
 				return emitRegressError(err, "regress", stdout, stderr, global)

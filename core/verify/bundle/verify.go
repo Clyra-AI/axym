@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Clyra-AI/axym/core/bundleartifacts"
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/compliance/match"
@@ -53,13 +54,19 @@ func (e *Error) Unwrap() error {
 }
 
 type Result struct {
-	Path               string     `json:"path"`
-	Files              int        `json:"files"`
-	Algo               string     `json:"algo"`
-	Cryptographic      bool       `json:"cryptographic"`
-	ComplianceVerified bool       `json:"compliance_verified"`
-	OSCALValid         bool       `json:"oscal_valid"`
-	Compliance         Compliance `json:"compliance,omitempty"`
+	Path               string                        `json:"path"`
+	Files              int                           `json:"files"`
+	Algo               string                        `json:"algo"`
+	Cryptographic      bool                          `json:"cryptographic"`
+	ComplianceVerified bool                          `json:"compliance_verified"`
+	OSCALValid         bool                          `json:"oscal_valid"`
+	DerivedArtifacts   []DerivedArtifactVerification `json:"derived_artifacts,omitempty"`
+	Compliance         Compliance                    `json:"compliance,omitempty"`
+}
+
+type DerivedArtifactVerification struct {
+	Name     string `json:"name"`
+	Verified bool   `json:"verified"`
 }
 
 type Compliance struct {
@@ -171,6 +178,10 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	if err := verifyIdentityArtifacts(path, chain.Records); err != nil {
 		return Result{}, err
 	}
+	derivedArtifacts, err := verifyDerivedArtifacts(path, chain.Records)
+	if err != nil {
+		return Result{}, err
+	}
 
 	// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
 	gradeArtifactRaw, err := os.ReadFile(filepath.Join(path, "auditability-grade.yaml"))
@@ -198,6 +209,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 
 	result.ComplianceVerified = true
 	result.OSCALValid = true
+	result.DerivedArtifacts = derivedArtifacts
 	result.Compliance = recomputed
 	return result, nil
 }
@@ -330,4 +342,73 @@ func normalizeFrameworkIDs(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func verifyDerivedArtifacts(path string, records []proof.Record) ([]DerivedArtifactVerification, error) {
+	files, err := bundleartifacts.Build(records).Files()
+	if err != nil {
+		return nil, &Error{ReasonCode: ReasonBundleVerify, Message: "marshal derived artifacts", ExitCode: 2, Err: err}
+	}
+	known := []string{
+		bundleartifacts.FileAuthorizationRegister,
+		bundleartifacts.FileInsuranceEvidenceProfile,
+		bundleartifacts.FileCredentialPosture,
+		bundleartifacts.FileFreezeWindowCoverage,
+		bundleartifacts.FileKillSwitchCoverage,
+		bundleartifacts.FileEnforcementExplain,
+		bundleartifacts.FileSandboxCoverage,
+		bundleartifacts.FileControlMaturity,
+	}
+	statuses := make([]DerivedArtifactVerification, 0, len(files))
+	for _, rel := range known {
+		wantRaw, expected := files[rel]
+		// #nosec G304 -- bundle verification intentionally reads artifacts from the explicit bundle root.
+		gotRaw, err := os.ReadFile(filepath.Join(path, rel))
+		if !expected {
+			if err == nil {
+				return nil, &Error{ReasonCode: ReasonBundleCompleteness, Message: "unexpected derived artifact declared in bundle: " + rel, ExitCode: 2}
+			}
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, &Error{ReasonCode: ReasonInvalidInput, Message: "read derived artifact " + rel, ExitCode: 6, Err: err}
+		}
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing derived artifact " + rel, ExitCode: 2, Err: err}
+			}
+			return nil, &Error{ReasonCode: ReasonInvalidInput, Message: "read derived artifact " + rel, ExitCode: 6, Err: err}
+		}
+		if err := validateDerivedArtifact(rel, gotRaw); err != nil {
+			return nil, &Error{ReasonCode: ReasonSchemaViolation, Message: "derived artifact schema validation failed for " + rel, ExitCode: 3, Err: err}
+		}
+		if string(gotRaw) != string(wantRaw) {
+			return nil, &Error{ReasonCode: ReasonBundleCompleteness, Message: "derived artifact does not match recomputed output: " + rel, ExitCode: 2}
+		}
+		statuses = append(statuses, DerivedArtifactVerification{Name: rel, Verified: true})
+	}
+	return statuses, nil
+}
+
+func validateDerivedArtifact(name string, payload []byte) error {
+	switch name {
+	case bundleartifacts.FileAuthorizationRegister:
+		return bundleschema.ValidateAuthorizationRegister(payload)
+	case bundleartifacts.FileInsuranceEvidenceProfile:
+		return bundleschema.ValidateInsuranceEvidenceProfile(payload)
+	case bundleartifacts.FileCredentialPosture:
+		return bundleschema.ValidateCredentialPostureRegister(payload)
+	case bundleartifacts.FileFreezeWindowCoverage:
+		return bundleschema.ValidateFreezeWindowCoverage(payload)
+	case bundleartifacts.FileKillSwitchCoverage:
+		return bundleschema.ValidateKillSwitchCoverage(payload)
+	case bundleartifacts.FileEnforcementExplain:
+		return bundleschema.ValidateEnforcementExplainRegister(payload)
+	case bundleartifacts.FileSandboxCoverage:
+		return bundleschema.ValidateSandboxCoverage(payload)
+	case bundleartifacts.FileControlMaturity:
+		return bundleschema.ValidateControlMaturity(payload)
+	default:
+		return nil
+	}
 }

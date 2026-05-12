@@ -56,7 +56,28 @@
           }
         }
       }
+    },
+    "control_maturity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "current_stage": {
+            "type": "string"
+          },
+          "remaining_gap_reason_codes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        }
+      }
     }
   }
 }
-

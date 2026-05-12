@@ -20,6 +20,7 @@ const reasonIngestChainReadFailed = "INGEST_CHAIN_READ_FAILED"
 func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobra.Command {
 	var source string
 	var inputPaths []string
+	var gaitPacks []string
 	var storeDir string
 	var stateDir string
 	var sessionGapThreshold time.Duration
@@ -29,8 +30,16 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 		Short: "Ingest sibling proof artifacts (Wrkr, Gait)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			selectedSource := strings.ToLower(strings.TrimSpace(source))
+			normalizedGaitPacks := compactStrings(gaitPacks)
+			if len(normalizedGaitPacks) > 0 {
+				if selectedSource != "" && selectedSource != "gait" {
+					return emitIngestInvalidInput("--gait-pack may only be used with --source gait", stdout, stderr, global)
+				}
+				selectedSource = "gait"
+				inputPaths = append(append([]string(nil), inputPaths...), normalizedGaitPacks...)
+			}
 			if selectedSource == "" {
-				return emitIngestInvalidInput("source is required (wrkr|gait)", stdout, stderr, global)
+				return emitIngestInvalidInput("source is required (wrkr|gait), or provide --gait-pack", stdout, stderr, global)
 			}
 			resolvedStateDir := strings.TrimSpace(stateDir)
 			if resolvedStateDir == "" {
@@ -110,6 +119,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 
 	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait)")
 	cmd.Flags().StringSliceVar(&inputPaths, "input", nil, "Input file or directory path(s)")
+	cmd.Flags().StringSliceVar(&gaitPacks, "gait-pack", nil, "Gait pack or source artifact path(s); implies --source gait")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "Path to ingest state directory (defaults to --store-dir)")
 	cmd.Flags().DurationVar(&sessionGapThreshold, "session-gap-threshold", 30*time.Minute, "Maximum allowed time between adjacent records before signaling CHAIN_SESSION_GAP")
@@ -170,7 +180,7 @@ func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *glob
 			_, _ = fmt.Fprintln(stderr, gaitErr.Error())
 		}
 		code := exitRuntimeFailure
-		if gaitErr.ReasonCode == gait.ReasonInvalidInput {
+		if gaitInvalidInputReason(gaitErr.ReasonCode) {
 			code = exitInvalidInput
 		}
 		return &cliError{code: code, msg: gaitErr.Error()}
@@ -203,4 +213,28 @@ func emitIngestInvalidInput(message string, stdout io.Writer, stderr io.Writer, 
 		_, _ = fmt.Fprintln(stderr, message)
 	}
 	return &cliError{code: exitInvalidInput, msg: message}
+}
+
+func compactStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func gaitInvalidInputReason(reason string) bool {
+	switch reason {
+	case gait.ReasonInvalidInput,
+		"GAIT_INVALID_AUTHORIZATION_ARTIFACT",
+		"GAIT_MISSING_AUTHORIZATION_BUNDLE_ID",
+		"GAIT_DUPLICATE_AUTHORIZATION_BUNDLE_ID",
+		"GAIT_UNSUPPORTED_AUTHORIZATION_PROFILE_VERSION",
+		"GAIT_UNVERIFIABLE_LINKED_REFS":
+		return true
+	default:
+		return false
+	}
 }

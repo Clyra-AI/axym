@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -74,6 +76,127 @@ func TestReadZipPack(t *testing.T) {
 	}
 }
 
+func TestReadDirectoryDetectsAuthorizationBundle(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	authDir := filepath.Join(dir, "authorization")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	writeProofFile(t, filepath.Join(dir, "proof_records.jsonl"))
+	writeAuthorizationArtifact(t, filepath.Join(authDir, "bundle.json"), map[string]any{
+		"artifact_type":       "gate_authorization_bundle",
+		"artifact_id":         "auth-artifact-1",
+		"bundle_id":           "bundle-1",
+		"timestamp":           "2026-05-12T17:00:00Z",
+		"decision":            "allow",
+		"trace_id":            "trace-1",
+		"intent_digest":       "sha256:intent-1",
+		"policy_digest":       "sha256:policy-1",
+		"schema_version":      "v1",
+		"approval_audit_refs": []string{"approval://chg-1"},
+	})
+
+	result, err := Read(dir)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(result.Artifacts) != 1 {
+		t.Fatalf("expected 1 source artifact, got %+v", result.Artifacts)
+	}
+	if result.Artifacts[0].Kind() != translate.ArtifactTypeAuthorizationBundle {
+		t.Fatalf("artifact kind mismatch: %+v", result.Artifacts[0])
+	}
+	if got := result.Artifacts[0].Base().SourceArtifactPath; got != "authorization/bundle.json" {
+		t.Fatalf("source path mismatch: got %q", got)
+	}
+}
+
+func TestReadZipOrdersAuthorizationBundlesDeterministically(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	zipPath := filepath.Join(root, "pack.zip")
+
+	file, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("create zip: %v", err)
+	}
+	writer := zip.NewWriter(file)
+	for _, item := range []struct {
+		name     string
+		bundleID string
+	}{
+		{name: "z/bundle-z.json", bundleID: "bundle-z"},
+		{name: "a/bundle-a.json", bundleID: "bundle-a"},
+	} {
+		entry, err := writer.Create(item.name)
+		if err != nil {
+			t.Fatalf("create zip entry: %v", err)
+		}
+		payload, err := json.Marshal(map[string]any{
+			"artifact_type": "gate_authorization_bundle",
+			"artifact_id":   item.bundleID + "-artifact",
+			"bundle_id":     item.bundleID,
+			"timestamp":     "2026-05-12T17:00:00Z",
+			"decision":      "allow",
+		})
+		if err != nil {
+			t.Fatalf("marshal auth payload: %v", err)
+		}
+		if _, err := entry.Write(payload); err != nil {
+			t.Fatalf("write zip entry: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close zip file: %v", err)
+	}
+
+	result, err := Read(zipPath)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	got := make([]string, 0, len(result.Artifacts))
+	for _, artifact := range result.Artifacts {
+		got = append(got, artifact.BundleID())
+	}
+	want := append([]string(nil), got...)
+	sort.Strings(want)
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected deterministic sorted bundle ids, got=%v want=%v", got, want)
+	}
+}
+
+func TestReadRejectsDuplicateAuthorizationBundleIDs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeAuthorizationArtifact(t, filepath.Join(dir, "bundle-a.json"), map[string]any{
+		"artifact_type": "gate_authorization_bundle",
+		"artifact_id":   "artifact-a",
+		"bundle_id":     "duplicate-bundle",
+		"timestamp":     "2026-05-12T17:00:00Z",
+	})
+	writeAuthorizationArtifact(t, filepath.Join(dir, "bundle-b.json"), map[string]any{
+		"artifact_type": "gate_authorization_bundle",
+		"artifact_id":   "artifact-b",
+		"bundle_id":     "duplicate-bundle",
+		"timestamp":     "2026-05-12T17:01:00Z",
+	})
+
+	_, err := Read(dir)
+	if err == nil {
+		t.Fatal("expected duplicate bundle id error")
+	}
+	if !strings.Contains(err.Error(), translate.ReasonDuplicateAuthorizationBundleID) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestReadDirectoryPackRejectsEmptyDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -97,6 +220,7 @@ func buildProofLine(t *testing.T) string {
 		Source:        "gait",
 		SourceProduct: "gait",
 		Type:          "approval",
+		AgentID:       "agent://gait",
 		Event: map[string]any{
 			"decision": "allow",
 		},
@@ -110,4 +234,15 @@ func buildProofLine(t *testing.T) string {
 		t.Fatalf("marshal record: %v", err)
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+func writeAuthorizationArtifact(t *testing.T, path string, payload map[string]any) {
+	t.Helper()
+	raw, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal auth artifact: %v", err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatalf("write auth artifact: %v", err)
+	}
 }

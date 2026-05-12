@@ -11,6 +11,7 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 - `init --sample-pack <dir>` for a supported offline first-value path that produces non-empty local evidence and compliance results.
 - Launch-facing docs that separate `smoke test`, `sample proof path`, and `real integration path`.
 - Root `LICENSE`, governance assets, issue templates, and PR template for the public OSS baseline.
+- [semver:minor] First-class Gait authorization bundle and `--gait-pack` ingest support, plus runtime-control bundle artifacts: `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json`.
 
 ### Changed
 
@@ -19,3 +20,4 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 - Clarified contributor full-gate and release-local prerequisites, plus the explicit private and fallback public security reporting paths.
 - Added an authoritative public `record add` contract under `schemas/v1/record/`, normalized compatibility-only `record_version: "1.0"` inputs to canonical `v1`, and locked `schema_violation` JSON behavior for payload contract failures.
 - Reconciled release docs and contracts with the hosted workflow: GoReleaser `v2.14.1`, local `dist/local-cosign.pub` verification for maintainer gates, and GitHub OIDC plus `dist/checksums.txt.pem` for hosted tag releases.
+- [semver:minor] Extended `verify --bundle` to recompute declared insurer-facing runtime-control artifacts and fail closed on drift, schema violations, or missing required Gait/Wrkr/Proof evidence classes.

@@ -34,3 +34,28 @@ func TestProductIdentityContract(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicDocsPreserveSourceOfTruthBoundary(t *testing.T) {
+	t.Parallel()
+
+	required := []string{
+		"Gait enforces",
+		"Wrkr inventories",
+		"Proof verifies",
+		"Axym correlates",
+		"does not block, freeze, broker, or sandbox execution",
+	}
+	for _, path := range []string{
+		"README.md",
+		"docs/commands/axym.md",
+		"docs/operator/integration-model.md",
+		"docs-site/public/llm/axym.md",
+	} {
+		doc := readRepoFile(t, path)
+		for _, snippet := range required {
+			if !strings.Contains(doc, snippet) {
+				t.Fatalf("%s missing source-of-truth snippet %q", path, snippet)
+			}
+		}
+	}
+}

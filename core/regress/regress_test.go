@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Clyra-AI/axym/core/bundleartifacts"
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
 )
 
@@ -48,6 +49,36 @@ func TestRunDetectsDeterministicDriftOrdering(t *testing.T) {
 	}
 }
 
+func TestRunDetectsControlMaturityRegression(t *testing.T) {
+	t.Parallel()
+
+	baselinePath := filepath.Join(t.TempDir(), "baseline.json")
+	if _, err := Init(InitRequest{
+		BaselinePath:    baselinePath,
+		CoverageReport:  fixtureCoverage("covered"),
+		ControlMaturity: fixtureMaturity("brokered_write"),
+	}); err != nil {
+		t.Fatalf("init baseline: %v", err)
+	}
+	result, err := Run(RunRequest{
+		BaselinePath:    baselinePath,
+		CoverageReport:  fixtureCoverage("covered"),
+		ControlMaturity: fixtureMaturity("approval_gated_write"),
+	})
+	if err != nil {
+		t.Fatalf("run baseline: %v", err)
+	}
+	if !result.DriftDetected {
+		t.Fatalf("expected drift detected: %+v", result)
+	}
+	if len(result.MaturityRegressions) != 1 {
+		t.Fatalf("expected one maturity regression: %+v", result)
+	}
+	if result.MaturityRegressions[0].Path != "proc.exec" {
+		t.Fatalf("path mismatch: %+v", result.MaturityRegressions)
+	}
+}
+
 func fixtureCoverage(status string) coverage.Report {
 	return coverage.Report{
 		Frameworks: []coverage.FrameworkCoverage{
@@ -61,6 +92,26 @@ func fixtureCoverage(status string) coverage.Report {
 						Status:      status,
 						ReasonCodes: []string{"CONTROL_" + status},
 					},
+				},
+			},
+		},
+	}
+}
+
+func fixtureMaturity(stage string) *bundleartifacts.ControlMaturity {
+	return &bundleartifacts.ControlMaturity{
+		Version: "v1",
+		Entries: []bundleartifacts.ControlMaturityEntry{
+			{
+				Path:               "proc.exec",
+				BundleID:           "bundle-1",
+				ArtifactID:         "trust-1",
+				CurrentStage:       stage,
+				Drift:              "unchanged",
+				SourceProduct:      "gait",
+				SourceArtifactPath: "authorization-bundle.json",
+				ProofRefs: []bundleartifacts.LinkedProofRef{
+					{RecordID: "prf-1"},
 				},
 			},
 		},

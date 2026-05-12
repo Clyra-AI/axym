@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Clyra-AI/axym/core/bundleartifacts"
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/compliance/match"
@@ -221,6 +222,17 @@ func Build(req BuildRequest) (Result, error) {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal delegated-chain exceptions", ExitCode: 1, Err: err}
 	}
 	artifacts["delegated-chain-exceptions.json"] = delegatedRaw
+
+	derivedArtifacts, err := bundleartifacts.Build(recordSnapshot).Files()
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal derived bundle artifacts", ExitCode: 1, Err: err}
+	}
+	for rel, payload := range derivedArtifacts {
+		if err := validateDerivedArtifact(rel, payload); err != nil {
+			return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "validate derived artifact schema " + rel, ExitCode: 3, Err: err}
+		}
+		artifacts[rel] = payload
+	}
 
 	executiveSummary := struct {
 		Version        string     `json:"version"`
@@ -504,6 +516,29 @@ func cloneChain(in *proof.Chain) (*proof.Chain, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+func validateDerivedArtifact(name string, payload []byte) error {
+	switch name {
+	case bundleartifacts.FileAuthorizationRegister:
+		return bundleschema.ValidateAuthorizationRegister(payload)
+	case bundleartifacts.FileInsuranceEvidenceProfile:
+		return bundleschema.ValidateInsuranceEvidenceProfile(payload)
+	case bundleartifacts.FileCredentialPosture:
+		return bundleschema.ValidateCredentialPostureRegister(payload)
+	case bundleartifacts.FileFreezeWindowCoverage:
+		return bundleschema.ValidateFreezeWindowCoverage(payload)
+	case bundleartifacts.FileKillSwitchCoverage:
+		return bundleschema.ValidateKillSwitchCoverage(payload)
+	case bundleartifacts.FileEnforcementExplain:
+		return bundleschema.ValidateEnforcementExplainRegister(payload)
+	case bundleartifacts.FileSandboxCoverage:
+		return bundleschema.ValidateSandboxCoverage(payload)
+	case bundleartifacts.FileControlMaturity:
+		return bundleschema.ValidateControlMaturity(payload)
+	default:
+		return nil
+	}
 }
 
 func buildExecutiveSummaryPDF(audit string, frameworks []string, recordCount int, report coverage.Report, gapReport gaps.Report) []byte {

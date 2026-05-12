@@ -5,6 +5,8 @@ Axym is a deterministic CLI for platform, security, and GRC engineers who need l
 ## Where it fits
 
 Axym sits after your runtime or CI evidence sources. Your code, providers, MCP servers, sibling systems, and IAM/PAM/IGA systems stay upstream; Axym collects, ingests, or appends structured evidence locally, then maps it and bundles it for audit use around the action-governance seam.
+Gait enforces runtime controls. Wrkr inventories ownership and posture. Proof verifies signatures and chain integrity. Axym correlates, maps, and packages that evidence.
+Axym does not block, freeze, broker, or sandbox execution.
 
 Operator walkthroughs live in [../../../docs/operator/quickstart.md](../../../docs/operator/quickstart.md) and [../../../docs/operator/integration-model.md](../../../docs/operator/integration-model.md).
 
@@ -73,7 +75,7 @@ Expected outcome:
 - Plugin collectors: `./axym collect --json --plugin "<cmd>"`.
 - Manual record append: `./axym record add --input <record.json> --json`.
 - Authoritative contract: [../../../schemas/v1/record/README.md](../../../schemas/v1/record/README.md).
-- Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --source gait --input <path> --json`.
+- Sibling ingest: `./axym ingest --source wrkr --input <path> --json` and `./axym ingest --gait-pack <path> --json`.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
@@ -98,12 +100,14 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - `./axym review --date 2026-09-15 --json`: emits deterministic daily review pack output with exception classes and grade distribution summaries.
 - `./axym override create --bundle Q3-2026 --reason "<reason>" --signer ops-key --json`: appends signed override artifacts and proof evidence.
 - `./axym ingest --source wrkr --input <path> --json`: ingests sibling evidence from Wrkr/Gait payloads with deterministic append/dedupe/reject counters.
+- `./axym ingest --gait-pack <path> --json`: ingests Gait native/proof packs plus authorization bundles and structured control artifacts with deterministic translation and bundle counts.
 - `./axym replay --model payments-agent --tier A --json`: emits deterministic replay-certification evidence for review workflows.
-- `./axym bundle --audit <name> --frameworks eu-ai-act,soc2 --json`: assembles deterministic signed audit bundles with executive summary (`.json` + `.pdf`), identity-governance artifacts, chain verification, and OSCAL export.
+- `./axym bundle --audit <name> --frameworks eu-ai-act,soc2 --json`: assembles deterministic signed audit bundles with executive summary (`.json` + `.pdf`), identity-governance artifacts, chain verification, OSCAL export, and when Gait control evidence exists: `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json`.
 - `./axym map --json` and `./axym gaps --json`: default to frameworks `eu-ai-act,soc2` when `--frameworks` is omitted.
 - `./axym map --frameworks eu-ai-act --min-coverage 0.80 --json`: enforces threshold policy and exits non-zero when coverage is below threshold.
 - `./axym verify --chain --json`: verifies local append-only chain integrity plus Axym-managed record signatures.
 - `./axym verify --bundle <path> --json`: verifies bundle manifest signatures, Axym-authored record signatures, and deterministic bundle compliance-completeness checks, including identity-governance artifact consistency, without writing store-managed temp artifacts.
+  It recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` when they are declared in the bundle.
 
 ## Contributor gates
 
