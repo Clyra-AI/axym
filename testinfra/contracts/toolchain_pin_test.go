@@ -33,7 +33,7 @@ func TestToolVersionsPinned(t *testing.T) {
 
 	content := readRepoFile(t, ".tool-versions")
 	expected := []string{
-		"golang 1.26.1",
+		"golang 1.26.3",
 		"python 3.13.0",
 		"nodejs 22.0.0",
 	}

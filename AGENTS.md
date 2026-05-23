@@ -1,7 +1,7 @@
 # AGENTS.md - Axym Repository Guide
 
 Version: 1.0  
-Last Updated: 2026-02-28  
+Last Updated: 2026-05-23  
 Scope: This repository (`axym`) only.
 
 ## 1) Scope and Intent
@@ -104,7 +104,7 @@ CLI output expectations:
 
 - Go is primary runtime language (single static binary model).
 - Target toolchain versions:
-  - Go `1.26.1`
+  - Go `1.26.3`
   - Python `3.13+` (scripts/tools)
   - Node `22+` (docs/UI only; not core runtime logic)
 - Use exact/pinned dependency versions where applicable.
