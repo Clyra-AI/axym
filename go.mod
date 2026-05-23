@@ -1,6 +1,6 @@
 module github.com/Clyra-AI/axym
 
-go 1.26.1
+go 1.26.3
 
 require (
 	github.com/Clyra-AI/proof v0.4.6

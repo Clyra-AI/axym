@@ -85,9 +85,13 @@ func TestPluginRelationshipOutputAccepted(t *testing.T) {
 	relationship := result.Candidates[0].Relationship
 	if relationship == nil {
 		t.Fatal("expected relationship to be preserved")
-	}
-	if relationship.ParentRef == nil || relationship.ParentRef.Kind != "trace" || relationship.ParentRef.ID != "trace-123" {
-		t.Fatalf("parent ref mismatch: %+v", relationship)
+	} else {
+		parentRef := relationship.ParentRef
+		if parentRef == nil {
+			t.Fatalf("parent ref mismatch: %+v", relationship)
+		} else if parentRef.Kind != "trace" || parentRef.ID != "trace-123" {
+			t.Fatalf("parent ref mismatch: %+v", relationship)
+		}
 	}
 	foundResource := false
 	for _, ref := range relationship.EntityRefs {
