@@ -63,8 +63,8 @@ Expected outcome:
 - The sample pack is created locally with no network dependency and no repo fixture dependency.
 - `collect` captures `4` governance events from the bundled sample pack.
 - The local chain ends with `6` total records after the manual approval and risk assessment append.
-- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
-- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `map` reports `6` covered controls out of `10` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving controls `article-15`, `article-26`, `cc7.1`, `cc8.1` as the remaining sample gaps.
 - `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
 - The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
 - `verify --chain --json` reports an intact `6`-record chain.
@@ -108,6 +108,8 @@ Public launch docs should also not position Axym as an IAM/PAM/IGA replacement o
 - `./axym verify --chain --json`: verifies local append-only chain integrity plus Axym-managed record signatures.
 - `./axym verify --bundle <path> --json`: verifies bundle manifest signatures, Axym-authored record signatures, and deterministic bundle compliance-completeness checks, including identity-governance artifact consistency, without writing store-managed temp artifacts.
   It recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` when they are declared in the bundle.
+
+Proof `v0.5.0` evidence sets are alternative ways to satisfy a control. Axym requires every record type within one set and applies that set's source-product, field, and frequency scope together. An incomplete multi-type set remains `partial` with `REQUIRED_RECORD_TYPES_NOT_MET`; `rationale` identifies the deterministically selected closest alternative as `evidence_set=<id>`. Map, gaps, bundle generation, and bundle verification use the same selected-set requirements.
 
 ## Contributor gates
 

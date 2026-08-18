@@ -92,8 +92,8 @@ Expected outcome:
 - The sample pack is created locally with no network dependency and no repo fixture dependency.
 - `collect` captures `4` governance events from the bundled sample pack.
 - The local chain ends with `6` total records after the manual approval and risk assessment append.
-- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
-- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `map` reports `6` covered controls out of `10` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving controls `article-15`, `article-26`, `cc7.1`, `cc8.1` as the remaining sample gaps.
 - `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
 - The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
 - `verify --chain --json` reports an intact `6`-record chain.
@@ -144,7 +144,7 @@ Axym validates the manual input envelope locally, normalizes compatibility-only 
 
 `ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes, authorization bundles, and structured control artifacts through `--gait-pack`.
 
-`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes.
+`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes. Proof `v0.5.0` evidence sets are alternatives; one set must satisfy all of its record-type, source-product, field, and frequency requirements. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and the selected closest alternative is identified by `evidence_set=<id>` in the rationale.
 
 `gaps` ranks `partial` and `gap` controls with deterministic remediation and auditability grade output.
 

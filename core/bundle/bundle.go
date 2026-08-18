@@ -135,7 +135,7 @@ func Build(req BuildRequest) (Result, error) {
 	matchResult := match.Evaluate(definitions, append([]proof.Record(nil), recordSnapshot...), match.Options{ExcludeInvalidEvidence: true})
 	coverageReport := coverage.Build(matchResult)
 	gapReport := gaps.Build(coverageReport)
-	compliance := buildCompliance(definitions, coverageReport, recordSnapshot, gapReport.Grade)
+	compliance := buildCompliance(matchResult, coverageReport, recordSnapshot, gapReport.Grade)
 	identityArtifacts := identitygovernance.Build(recordSnapshot)
 
 	artifacts := map[string][]byte{}
@@ -376,12 +376,16 @@ func wrapSafetyError(err error) error {
 	}
 }
 
-func buildCompliance(definitions []framework.Definition, report coverage.Report, records []proof.Record, gradeResult grade.Result) Compliance {
+func buildCompliance(matchResult match.Result, report coverage.Report, records []proof.Record, gradeResult grade.Result) Compliance {
 	required := map[string]struct{}{}
-	for _, def := range definitions {
-		for _, control := range def.Controls {
+	missingRequired := map[string]struct{}{}
+	for _, frameworkResult := range matchResult.Frameworks {
+		for _, control := range frameworkResult.Controls {
 			for _, recordType := range control.RequiredRecordTypes {
 				required[strings.TrimSpace(recordType)] = struct{}{}
+			}
+			for _, recordType := range match.MissingRequiredRecordTypes(control) {
+				missingRequired[strings.TrimSpace(recordType)] = struct{}{}
 			}
 		}
 	}
@@ -393,13 +397,7 @@ func buildCompliance(definitions []framework.Definition, report coverage.Report,
 	requiredTypes := setToSortedSlice(required)
 	observedTypes := setToSortedSlice(observed)
 
-	missing := make([]string, 0)
-	for _, want := range requiredTypes {
-		if _, ok := observed[want]; ok {
-			continue
-		}
-		missing = append(missing, want)
-	}
+	missing := setToSortedSlice(missingRequired)
 
 	incomplete := 0
 	missingFields := 0

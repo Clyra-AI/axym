@@ -6,14 +6,51 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/compliance/coverage"
+	"github.com/Clyra-AI/axym/core/compliance/framework"
+	"github.com/Clyra-AI/axym/core/compliance/match"
 	ingestgait "github.com/Clyra-AI/axym/core/ingest/gait"
 	coreoverride "github.com/Clyra-AI/axym/core/override"
+	"github.com/Clyra-AI/axym/core/review/grade"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/proof"
 )
+
+func TestBuildComplianceUsesSelectedEvidenceSetRequirements(t *testing.T) {
+	t.Parallel()
+
+	definitions := []framework.Definition{{
+		ID: "fw",
+		Controls: []framework.Control{{
+			FrameworkID: "fw",
+			ID:          "scoped",
+			EvidenceSets: []framework.EvidenceSet{{
+				ID:                  "axym",
+				SourceProducts:      []string{"axym"},
+				RequiredRecordTypes: []string{"incident", "risk_assessment"},
+				RequiredFields:      []string{"record_type"},
+				MinimumFrequency:    "continuous",
+			}},
+		}},
+	}}
+	records := []proof.Record{
+		{RecordID: "risk", RecordType: "risk_assessment", SourceProduct: "axym", Timestamp: time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC), Event: map[string]any{}},
+		{RecordID: "incident", RecordType: "incident", SourceProduct: "gait", Timestamp: time.Date(2026, 3, 1, 12, 1, 0, 0, time.UTC), Event: map[string]any{}},
+	}
+	matchResult := match.Evaluate(definitions, records, match.Options{})
+
+	result := buildCompliance(matchResult, coverage.Report{}, records, grade.Result{})
+	if got, want := result.RequiredRecordTypes, []string{"incident", "risk_assessment"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("required record types mismatch: got %v want %v", got, want)
+	}
+	if got, want := result.MissingRecordTypes, []string{"incident"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("missing record types mismatch: got %v want %v", got, want)
+	}
+}
 
 func TestBuildRequiresAuditName(t *testing.T) {
 	t.Parallel()

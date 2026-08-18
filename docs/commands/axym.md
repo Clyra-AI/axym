@@ -71,8 +71,8 @@ Expected outcome:
 - The sample pack is created locally with no network dependency and no repo fixture dependency.
 - `collect` captures `4` governance events from the bundled sample pack.
 - The local chain ends with `6` total records after the manual approval and risk assessment append.
-- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
-- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `map` reports `6` covered controls out of `10` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving controls `article-15`, `article-26`, `cc7.1`, `cc8.1` as the remaining sample gaps.
 - `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
 - The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
 - `verify --chain --json` reports an intact `6`-record chain.
@@ -113,6 +113,12 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym verify --chain --json`: verifies append-only chain integrity plus Axym-managed record signatures.
 - `axym verify --bundle ./axym-evidence --json`: verifies bundle manifest signatures, Axym-authored record signatures, and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
   It recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` when they are declared in the bundle.
+
+### Framework evidence-set mapping
+
+Axym supports both legacy Proof framework controls and Proof `v0.5.0` evidence sets. Legacy `required_record_types` keep their existing alternative-match behavior. For `evidence_sets`, Axym treats sets as alternatives, requires every `required_record_type` within one set, and applies that set's `source_products`, `required_fields`, and `minimum_frequency` constraints together. A control is covered when any one set is complete.
+
+When no set is complete, Axym deterministically reports the closest partial or gap alternative by matched-type completeness, then missing types and fields; the evidence-set ID breaks any remaining tie. `map --json` exposes the selected set as an `evidence_set=<id>` prefix in `rationale`. A multi-type set with only some required types remains `partial` and includes `REQUIRED_RECORD_TYPES_NOT_MET` in `reason_codes`. `gaps`, generated bundles, and `verify --bundle` use the same selected-set requirements, so remediation and audit artifacts do not flatten alternatives into false coverage.
 
 ## Contributor checks
 

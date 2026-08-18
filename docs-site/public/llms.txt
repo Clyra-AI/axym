@@ -57,8 +57,8 @@ Expected outcome:
 - The sample pack is created locally with no network dependency and no repo fixture dependency.
 - `collect` captures `4` governance events from the bundled sample pack.
 - The local chain ends with `6` total records after the manual approval and risk assessment append.
-- `map` reports `5` covered controls out of `6` across `eu-ai-act,soc2`.
-- `gaps` reports grade `C`, leaving SOC 2 `cc7` as the remaining sample gap.
+- `map` reports `6` covered controls out of `10` across `eu-ai-act,soc2`.
+- `gaps` reports grade `C`, leaving controls `article-15`, `article-26`, `cc7.1`, `cc8.1` as the remaining sample gaps.
 - `bundle` emits identity-governance artifacts, keeps compliance incomplete (`complete=false`), and leaves `weak_record_count=1`.
 - The identity-governance artifacts are `identity-chain-summary.json`, `ownership-register.json`, `privilege-drift-report.json`, and `delegated-chain-exceptions.json`.
 - `verify --chain --json` reports an intact `6`-record chain.
@@ -71,6 +71,7 @@ Real integration path
 - Authoritative contract: `schemas/v1/record/README.md`.
 - Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --gait-pack ./gait-pack --json`.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+- Proof `v0.5.0` evidence sets are OR alternatives with AND semantics for record types inside a set; source-product, field, and frequency constraints stay scoped to that set. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and `rationale` names the closest selected set as `evidence_set=<id>`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
 

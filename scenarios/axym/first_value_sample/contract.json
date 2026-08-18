@@ -3,14 +3,17 @@
   "sample_pack_path": "./axym-sample",
   "governance_event_capture_count": 4,
   "final_chain_record_count": 6,
-  "covered_control_count": 5,
-  "control_count": 6,
+  "covered_control_count": 6,
+  "control_count": 10,
   "grade": "C",
   "bundle_complete": false,
   "weak_record_count": 1,
   "chain_intact": true,
   "remaining_gap_control_ids": [
-    "cc7"
+    "article-15",
+    "article-26",
+    "cc7.1",
+    "cc8.1"
   ],
   "required_bundle_artifacts": [
     "identity-chain-summary.json",

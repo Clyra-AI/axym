@@ -44,6 +44,12 @@ func TestVerifyBundleWithCompliance(t *testing.T) {
 	if result.Path == "" || result.Files == 0 || result.Algo == "" {
 		t.Fatalf("unexpected result fields: %+v", result)
 	}
+	if len(result.Compliance.RequiredRecordTypes) == 0 {
+		t.Fatalf("evidence-set requirements missing from recomputed compliance: %+v", result.Compliance)
+	}
+	if len(result.Compliance.MissingRecordTypes) == 0 {
+		t.Fatalf("expected unresolved evidence-set types in fixture compliance: %+v", result.Compliance)
+	}
 	_ = storeDir
 }
 
