@@ -114,6 +114,12 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym verify --bundle ./axym-evidence --json`: verifies bundle manifest signatures, Axym-authored record signatures, and compliance completeness, including identity-governance artifact consistency, without writing store-managed temp artifacts.
   It recomputes `authorization-register.json`, `insurance-evidence-profile.json`, `credential-posture-register.json`, `freeze-window-coverage.json`, `kill-switch-coverage.json`, `enforcement-explain-register.json`, `sandbox-coverage.json`, and `control-maturity.json` when they are declared in the bundle.
 
+### Framework evidence-set mapping
+
+Axym supports both legacy Proof framework controls and Proof `v0.5.0` evidence sets. Legacy `required_record_types` keep their existing alternative-match behavior. For `evidence_sets`, Axym treats sets as alternatives, requires every `required_record_type` within one set, and applies that set's `source_products`, `required_fields`, and `minimum_frequency` constraints together. A control is covered when any one set is complete.
+
+When no set is complete, Axym deterministically reports the closest partial or gap alternative by matched-type completeness, then missing types and fields; the evidence-set ID breaks any remaining tie. `map --json` exposes the selected set as an `evidence_set=<id>` prefix in `rationale`. A multi-type set with only some required types remains `partial` and includes `REQUIRED_RECORD_TYPES_NOT_MET` in `reason_codes`. `gaps`, generated bundles, and `verify --bundle` use the same selected-set requirements, so remediation and audit artifacts do not flatten alternatives into false coverage.
+
 ## Contributor checks
 
 Fast local checks:

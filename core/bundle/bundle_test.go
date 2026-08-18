@@ -6,14 +6,37 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/compliance/coverage"
+	"github.com/Clyra-AI/axym/core/compliance/match"
 	ingestgait "github.com/Clyra-AI/axym/core/ingest/gait"
 	coreoverride "github.com/Clyra-AI/axym/core/override"
+	"github.com/Clyra-AI/axym/core/review/grade"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/proof"
 )
+
+func TestBuildComplianceUsesSelectedEvidenceSetRequirements(t *testing.T) {
+	t.Parallel()
+
+	matchResult := match.Result{Frameworks: []match.FrameworkResult{{
+		Controls: []match.ControlResult{{
+			RequiredRecordTypes: []string{"incident", "risk_assessment"},
+		}},
+	}}}
+	records := []proof.Record{{RecordType: "risk_assessment"}}
+
+	result := buildCompliance(matchResult, coverage.Report{}, records, grade.Result{})
+	if got, want := result.RequiredRecordTypes, []string{"incident", "risk_assessment"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("required record types mismatch: got %v want %v", got, want)
+	}
+	if got, want := result.MissingRecordTypes, []string{"incident"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("missing record types mismatch: got %v want %v", got, want)
+	}
+}
 
 func TestBuildRequiresAuditName(t *testing.T) {
 	t.Parallel()

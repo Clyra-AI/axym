@@ -59,21 +59,22 @@ type FrameworkResult struct {
 }
 
 type ControlResult struct {
-	FrameworkID         string        `json:"framework_id"`
-	ControlID           string        `json:"control_id"`
-	Title               string        `json:"title"`
-	RequiredRecordTypes []string      `json:"required_record_types"`
-	RequiredFields      []string      `json:"required_fields"`
-	MinimumFrequency    string        `json:"minimum_frequency"`
-	Status              string        `json:"status"`
-	CandidateCount      int           `json:"candidate_count"`
-	MatchedCount        int           `json:"matched_count"`
-	PartialCount        int           `json:"partial_count"`
-	FailedCount         int           `json:"failed_count"`
-	InvalidExcluded     int           `json:"invalid_excluded"`
-	ReasonCodes         []string      `json:"reason_codes"`
-	Rationale           string        `json:"rationale"`
-	Evidence            []RecordMatch `json:"evidence"`
+	FrameworkID          string        `json:"framework_id"`
+	ControlID            string        `json:"control_id"`
+	Title                string        `json:"title"`
+	RequiredRecordTypes  []string      `json:"required_record_types"`
+	RequiredFields       []string      `json:"required_fields"`
+	MinimumFrequency     string        `json:"minimum_frequency"`
+	Status               string        `json:"status"`
+	CandidateCount       int           `json:"candidate_count"`
+	MatchedCount         int           `json:"matched_count"`
+	PartialCount         int           `json:"partial_count"`
+	FailedCount          int           `json:"failed_count"`
+	InvalidExcluded      int           `json:"invalid_excluded"`
+	ReasonCodes          []string      `json:"reason_codes"`
+	Rationale            string        `json:"rationale"`
+	Evidence             []RecordMatch `json:"evidence"`
+	matchedRequiredTypes int
 }
 
 type RecordMatch struct {
@@ -130,15 +131,14 @@ func Evaluate(definitions []framework.Definition, records []proof.Record, opts O
 func evaluateControl(control framework.Control, records []proof.Record, opts Options) ControlResult {
 	requirementSets := controlRequirementSets(control)
 	var selected ControlResult
-	selectedRank := -1
+	hasSelected := false
 	for _, requirements := range requirementSets {
 		candidate := evaluateRequirementSet(control, requirements, records, opts)
-		rank := controlStatusRank(candidate.Status)
-		if rank <= selectedRank {
+		if hasSelected && !preferControlResult(candidate, selected) {
 			continue
 		}
 		selected = candidate
-		selectedRank = rank
+		hasSelected = true
 	}
 	return selected
 }
@@ -299,10 +299,62 @@ func evaluateRequirementSet(control framework.Control, requirements controlRequi
 	}
 	result.ReasonCodes = uniqueSorted(reasons)
 	result.Rationale = buildRationale(result, requiredMatches, matchedInFrequencyWindow)
+	result.matchedRequiredTypes = len(matchedTypesInFrequencyWindow)
 	if requirements.ID != "" {
 		result.Rationale = fmt.Sprintf("evidence_set=%s %s", requirements.ID, result.Rationale)
 	}
 	return result
+}
+
+func preferControlResult(candidate ControlResult, current ControlResult) bool {
+	candidateRank := controlStatusRank(candidate.Status)
+	currentRank := controlStatusRank(current.Status)
+	if candidateRank != currentRank {
+		return candidateRank > currentRank
+	}
+
+	candidateRequired := len(candidate.RequiredRecordTypes)
+	currentRequired := len(current.RequiredRecordTypes)
+	candidateCompleteness := candidate.matchedRequiredTypes * currentRequired
+	currentCompleteness := current.matchedRequiredTypes * candidateRequired
+	if candidateCompleteness != currentCompleteness {
+		return candidateCompleteness > currentCompleteness
+	}
+
+	candidateMissingTypes := candidateRequired - candidate.matchedRequiredTypes
+	currentMissingTypes := currentRequired - current.matchedRequiredTypes
+	if candidateMissingTypes != currentMissingTypes {
+		return candidateMissingTypes < currentMissingTypes
+	}
+
+	candidateMissingFields := missingFieldCount(candidate)
+	currentMissingFields := missingFieldCount(current)
+	if candidateMissingFields != currentMissingFields {
+		return candidateMissingFields < currentMissingFields
+	}
+	if candidate.MatchedCount != current.MatchedCount {
+		return candidate.MatchedCount > current.MatchedCount
+	}
+	if candidate.PartialCount != current.PartialCount {
+		return candidate.PartialCount > current.PartialCount
+	}
+	if candidate.FailedCount != current.FailedCount {
+		return candidate.FailedCount < current.FailedCount
+	}
+	return false
+}
+
+func missingFieldCount(result ControlResult) int {
+	missing := map[string]struct{}{}
+	for _, evidence := range result.Evidence {
+		for _, field := range evidence.Missing {
+			trimmed := strings.TrimSpace(field)
+			if trimmed != "" {
+				missing[trimmed] = struct{}{}
+			}
+		}
+	}
+	return len(missing)
 }
 
 func controlStatusRank(status string) int {

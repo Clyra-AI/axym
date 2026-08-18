@@ -303,6 +303,56 @@ func TestEvaluateEvidenceSetsUseAlternativeAndSourceScope(t *testing.T) {
 	}
 }
 
+func TestEvaluateEvidenceSetsChooseClosestPartialAlternative(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{{
+		ID:      "fw",
+		Version: "v1",
+		Title:   "Framework",
+		Controls: []framework.Control{{
+			FrameworkID: "fw",
+			ID:          "closest-partial",
+			Title:       "Closest partial",
+			EvidenceSets: []framework.EvidenceSet{
+				{
+					ID:                  "a_broad",
+					SourceProducts:      []string{"axym"},
+					RequiredRecordTypes: []string{"risk_assessment", "incident", "test_result"},
+					RequiredFields:      []string{"record_id", "event"},
+					MinimumFrequency:    "continuous",
+				},
+				{
+					ID:                  "z_close",
+					SourceProducts:      []string{"axym"},
+					RequiredRecordTypes: []string{"risk_assessment", "incident"},
+					RequiredFields:      []string{"record_id", "event"},
+					MinimumFrequency:    "continuous",
+				},
+			},
+		}},
+	}}
+	risk := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
+		Source:        "manual",
+		SourceProduct: "axym",
+		Type:          "risk_assessment",
+		Event:         map[string]any{"risk_id": "risk-1"},
+	})
+
+	result := Evaluate(defs, []proof.Record{risk}, Options{ExcludeInvalidEvidence: true})
+	control := result.Frameworks[0].Controls[0]
+	if control.Status != ControlStatusPartial {
+		t.Fatalf("expected partial status: %+v", control)
+	}
+	if got, want := control.RequiredRecordTypes, []string{"incident", "risk_assessment"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("closest evidence set not selected: got %v want %v", got, want)
+	}
+	if !strings.HasPrefix(control.Rationale, "evidence_set=z_close ") {
+		t.Fatalf("closest evidence set missing from rationale: %q", control.Rationale)
+	}
+}
+
 func TestEvaluateLegacyControlRetainsAnyRecordTypeBehavior(t *testing.T) {
 	t.Parallel()
 

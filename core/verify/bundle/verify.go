@@ -171,7 +171,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 
 	matchResult := match.Evaluate(definitions, chain.Records, match.Options{ExcludeInvalidEvidence: true})
 	coverageReport := coverage.Build(matchResult)
-	recomputed := buildCompliance(definitions, coverageReport, chain.Records)
+	recomputed := buildCompliance(matchResult, coverageReport, chain.Records)
 	if !equalCompliance(summary.Compliance, recomputed) {
 		return Result{}, &Error{ReasonCode: ReasonBundleCompleteness, Message: "executive summary compliance does not match recomputed output", ExitCode: 2}
 	}
@@ -214,10 +214,10 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	return result, nil
 }
 
-func buildCompliance(definitions []framework.Definition, report coverage.Report, records []proof.Record) Compliance {
+func buildCompliance(matchResult match.Result, report coverage.Report, records []proof.Record) Compliance {
 	required := map[string]struct{}{}
-	for _, def := range definitions {
-		for _, control := range def.Controls {
+	for _, frameworkResult := range matchResult.Frameworks {
+		for _, control := range frameworkResult.Controls {
 			for _, recordType := range control.RequiredRecordTypes {
 				trimmed := strings.TrimSpace(recordType)
 				if trimmed == "" {
