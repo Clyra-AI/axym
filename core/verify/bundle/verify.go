@@ -216,6 +216,7 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 
 func buildCompliance(matchResult match.Result, report coverage.Report, records []proof.Record) Compliance {
 	required := map[string]struct{}{}
+	missingRequired := map[string]struct{}{}
 	for _, frameworkResult := range matchResult.Frameworks {
 		for _, control := range frameworkResult.Controls {
 			for _, recordType := range control.RequiredRecordTypes {
@@ -224,6 +225,12 @@ func buildCompliance(matchResult match.Result, report coverage.Report, records [
 					continue
 				}
 				required[trimmed] = struct{}{}
+			}
+			for _, recordType := range match.MissingRequiredRecordTypes(control) {
+				trimmed := strings.TrimSpace(recordType)
+				if trimmed != "" {
+					missingRequired[trimmed] = struct{}{}
+				}
 			}
 		}
 	}
@@ -238,13 +245,7 @@ func buildCompliance(matchResult match.Result, report coverage.Report, records [
 
 	requiredTypes := setToSortedSlice(required)
 	observedTypes := setToSortedSlice(observed)
-	missingTypes := make([]string, 0)
-	for _, requiredType := range requiredTypes {
-		if _, ok := observed[requiredType]; ok {
-			continue
-		}
-		missingTypes = append(missingTypes, requiredType)
-	}
+	missingTypes := setToSortedSlice(missingRequired)
 
 	incomplete := 0
 	missingFields := 0

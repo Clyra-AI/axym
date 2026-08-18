@@ -75,6 +75,7 @@ type ControlResult struct {
 	Rationale            string        `json:"rationale"`
 	Evidence             []RecordMatch `json:"evidence"`
 	matchedRequiredTypes int
+	presentRequiredTypes []string
 }
 
 type RecordMatch struct {
@@ -204,6 +205,7 @@ func evaluateRequirementSet(control framework.Control, requirements controlRequi
 
 	matchedInFrequencyWindow := 0
 	matchedTypesInFrequencyWindow := make(map[string]struct{}, len(requiredTypes))
+	presentTypesInFrequencyWindow := make(map[string]struct{}, len(requiredTypes))
 	windowStart, hasWindow := frequencyWindowStart(requirements.MinimumFrequency, records)
 
 	for _, record := range records {
@@ -228,6 +230,10 @@ func evaluateRequirementSet(control framework.Control, requirements controlRequi
 				continue
 			}
 		}
+		inFrequencyWindow := !hasWindow || !record.Timestamp.Before(windowStart)
+		if inFrequencyWindow {
+			presentTypesInFrequencyWindow[recordType] = struct{}{}
+		}
 
 		identityMissing, identityReasons := IdentityWeaknesses(record)
 		missingFields = uniqueSorted(append(missingFields, identityMissing...))
@@ -239,7 +245,7 @@ func evaluateRequirementSet(control framework.Control, requirements controlRequi
 			recordStatus = RecordStatusMatched
 			reasons = []string{"MATCHED"}
 			result.MatchedCount++
-			if !hasWindow || !record.Timestamp.Before(windowStart) {
+			if inFrequencyWindow {
 				matchedInFrequencyWindow++
 				matchedTypesInFrequencyWindow[recordType] = struct{}{}
 			}
@@ -300,6 +306,7 @@ func evaluateRequirementSet(control framework.Control, requirements controlRequi
 	result.ReasonCodes = uniqueSorted(reasons)
 	result.Rationale = buildRationale(result, requiredMatches, matchedInFrequencyWindow)
 	result.matchedRequiredTypes = len(matchedTypesInFrequencyWindow)
+	result.presentRequiredTypes = sortedSetKeys(presentTypesInFrequencyWindow)
 	if requirements.ID != "" {
 		result.Rationale = fmt.Sprintf("evidence_set=%s %s", requirements.ID, result.Rationale)
 	}
@@ -320,9 +327,16 @@ func preferControlResult(candidate ControlResult, current ControlResult) bool {
 	if candidateCompleteness != currentCompleteness {
 		return candidateCompleteness > currentCompleteness
 	}
+	candidatePresent := len(candidate.presentRequiredTypes)
+	currentPresent := len(current.presentRequiredTypes)
+	candidatePresence := candidatePresent * currentRequired
+	currentPresence := currentPresent * candidateRequired
+	if candidatePresence != currentPresence {
+		return candidatePresence > currentPresence
+	}
 
-	candidateMissingTypes := candidateRequired - candidate.matchedRequiredTypes
-	currentMissingTypes := currentRequired - current.matchedRequiredTypes
+	candidateMissingTypes := candidateRequired - candidatePresent
+	currentMissingTypes := currentRequired - currentPresent
 	if candidateMissingTypes != currentMissingTypes {
 		return candidateMissingTypes < currentMissingTypes
 	}
@@ -342,6 +356,32 @@ func preferControlResult(candidate ControlResult, current ControlResult) bool {
 		return candidate.FailedCount < current.FailedCount
 	}
 	return false
+}
+
+// MissingRequiredRecordTypes returns types without valid, in-scope evidence in
+// the selected requirement set. Field-incomplete records still establish type
+// presence so gap remediation can focus on their missing fields.
+func MissingRequiredRecordTypes(result ControlResult) []string {
+	present := make(map[string]struct{}, len(result.presentRequiredTypes))
+	for _, recordType := range result.presentRequiredTypes {
+		present[recordType] = struct{}{}
+	}
+	missing := make([]string, 0, len(result.RequiredRecordTypes))
+	for _, recordType := range result.RequiredRecordTypes {
+		if _, ok := present[recordType]; !ok {
+			missing = append(missing, recordType)
+		}
+	}
+	return uniqueSorted(missing)
+}
+
+func sortedSetKeys(values map[string]struct{}) []string {
+	out := make([]string, 0, len(values))
+	for value := range values {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func missingFieldCount(result ControlResult) int {

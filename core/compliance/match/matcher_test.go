@@ -353,6 +353,59 @@ func TestEvaluateEvidenceSetsChooseClosestPartialAlternative(t *testing.T) {
 	}
 }
 
+func TestEvaluateEvidenceSetsClosestGapCreditsPresentType(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{{
+		ID: "fw",
+		Controls: []framework.Control{{
+			FrameworkID: "fw",
+			ID:          "closest-gap",
+			EvidenceSets: []framework.EvidenceSet{
+				{
+					ID:                  "a_present",
+					SourceProducts:      []string{"axym"},
+					RequiredRecordTypes: []string{"risk_assessment"},
+					RequiredFields:      []string{"event.required"},
+					MinimumFrequency:    "continuous",
+				},
+				{
+					ID:                  "b_empty",
+					SourceProducts:      []string{"axym"},
+					RequiredRecordTypes: []string{"incident"},
+					RequiredFields:      []string{"record_type"},
+					MinimumFrequency:    "continuous",
+				},
+			},
+		}},
+	}}
+	risk := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
+		Source:        "manual",
+		SourceProduct: "axym",
+		Type:          "risk_assessment",
+		Event:         map[string]any{"risk_id": "risk-1"},
+	})
+
+	result := Evaluate(defs, []proof.Record{risk}, Options{ExcludeInvalidEvidence: true})
+	control := result.Frameworks[0].Controls[0]
+	if control.Status != ControlStatusGap {
+		t.Fatalf("expected gap status: %+v", control)
+	}
+	if got, want := control.RequiredRecordTypes, []string{"risk_assessment"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("present-type evidence set not selected: got %v want %v", got, want)
+	}
+	if !strings.HasPrefix(control.Rationale, "evidence_set=a_present ") {
+		t.Fatalf("present-type evidence set missing from rationale: %q", control.Rationale)
+	}
+	if missing := MissingRequiredRecordTypes(control); len(missing) != 0 {
+		t.Fatalf("field-incomplete evidence must not be reported as a missing type: %v", missing)
+	}
+	if len(control.Evidence) != 1 || !containsString(control.Evidence[0].Missing, "event.required") {
+		t.Fatalf("expected field remediation for present type: %+v", control.Evidence)
+	}
+}
+
 func TestEvaluateLegacyControlRetainsAnyRecordTypeBehavior(t *testing.T) {
 	t.Parallel()
 

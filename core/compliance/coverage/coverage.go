@@ -82,22 +82,13 @@ func Build(result match.Result) Report {
 }
 
 func buildControlCoverage(control match.ControlResult) ControlCoverage {
-	recordTypes := make(map[string]struct{}, len(control.Evidence))
 	missingFields := make(map[string]struct{})
 	for _, evidence := range control.Evidence {
-		recordTypes[evidence.RecordType] = struct{}{}
 		for _, field := range evidence.Missing {
 			missingFields[field] = struct{}{}
 		}
 	}
-	missingTypes := make([]string, 0)
-	for _, requiredType := range control.RequiredRecordTypes {
-		if _, ok := recordTypes[requiredType]; ok {
-			continue
-		}
-		missingTypes = append(missingTypes, requiredType)
-	}
-	sort.Strings(missingTypes)
+	missingTypes := match.MissingRequiredRecordTypes(control)
 
 	missing := make([]string, 0, len(missingFields))
 	for field := range missingFields {

@@ -378,10 +378,14 @@ func wrapSafetyError(err error) error {
 
 func buildCompliance(matchResult match.Result, report coverage.Report, records []proof.Record, gradeResult grade.Result) Compliance {
 	required := map[string]struct{}{}
+	missingRequired := map[string]struct{}{}
 	for _, frameworkResult := range matchResult.Frameworks {
 		for _, control := range frameworkResult.Controls {
 			for _, recordType := range control.RequiredRecordTypes {
 				required[strings.TrimSpace(recordType)] = struct{}{}
+			}
+			for _, recordType := range match.MissingRequiredRecordTypes(control) {
+				missingRequired[strings.TrimSpace(recordType)] = struct{}{}
 			}
 		}
 	}
@@ -393,13 +397,7 @@ func buildCompliance(matchResult match.Result, report coverage.Report, records [
 	requiredTypes := setToSortedSlice(required)
 	observedTypes := setToSortedSlice(observed)
 
-	missing := make([]string, 0)
-	for _, want := range requiredTypes {
-		if _, ok := observed[want]; ok {
-			continue
-		}
-		missing = append(missing, want)
-	}
+	missing := setToSortedSlice(missingRequired)
 
 	incomplete := 0
 	missingFields := 0
