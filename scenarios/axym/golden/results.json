@@ -15,7 +15,7 @@
       }
     },
     "map": {
-      "covered_count": 1,
+      "covered_count": 0,
       "framework_count": 2,
       "gap_count": 5
     },
@@ -48,10 +48,10 @@
   },
   "ac05_gap_alert_ranking": {
     "gap_count": 5,
-    "highest_priority": 32,
-    "top_gap_control": "article-14",
-    "top_gap_effort": "high",
-    "top_gap_fix": "Collect evidence types [approval,compiled_action,human_oversight]",
+    "highest_priority": 62,
+    "top_gap_control": "article-26",
+    "top_gap_effort": "medium",
+    "top_gap_fix": "Link governed actions to actor, executor, owner, delegation, policy, and approval evidence",
     "top_gap_framework": "eu-ai-act"
   },
   "ac06_builtin_collector_capture": {

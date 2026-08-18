@@ -48,10 +48,21 @@ func TestMapWorkflowFixtureDeterministic(t *testing.T) {
 		t.Fatalf("LoadMany: %v", err)
 	}
 	result := match.Evaluate(frameworks, chain.Records, match.Options{ExcludeInvalidEvidence: true})
-	if result.Summary.ControlCount == 0 {
-		t.Fatalf("expected control coverage result: %+v", result.Summary)
+	want := match.Summary{
+		FrameworkCount: 2,
+		ControlCount:   10,
+		CoveredCount:   0,
+		PartialCount:   5,
+		GapCount:       5,
 	}
-	if result.Summary.CoveredCount == 0 {
-		t.Fatalf("expected at least one covered control from fixture corpus: %+v", result.Summary)
+	if result.Summary != want {
+		t.Fatalf("v0.5 evidence-set coverage mismatch: got %+v want %+v", result.Summary, want)
+	}
+	for _, frameworkResult := range result.Frameworks {
+		for _, control := range frameworkResult.Controls {
+			if len(control.RequiredRecordTypes) == 0 {
+				t.Fatalf("selected evidence set lost record types for %s/%s", frameworkResult.ID, control.ControlID)
+			}
+		}
 	}
 }

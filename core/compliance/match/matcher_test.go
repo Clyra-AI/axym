@@ -2,6 +2,8 @@ package match
 
 import (
 	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,6 +231,134 @@ func TestEvaluateDowngradesWeakIdentityLinkage(t *testing.T) {
 	}
 	if !containsString(control.Evidence[0].Missing, "event.owner_identity") {
 		t.Fatalf("expected missing owner field: %+v", control.Evidence[0].Missing)
+	}
+}
+
+func TestEvaluateEvidenceSetRequiresEveryRecordType(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{evidenceSetDefinition()}
+	risk := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
+		Source:        "manual",
+		SourceProduct: "axym",
+		Type:          "risk_assessment",
+		Event:         map[string]any{"risk_id": "risk-1"},
+	})
+
+	result := Evaluate(defs, []proof.Record{risk}, Options{ExcludeInvalidEvidence: true})
+	control := result.Frameworks[0].Controls[0]
+	if control.Status != ControlStatusPartial {
+		t.Fatalf("one record type must not cover a multi-type evidence set: %+v", control)
+	}
+	if !containsString(control.ReasonCodes, ReasonRequiredRecordTypesNotMet) {
+		t.Fatalf("missing required-record-types reason: %+v", control.ReasonCodes)
+	}
+	if got, want := control.RequiredRecordTypes, []string{"incident", "risk_assessment"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("selected evidence-set record types mismatch: got %v want %v", got, want)
+	}
+}
+
+func TestEvaluateEvidenceSetsUseAlternativeAndSourceScope(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{evidenceSetDefinition()}
+	risk := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
+		Source:        "manual",
+		SourceProduct: "axym",
+		Type:          "risk_assessment",
+		Event:         map[string]any{"risk_id": "risk-1"},
+	})
+	incidentFromWrongProduct := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 1, 0, 0, time.UTC),
+		Source:        "runtime",
+		SourceProduct: "gait",
+		Type:          "incident",
+		Event:         map[string]any{"incident_id": "incident-1"},
+	})
+	guardrail := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 2, 0, 0, time.UTC),
+		Source:        "runtime",
+		SourceProduct: "gait",
+		Type:          "guardrail_activation",
+		Event:         map[string]any{"guardrail": "policy"},
+	})
+
+	withoutAlternative := Evaluate(defs, []proof.Record{risk, incidentFromWrongProduct}, Options{ExcludeInvalidEvidence: true})
+	if control := withoutAlternative.Frameworks[0].Controls[0]; control.Status != ControlStatusPartial {
+		t.Fatalf("wrong source product must not complete scoped evidence set: %+v", control)
+	}
+
+	withAlternative := Evaluate(defs, []proof.Record{risk, incidentFromWrongProduct, guardrail}, Options{ExcludeInvalidEvidence: true})
+	control := withAlternative.Frameworks[0].Controls[0]
+	if control.Status != ControlStatusCovered {
+		t.Fatalf("one complete alternative evidence set must cover the control: %+v", control)
+	}
+	if got, want := control.RequiredRecordTypes, []string{"guardrail_activation"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("selected alternative record types mismatch: got %v want %v", got, want)
+	}
+	if !strings.HasPrefix(control.Rationale, "evidence_set=gait_single ") {
+		t.Fatalf("selected evidence set missing from rationale: %q", control.Rationale)
+	}
+}
+
+func TestEvaluateLegacyControlRetainsAnyRecordTypeBehavior(t *testing.T) {
+	t.Parallel()
+
+	defs := []framework.Definition{{
+		ID:      "fw",
+		Version: "v1",
+		Title:   "Framework",
+		Controls: []framework.Control{{
+			FrameworkID:         "fw",
+			ID:                  "legacy",
+			Title:               "Legacy control",
+			RequiredRecordTypes: []string{"incident", "risk_assessment"},
+			RequiredFields:      []string{"record_id", "event"},
+			MinimumFrequency:    "continuous",
+		}},
+	}}
+	risk := mustMatchRecord(t, proof.RecordOpts{
+		Timestamp:     time.Date(2026, 3, 1, 14, 0, 0, 0, time.UTC),
+		Source:        "manual",
+		SourceProduct: "axym",
+		Type:          "risk_assessment",
+		Event:         map[string]any{"risk_id": "risk-1"},
+	})
+
+	result := Evaluate(defs, []proof.Record{risk}, Options{ExcludeInvalidEvidence: true})
+	if control := result.Frameworks[0].Controls[0]; control.Status != ControlStatusCovered {
+		t.Fatalf("legacy control behavior changed: %+v", control)
+	}
+}
+
+func evidenceSetDefinition() framework.Definition {
+	return framework.Definition{
+		ID:      "fw",
+		Version: "v1",
+		Title:   "Framework",
+		Controls: []framework.Control{{
+			FrameworkID: "fw",
+			ID:          "evidence-sets",
+			Title:       "Evidence sets",
+			EvidenceSets: []framework.EvidenceSet{
+				{
+					ID:                  "axym_pair",
+					SourceProducts:      []string{"axym"},
+					RequiredRecordTypes: []string{"risk_assessment", "incident"},
+					RequiredFields:      []string{"record_id", "event"},
+					MinimumFrequency:    "continuous",
+				},
+				{
+					ID:                  "gait_single",
+					SourceProducts:      []string{"gait"},
+					RequiredRecordTypes: []string{"guardrail_activation"},
+					RequiredFields:      []string{"record_id", "event.guardrail"},
+					MinimumFrequency:    "continuous",
+				},
+			},
+		}},
 	}
 }
 

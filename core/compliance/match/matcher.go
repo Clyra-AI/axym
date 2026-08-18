@@ -22,14 +22,15 @@ const (
 	ControlStatusPartial = "partial"
 	ControlStatusGap     = "gap"
 
-	ReasonMissingActorLinkage      = "MISSING_ACTOR_LINKAGE"
-	ReasonMissingDownstreamLinkage = "MISSING_DOWNSTREAM_LINKAGE"
-	ReasonMissingOwnerLinkage      = "MISSING_OWNER_LINKAGE"
-	ReasonMissingTargetLinkage     = "MISSING_TARGET_LINKAGE"
-	ReasonMissingPolicyBinding     = "MISSING_POLICY_BINDING"
-	ReasonMissingApprovalBinding   = "MISSING_APPROVAL_BINDING"
-	ReasonIncompleteDelegation     = "INCOMPLETE_DELEGATION_CHAIN"
-	ReasonUnapprovedPrivilegeDrift = "UNAPPROVED_PRIVILEGE_DRIFT"
+	ReasonMissingActorLinkage       = "MISSING_ACTOR_LINKAGE"
+	ReasonMissingDownstreamLinkage  = "MISSING_DOWNSTREAM_LINKAGE"
+	ReasonMissingOwnerLinkage       = "MISSING_OWNER_LINKAGE"
+	ReasonMissingTargetLinkage      = "MISSING_TARGET_LINKAGE"
+	ReasonMissingPolicyBinding      = "MISSING_POLICY_BINDING"
+	ReasonMissingApprovalBinding    = "MISSING_APPROVAL_BINDING"
+	ReasonIncompleteDelegation      = "INCOMPLETE_DELEGATION_CHAIN"
+	ReasonUnapprovedPrivilegeDrift  = "UNAPPROVED_PRIVILEGE_DRIFT"
+	ReasonRequiredRecordTypesNotMet = "REQUIRED_RECORD_TYPES_NOT_MET"
 )
 
 type Options struct {
@@ -127,11 +128,67 @@ func Evaluate(definitions []framework.Definition, records []proof.Record, opts O
 }
 
 func evaluateControl(control framework.Control, records []proof.Record, opts Options) ControlResult {
-	requiredFields := uniqueSorted(control.RequiredFields)
-	requiredTypes := uniqueSorted(control.RequiredRecordTypes)
+	requirementSets := controlRequirementSets(control)
+	var selected ControlResult
+	selectedRank := -1
+	for _, requirements := range requirementSets {
+		candidate := evaluateRequirementSet(control, requirements, records, opts)
+		rank := controlStatusRank(candidate.Status)
+		if rank <= selectedRank {
+			continue
+		}
+		selected = candidate
+		selectedRank = rank
+	}
+	return selected
+}
+
+type controlRequirements struct {
+	ID                  string
+	SourceProducts      []string
+	RequiredRecordTypes []string
+	RequiredFields      []string
+	MinimumFrequency    string
+	RequireAllTypes     bool
+}
+
+func controlRequirementSets(control framework.Control) []controlRequirements {
+	if len(control.EvidenceSets) == 0 {
+		return []controlRequirements{{
+			RequiredRecordTypes: uniqueSorted(control.RequiredRecordTypes),
+			RequiredFields:      uniqueSorted(control.RequiredFields),
+			MinimumFrequency:    strings.TrimSpace(control.MinimumFrequency),
+		}}
+	}
+
+	sets := append([]framework.EvidenceSet(nil), control.EvidenceSets...)
+	sort.Slice(sets, func(i, j int) bool {
+		return strings.TrimSpace(sets[i].ID) < strings.TrimSpace(sets[j].ID)
+	})
+	out := make([]controlRequirements, 0, len(sets))
+	for _, set := range sets {
+		out = append(out, controlRequirements{
+			ID:                  strings.TrimSpace(set.ID),
+			SourceProducts:      uniqueLowerSorted(set.SourceProducts),
+			RequiredRecordTypes: uniqueLowerSorted(set.RequiredRecordTypes),
+			RequiredFields:      uniqueSorted(set.RequiredFields),
+			MinimumFrequency:    strings.TrimSpace(set.MinimumFrequency),
+			RequireAllTypes:     true,
+		})
+	}
+	return out
+}
+
+func evaluateRequirementSet(control framework.Control, requirements controlRequirements, records []proof.Record, opts Options) ControlResult {
+	requiredFields := requirements.RequiredFields
+	requiredTypes := requirements.RequiredRecordTypes
 	requiredTypeSet := make(map[string]struct{}, len(requiredTypes))
 	for _, recordType := range requiredTypes {
 		requiredTypeSet[recordType] = struct{}{}
+	}
+	allowedSourceProducts := make(map[string]struct{}, len(requirements.SourceProducts))
+	for _, sourceProduct := range requirements.SourceProducts {
+		allowedSourceProducts[sourceProduct] = struct{}{}
 	}
 
 	result := ControlResult{
@@ -140,18 +197,25 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 		Title:               control.Title,
 		RequiredRecordTypes: requiredTypes,
 		RequiredFields:      requiredFields,
-		MinimumFrequency:    control.MinimumFrequency,
+		MinimumFrequency:    requirements.MinimumFrequency,
 		ReasonCodes:         []string{},
 		Evidence:            []RecordMatch{},
 	}
 
 	matchedInFrequencyWindow := 0
-	windowStart, hasWindow := frequencyWindowStart(control.MinimumFrequency, records)
+	matchedTypesInFrequencyWindow := make(map[string]struct{}, len(requiredTypes))
+	windowStart, hasWindow := frequencyWindowStart(requirements.MinimumFrequency, records)
 
 	for _, record := range records {
 		recordType := strings.ToLower(strings.TrimSpace(record.RecordType))
 		if _, ok := requiredTypeSet[recordType]; !ok {
 			continue
+		}
+		if len(allowedSourceProducts) > 0 {
+			sourceProduct := strings.ToLower(strings.TrimSpace(record.SourceProduct))
+			if _, ok := allowedSourceProducts[sourceProduct]; !ok {
+				continue
+			}
 		}
 		result.CandidateCount++
 		matchedFields, missingFields := evaluateFields(record, requiredFields)
@@ -177,6 +241,7 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 			result.MatchedCount++
 			if !hasWindow || !record.Timestamp.Before(windowStart) {
 				matchedInFrequencyWindow++
+				matchedTypesInFrequencyWindow[recordType] = struct{}{}
 			}
 		case len(matchedFields) > 0:
 			recordStatus = RecordStatusPartial
@@ -190,11 +255,20 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 	}
 
 	reasons := make([]string, 0, 3)
-	requiredMatches := minimumMatches(control.MinimumFrequency)
+	requiredMatches := minimumMatches(requirements.MinimumFrequency)
 	frequencyMet := matchedInFrequencyWindow >= requiredMatches
+	allRequiredTypesMet := true
+	if requirements.RequireAllTypes {
+		for _, recordType := range requiredTypes {
+			if _, ok := matchedTypesInFrequencyWindow[recordType]; !ok {
+				allRequiredTypesMet = false
+				break
+			}
+		}
+	}
 
 	switch {
-	case result.MatchedCount > 0 && frequencyMet:
+	case result.MatchedCount > 0 && frequencyMet && allRequiredTypesMet:
 		result.Status = ControlStatusCovered
 		reasons = append(reasons, "CONTROL_COVERED")
 	case result.MatchedCount > 0 || result.PartialCount > 0:
@@ -206,6 +280,9 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 	}
 	if !frequencyMet {
 		reasons = append(reasons, "FREQUENCY_NOT_MET")
+	}
+	if !allRequiredTypesMet {
+		reasons = append(reasons, ReasonRequiredRecordTypesNotMet)
 	}
 	if result.CandidateCount == 0 {
 		reasons = append(reasons, "NO_RECORD_TYPE_MATCH")
@@ -222,7 +299,21 @@ func evaluateControl(control framework.Control, records []proof.Record, opts Opt
 	}
 	result.ReasonCodes = uniqueSorted(reasons)
 	result.Rationale = buildRationale(result, requiredMatches, matchedInFrequencyWindow)
+	if requirements.ID != "" {
+		result.Rationale = fmt.Sprintf("evidence_set=%s %s", requirements.ID, result.Rationale)
+	}
 	return result
+}
+
+func controlStatusRank(status string) int {
+	switch status {
+	case ControlStatusCovered:
+		return 2
+	case ControlStatusPartial:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func buildRecordMatch(record proof.Record, matched []string, missing []string, status string, reasons []string) RecordMatch {
@@ -421,6 +512,17 @@ func uniqueSorted(in []string) []string {
 		}
 	}
 	return result
+}
+
+func uniqueLowerSorted(in []string) []string {
+	normalized := make([]string, 0, len(in))
+	for _, item := range in {
+		trimmed := strings.ToLower(strings.TrimSpace(item))
+		if trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return uniqueSorted(normalized)
 }
 
 func roundRatio(in float64) float64 {

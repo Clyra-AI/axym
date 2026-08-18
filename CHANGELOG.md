@@ -15,7 +15,8 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 ### Changed
 
-- Corrected the public first-value contract to `4` governance-event captures, `6` total sample records, `5/6` covered controls, grade `C`, and truthful `complete=false` / `weak_record_count=1` messaging.
+- Pinned `Clyra-AI/proof` to `v0.5.0` and added deterministic framework adaptation for both legacy controls and scoped evidence-set alternatives without flattening multi-record requirements into false coverage.
+- Updated the public first-value contract for Proof `v0.5.0`'s expanded evidence-set framework catalog: `4` governance-event captures, `6` total sample records, `6/10` covered controls, four partial controls, grade `C`, and truthful `complete=false` / `weak_record_count=1` messaging.
 - Corrected public install guidance so Homebrew users verify with `axym version --json` while source builds and unpacked release binaries use `./axym version --json`.
 - Clarified contributor full-gate and release-local prerequisites, plus the explicit private and fallback public security reporting paths.
 - Added an authoritative public `record add` contract under `schemas/v1/record/`, normalized compatibility-only `record_version: "1.0"` inputs to canonical `v1`, and locked `schema_violation` JSON behavior for payload contract failures.

@@ -155,8 +155,12 @@ func launchStoryCommandSnippets(contract firstValueSampleContract) []string {
 
 func launchStoryOutcomeSnippets(contract firstValueSampleContract) []string {
 	remainingGap := "the remaining sample gap"
-	if len(contract.RemainingGapControlIDs) == 1 {
+	switch len(contract.RemainingGapControlIDs) {
+	case 0:
+	case 1:
 		remainingGap = fmt.Sprintf("SOC 2 `%s` as the remaining sample gap", contract.RemainingGapControlIDs[0])
+	default:
+		remainingGap = fmt.Sprintf("controls `%s` as the remaining sample gaps", strings.Join(contract.RemainingGapControlIDs, "`, `"))
 	}
 
 	return []string{
