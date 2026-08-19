@@ -43,7 +43,7 @@ Release binary:
 
 If you installed via Homebrew, replace `./axym` with `axym` in the commands below.
 
-Requires Go `1.26.3` for source builds.
+Requires Go `1.26.6` for source builds.
 
 ## Project docs
 

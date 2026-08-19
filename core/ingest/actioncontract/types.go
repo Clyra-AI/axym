@@ -35,6 +35,7 @@ const (
 	ClassContextual         = "contextual"
 	ClassExplicitlyExcepted = "explicitly_excepted"
 	ClassMismatched         = "mismatched"
+	ClassWeakened           = "weakened"
 	ClassIncomplete         = "incomplete"
 	ClassUnverifiable       = "unverifiable"
 )
@@ -116,10 +117,26 @@ type Activation struct {
 }
 
 type ValidationOptions struct {
-	Now              time.Time
-	PublicKey        ed25519.PublicKey
-	Proposal         *Proposal
-	ExpectedRevision int
+	Now                     time.Time
+	PublicKey               ed25519.PublicKey
+	Proposal                *Proposal
+	Selection               *SelectionEvidence
+	ExpectedRevision        int
+	AllowDevelopmentSigning bool
+}
+
+// SelectionEvidence is the trusted current-selection assertion supplied by
+// Gait or an explicit Axym integration boundary. It binds the activation to
+// one exact proposal, family, revision, and byte digest.
+type SelectionEvidence struct {
+	ArtifactID             string `json:"artifact_id"`
+	ArtifactSHA256         string `json:"artifact_sha256"`
+	CanonicalContentDigest string `json:"canonical_content_digest"`
+	ContractID             string `json:"contract_id"`
+	ContractFamilyID       string `json:"contract_family_id"`
+	Revision               int    `json:"revision"`
+	Current                bool   `json:"current"`
+	CandidateCount         int    `json:"candidate_count,omitempty"`
 }
 
 type ValidationResult struct {
@@ -133,10 +150,29 @@ type ValidationResult struct {
 type ConformanceResult struct {
 	Classification string   `json:"classification"`
 	Valid          bool     `json:"valid"`
+	NonBinding     bool     `json:"non_binding"`
 	ReasonCodes    []string `json:"reason_codes,omitempty"`
 	CheckedFields  []string `json:"checked_fields,omitempty"`
 	MissingFields  []string `json:"missing_fields,omitempty"`
 	Exceptions     []string `json:"explicit_exceptions,omitempty"`
+}
+
+// ActivationProjection is an optional Axym-owned observation of controls
+// emitted by a future activation producer. The released Gait activation
+// artifact does not duplicate proposal controls, so the default comparison
+// relies on the exact proposal digest and never infers tightening from mode.
+type ActivationProjection struct {
+	AuthorityRefs           []string
+	Preconditions           []string
+	ConfirmationRequirement string
+	ApprovalRequirement     string
+	CredentialMode          string
+	DelegationDepth         int
+	ExpectedOutcomeClass    string
+	ForbiddenEffects        []string
+	CompensationRequired    *bool
+	ValidityNotBefore       string
+	ValidityNotAfter        string
 }
 
 type Receipt struct {

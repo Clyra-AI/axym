@@ -1,13 +1,17 @@
 package actioncontract
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -173,19 +177,20 @@ func TestActivationBindingAndConformanceAreDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validation := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, PublicKey: publicKey})
+	selection := testSelection(proposal)
+	validation := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: selection, PublicKey: publicKey})
 	if !validation.Valid {
 		t.Fatalf("activation validation failed: %+v", validation)
 	}
 	contextual := CompareProposalActivation(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation)
-	if contextual.Classification != ClassContextual || !contextual.Valid {
+	if contextual.Classification != ClassContextual || !contextual.Valid || !contextual.NonBinding {
 		t.Fatalf("context-only classification mismatch: %+v", contextual)
 	}
 	activation2, err := ParseActivation(activationRaw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := CompareProposalActivation(proposal, activation2, ValidateProposal(proposal, ValidationOptions{}), ValidateActivation(activation2, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, PublicKey: publicKey})); got.Classification != contextual.Classification || got.Valid != contextual.Valid {
+	if got := CompareProposalActivation(proposal, activation2, ValidateProposal(proposal, ValidationOptions{}), ValidateActivation(activation2, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: selection, PublicKey: publicKey})); got.Classification != contextual.Classification || got.Valid != contextual.Valid {
 		t.Fatalf("non-deterministic conformance: got %+v want %+v", got, contextual)
 	}
 }
@@ -212,7 +217,7 @@ func TestActivationTamperFailsSignatureVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validation := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, PublicKey: publicKey})
+	validation := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: testSelection(proposal), PublicKey: publicKey})
 	if validation.Valid || !containsReason(validation.ReasonCodes, ReasonSignature) {
 		t.Fatalf("tampered activation unexpectedly verified: %+v", validation)
 	}
@@ -229,14 +234,14 @@ func TestActivationRevisionModeAndExceptionClassification(t *testing.T) {
 		t.Fatal(err)
 	}
 	activation, publicKey := makeTestActivation(t, proposal, "enforce_floor", nil)
-	options := ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, PublicKey: publicKey}
+	options := ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: testSelection(proposal), PublicKey: publicKey}
 	if result := ValidateActivation(activation, options); !result.Valid {
 		t.Fatalf("enforce_floor activation should verify: %+v", result)
 	}
 
 	wrongRevision := activation
 	wrongRevision.Revision++
-	wrongRevisionResult := ValidateActivation(wrongRevision, ValidationOptions{Now: options.Now, Proposal: &proposal, PublicKey: publicKey, ExpectedRevision: proposal.Revision})
+	wrongRevisionResult := ValidateActivation(wrongRevision, ValidationOptions{Now: options.Now, Proposal: &proposal, Selection: options.Selection, PublicKey: publicKey, ExpectedRevision: proposal.Revision})
 	if wrongRevisionResult.Valid || !containsReason(wrongRevisionResult.ReasonCodes, ReasonBinding) {
 		t.Fatalf("revision drift must fail closed: %+v", wrongRevisionResult)
 	}
@@ -259,6 +264,183 @@ func TestActivationRevisionModeAndExceptionClassification(t *testing.T) {
 	conformance := CompareProposalActivation(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), ValidateActivation(activation, options))
 	if conformance.Classification != ClassExplicitlyExcepted || !conformance.Valid {
 		t.Fatalf("explicit exception classification mismatch: %+v", conformance)
+	}
+}
+
+func TestActivationRequiresSelectionAndExplicitEvaluationTime(t *testing.T) {
+	proposalPath := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1", "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json")
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := ParseProposal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	activation, publicKey := makeTestActivation(t, proposal, "context_only", nil)
+	withoutSelection := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, PublicKey: publicKey})
+	if withoutSelection.Valid || !containsReason(withoutSelection.ReasonCodes, ReasonSelectionRequired) {
+		t.Fatalf("activation without current selection must fail closed: %+v", withoutSelection)
+	}
+	withoutTime := ValidateActivation(activation, ValidationOptions{Proposal: &proposal, Selection: testSelection(proposal), PublicKey: publicKey})
+	if withoutTime.Valid || withoutTime.Status != StatusUnverifiable || !containsReason(withoutTime.ReasonCodes, ReasonEvaluationTime) {
+		t.Fatalf("activation without explicit evaluation time must remain unverifiable: %+v", withoutTime)
+	}
+	contextual := CompareProposalActivation(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), withoutTime)
+	if contextual.Classification != ClassContextual || contextual.Valid || !contextual.NonBinding {
+		t.Fatalf("unverifiable context-only activation must remain non-binding: %+v", contextual)
+	}
+	stale := testSelection(proposal)
+	stale.Current = false
+	staleResult := ValidateActivation(activation, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: stale, PublicKey: publicKey})
+	if staleResult.Valid || !containsReason(staleResult.ReasonCodes, ReasonSelectionNotCurrent) {
+		t.Fatalf("stale selection must fail closed: %+v", staleResult)
+	}
+}
+
+func TestDevelopmentSigningIsNeverVerified(t *testing.T) {
+	proposalPath := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1", "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json")
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := ParseProposal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	activation, publicKey := makeTestActivation(t, proposal, "context_only", nil)
+	activation.DevelopmentSigning = true
+	options := ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: testSelection(proposal), PublicKey: publicKey}
+	defaultResult := ValidateActivation(activation, options)
+	if defaultResult.Valid || !containsReason(defaultResult.ReasonCodes, ReasonDevelopmentSigning) {
+		t.Fatalf("development signing must be rejected by default: %+v", defaultResult)
+	}
+	options.AllowDevelopmentSigning = true
+	testResult := ValidateActivation(activation, options)
+	if testResult.Valid || testResult.Status != StatusUnverifiable || !containsReason(testResult.ReasonCodes, ReasonDevelopmentUnverified) {
+		t.Fatalf("explicit development allowance must remain unverifiable: %+v", testResult)
+	}
+}
+
+func TestDeepProjectionClassifiesExactTightenedWeakenedAndExactExceptions(t *testing.T) {
+	proposalPath := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1", "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json")
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := ParseProposal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	activation, publicKey := makeTestActivation(t, proposal, "enforce_floor", nil)
+	options := ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: testSelection(proposal), PublicKey: publicKey}
+	validation := ValidateActivation(activation, options)
+	values := proposalControlValues(proposal)
+	compensation := boolField(proposal.Contract, "compensation_required")
+	projection := &ActivationProjection{
+		AuthorityRefs: strings.Split(values["authority"], "|"), Preconditions: strings.Split(values["preconditions"], "|"),
+		ConfirmationRequirement: values["confirmation"], ApprovalRequirement: values["approval"], CredentialMode: values["credential_mode"],
+		DelegationDepth: intValue(values["delegation_depth"]), ExpectedOutcomeClass: values["expected_outcome"], ForbiddenEffects: strings.Split(values["forbidden_effects"], "|"),
+		CompensationRequired: &compensation, ValidityNotAfter: values["validity"],
+	}
+	exact := CompareProposalActivationWithProjection(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation, projection)
+	if exact.Classification != ClassExact || !exact.Valid {
+		t.Fatalf("equal control projection must be exact: %+v", exact)
+	}
+	projection.AuthorityRefs = append(projection.AuthorityRefs, "additional:authority")
+	tightened := CompareProposalActivationWithProjection(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation, projection)
+	if tightened.Classification != ClassTightened || !tightened.Valid {
+		t.Fatalf("actual stricter authority projection must be tightened: %+v", tightened)
+	}
+	projection.DelegationDepth++
+	weakened := CompareProposalActivationWithProjection(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation, projection)
+	if weakened.Classification != ClassWeakened || weakened.Valid {
+		t.Fatalf("weaker delegation projection must fail closed: %+v", weakened)
+	}
+	projection.DelegationDepth = intValue(values["delegation_depth"])
+	projection.AuthorityRefs = nil
+	activation.ExplicitExceptions = []string{"authority"}
+	excepted := CompareProposalActivationWithProjection(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation, projection)
+	if excepted.Classification != ClassExplicitlyExcepted || !excepted.Valid {
+		t.Fatalf("exact authority exception must classify explicitly_excepted: %+v", excepted)
+	}
+	activation.ExplicitExceptions = []string{"author"}
+	unknown := CompareProposalActivationWithProjection(proposal, activation, ValidateProposal(proposal, ValidationOptions{}), validation, projection)
+	if unknown.Classification != ClassMismatched || unknown.Valid {
+		t.Fatalf("near-match exception must not authorize omission: %+v", unknown)
+	}
+}
+
+func TestSelectionManifestAndStableReadSafety(t *testing.T) {
+	proposalPath := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1", "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json")
+	raw, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := ParseProposal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := []byte(`{"fixture_version":"1","producer":{"name":"wrkr","version":"v1.14.0"},"schemas":{"artifact":"1","contract":"3"},"scenarios":[{"scenario_id":"customer-data-to-egress","artifact_path":"customer-data-to-egress/pac-6dcee5a6d9a65e8c.json","artifact_sha256":"` + rawDigest(raw) + `","artifact_id":"` + proposal.ArtifactID + `","canonical_content_digest":"` + proposal.CanonicalContentDigest + `","contract_id":"` + proposal.ContractID + `","contract_family_id":"` + proposal.ContractFamilyID + `","revision":` + fmt.Sprint(proposal.Revision) + `,"current":true}]}`)
+	selection, err := ParseSelectionManifest(manifest, proposal)
+	if err != nil || !selection.Current || selection.Revision != proposal.Revision {
+		t.Fatalf("current selection manifest should validate: %v %+v", err, selection)
+	}
+	if _, err := ParseSelectionManifest(bytes.Replace(manifest, []byte(`"current":true`), []byte(`"current":false`), 1), proposal); err == nil || !containsReason(err.(*ValidationError).Reasons, ReasonSelectionNotCurrent) {
+		t.Fatalf("stale selection manifest must fail: %v", err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink safety test requires portable symlink support")
+	}
+	root := t.TempDir()
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	regular := filepath.Join(root, "proposal.json")
+	if err := os.WriteFile(regular, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link.json")
+	if err := os.Symlink(regular, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadProposal(link); err == nil || !containsReason(err.(*ValidationError).Reasons, ReasonMalformed) {
+		t.Fatalf("final symlink must be rejected: %v", err)
+	}
+	ancestor := filepath.Join(root, "ancestor", "proposal.json")
+	if err := os.Symlink(root, filepath.Join(root, "ancestor")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadProposal(ancestor); err == nil || !containsReason(err.(*ValidationError).Reasons, ReasonMalformed) {
+		t.Fatalf("symlinked ancestor must be rejected: %v", err)
+	}
+	overflow := filepath.Join(root, "overflow.json")
+	file, err := os.Create(overflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(maxArtifactBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	_ = file.Close()
+	if _, err := ReadProposal(overflow); err == nil || !containsReason(err.(*ValidationError).Reasons, ReasonMalformed) {
+		t.Fatalf("oversized artifact must be rejected: %v", err)
+	}
+}
+
+func TestStableReasonCodesHideFilesystemDetails(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ReadProposal(filepath.Join(root, "missing.json"))
+	if err == nil {
+		t.Fatal("missing artifact unexpectedly read")
+	}
+	codes := StableReasonCodes(err)
+	if len(codes) != 1 || codes[0] != ReasonInputUnreadable {
+		t.Fatalf("unstable filesystem error leaked or was misclassified: err=%v codes=%v", err, codes)
 	}
 }
 
@@ -293,6 +475,10 @@ func makeTestActivation(t *testing.T, proposal Proposal, mode string, exceptions
 		t.Fatal(err)
 	}
 	return activation, publicKey
+}
+
+func testSelection(proposal Proposal) *SelectionEvidence {
+	return &SelectionEvidence{ArtifactID: proposal.ArtifactID, ArtifactSHA256: rawDigest(proposal.Raw), CanonicalContentDigest: proposal.CanonicalContentDigest, ContractID: proposal.ContractID, ContractFamilyID: proposal.ContractFamilyID, Revision: proposal.Revision, Current: true}
 }
 
 func containsReason(reasons []string, wanted string) bool {

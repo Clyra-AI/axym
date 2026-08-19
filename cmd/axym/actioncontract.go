@@ -16,7 +16,7 @@ func newActionContractCmd(stdout io.Writer, stderr io.Writer, global *globalFlag
 		Short: "Consume exactly one Wrkr proposal without asserting authority",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				return emitActionContractError(stdout, stderr, global, fmt.Errorf("exactly one proposed_action_contract path is required"))
+				return emitActionContractError(stdout, stderr, global, &actioncontract.ValidationError{Reasons: []string{actioncontract.ReasonSelectionRequired}})
 			}
 			proposal, err := actioncontract.ReadProposal(args[0])
 			if err != nil {
@@ -26,7 +26,7 @@ func newActionContractCmd(stdout io.Writer, stderr io.Writer, global *globalFlag
 			receipt := actioncontract.Receipt{
 				Consumer: actioncontract.ConsumerName, Version: actioncontract.ConsumerVersion,
 				ScenarioID: filepath.Base(filepath.Dir(args[0])), ArtifactSHA256: proposal.RawSHA256,
-				Status: actioncontract.StatusPass, SelfAttestation: false,
+				Status: validation.Status, SelfAttestation: false,
 				ProposalArtifactID: proposal.ArtifactID, ContractID: proposal.ContractID,
 				ContractFamilyID: proposal.ContractFamilyID, Revision: proposal.Revision,
 				ResolutionKey:   proposal.ResolutionKey,
@@ -34,7 +34,7 @@ func newActionContractCmd(stdout io.Writer, stderr io.Writer, global *globalFlag
 				SchemaVersions:  map[string]string{"artifact": proposal.SchemaVersion, "contract": proposal.Producer.ContractSchemaVersion},
 				SemanticResult:  actioncontract.SemanticResult{ProposalValid: validation.Valid, Classification: actioncontract.ClassIncomplete, ReasonCodes: validation.ReasonCodes},
 			}
-			if !validation.Valid {
+			if !validation.Valid && validation.Status != actioncontract.StatusUnverifiable {
 				receipt.Status = actioncontract.StatusInvalid
 			}
 			if global.JSON {
@@ -53,10 +53,19 @@ func newActionContractCmd(stdout io.Writer, stderr io.Writer, global *globalFlag
 }
 
 func emitActionContractError(stdout io.Writer, stderr io.Writer, global *globalFlags, err error) error {
+	reasons := actioncontract.StableReasonCodes(err)
+	code := exitInvalidInput
+	if len(reasons) > 0 && reasons[0] != actioncontract.ReasonInputUnreadable && reasons[0] != actioncontract.ReasonSelectionRequired {
+		code = exitVerificationFailed
+	}
 	if global.JSON {
-		_ = printJSON(stdout, envelope{OK: false, Command: "action-contract consume", Error: &errorEnvelope{Reason: "invalid_input", Message: err.Error()}})
+		reason := actioncontract.ReasonInputUnreadable
+		if len(reasons) > 0 {
+			reason = reasons[0]
+		}
+		_ = printJSON(stdout, envelope{OK: false, Command: "action-contract consume", Error: &errorEnvelope{Reason: reason, Message: err.Error()}})
 	} else if !global.Quiet {
 		_, _ = fmt.Fprintln(stderr, err.Error())
 	}
-	return &cliError{code: exitInvalidInput, msg: err.Error()}
+	return &cliError{code: code, msg: err.Error()}
 }

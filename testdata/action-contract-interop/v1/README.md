@@ -8,6 +8,7 @@ intentionally not imported because this Axym slice consumes proposals only.
 
 The Gait activation schema is copied from merged Gait commit `0897620`. That
 commit ships the activation schema and deterministic activation tests, but no
-standalone activation golden file; Axym's activation tests therefore generate
-a producer-shaped signed artifact in memory and verify it against the copied
-schema and exact proposal bytes.
+standalone v1.4 activation golden file; Axym's activation tests therefore
+generate a producer-shaped signed artifact in memory and verify it against the
+copied schema and exact proposal bytes. Exact Gait producer compatibility is
+blocked until that golden is committed and released.

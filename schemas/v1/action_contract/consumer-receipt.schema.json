@@ -10,7 +10,7 @@
     "version": {"type": "string", "minLength": 1},
     "scenario_id": {"type": "string", "minLength": 1},
     "artifact_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-    "status": {"enum": ["pass", "invalid"]},
+    "status": {"enum": ["pass", "invalid", "unverifiable"]},
     "self_attestation": {"const": false},
     "proposal_artifact_id": {"type": "string"},
     "contract_id": {"type": "string"},

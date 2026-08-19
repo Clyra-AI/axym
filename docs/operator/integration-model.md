@@ -62,6 +62,8 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - The consumer preserves producer-native bytes, IDs, revisions, supersession, authority/precondition/confirmation/compensation fields, and evidence references.
 - A proposal is report-only evidence, never execution authority. `context_only` activation is explicitly non-binding; `enforce_floor` conformance reports structural preservation/tightening only.
 - Gait `activated_action_contract` artifacts are validated against the Axym-owned schema and can be verified with the typed `core/ingest/actioncontract` package when the activation public key and exact proposal bytes are supplied.
+- Activation verification also requires current-selection evidence for the exact family/revision and an explicit UTC evaluation time. Development-signed activations remain unverifiable even when a test-only allowance is supplied.
+- `enforce_floor` is not interpreted as tightening by mode alone: only an explicit value projection can prove `tightened`; otherwise the exact proposal binding is reported conservatively.
 - Execution, effects, containment, compensation events, and telemetry authenticity remain deferred until corresponding released producer artifacts exist. See [the versioned schema contract](../../schemas/v1/action_contract/README.md).
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.

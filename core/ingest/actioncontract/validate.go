@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -23,6 +24,8 @@ import (
 	proofsign "github.com/Clyra-AI/proof/signing"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
+
+const maxArtifactBytes int64 = 16 << 20
 
 //go:embed schemaassets/*.json
 var schemaAssets embed.FS
@@ -55,6 +58,14 @@ const (
 	ReasonExpired               = "activation_expired"
 	ReasonNotYetValid           = "activation_not_yet_valid"
 	ReasonCurrentRevision       = "revision_not_current"
+	ReasonSelectionRequired     = "selection_evidence_required"
+	ReasonSelectionMismatch     = "selection_mismatch"
+	ReasonSelectionNotCurrent   = "selection_not_current"
+	ReasonSelectionAmbiguous    = "selection_ambiguous"
+	ReasonEvaluationTime        = "evaluation_time_required"
+	ReasonDevelopmentSigning    = "development_signing_not_allowed"
+	ReasonDevelopmentUnverified = "development_signing_unverifiable"
+	ReasonInputUnreadable       = "artifact_unreadable"
 )
 
 type ValidationError struct{ Reasons []string }
@@ -64,6 +75,19 @@ func (e *ValidationError) Error() string {
 		return "action contract validation failed"
 	}
 	return "action contract validation failed: " + strings.Join(e.Reasons, ",")
+}
+
+// StableReasonCodes converts any ingestion error into the bounded public
+// reason vocabulary. Dynamic OS/parser text is never emitted as a reason.
+func StableReasonCodes(err error) []string {
+	if err == nil {
+		return nil
+	}
+	var validationErr *ValidationError
+	if errors.As(err, &validationErr) && validationErr != nil && len(validationErr.Reasons) > 0 {
+		return sortedUnique(validationErr.Reasons)
+	}
+	return []string{ReasonInputUnreadable}
 }
 
 func sortedUnique(values []string) []string {
@@ -253,11 +277,7 @@ func ReadProposal(path string) (Proposal, error) {
 	if path == "" {
 		return Proposal{}, &ValidationError{Reasons: []string{ReasonMalformed}}
 	}
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-		return Proposal{}, &ValidationError{Reasons: []string{ReasonMalformed}}
-	}
-	raw, err := os.ReadFile(path) // #nosec G304 -- explicit consumer path.
+	raw, err := readStableArtifact(path)
 	if err != nil {
 		return Proposal{}, err
 	}
@@ -317,19 +337,30 @@ func ValidateProposal(proposal Proposal, options ValidationOptions) ValidationRe
 		add(ReasonRevision)
 	}
 	now := options.Now
-	if !now.IsZero() {
-		if expires := stringField(proposal.Contract, "expires_at"); expires != "" {
-			if parsed, err := time.Parse(time.RFC3339, expires); err != nil || parsed.Before(now) {
-				add(ReasonValidity)
-			}
+	if expires := stringField(proposal.Contract, "expires_at"); expires != "" {
+		if now.IsZero() {
+			add(ReasonEvaluationTime)
+		} else if parsed, err := parseUTCInstant(expires); err != nil || parsed.Before(now.UTC()) {
+			add(ReasonValidity)
 		}
 	}
 	result.ReasonCodes = sortedUnique(reasons)
 	result.Valid = len(result.ReasonCodes) == 0
 	if result.Valid {
 		result.Status = StatusPass
+	} else if hasReason(result.ReasonCodes, ReasonEvaluationTime) {
+		result.Status = StatusUnverifiable
 	}
 	return result
+}
+
+func hasReason(reasons []string, wanted string) bool {
+	for _, reason := range reasons {
+		if reason == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func ParseActivation(raw []byte) (Activation, error) {
@@ -353,15 +384,181 @@ func ParseActivation(raw []byte) (Activation, error) {
 }
 
 func ReadActivation(path string) (Activation, error) {
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-		return Activation{}, &ValidationError{Reasons: []string{ReasonMalformed}}
-	}
-	raw, err := os.ReadFile(path) // #nosec G304 -- explicit consumer path.
+	raw, err := readStableArtifact(path)
 	if err != nil {
 		return Activation{}, err
 	}
 	return ParseActivation(raw)
+}
+
+func readStableArtifact(path string) ([]byte, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	if err := rejectSymlinkAncestors(abs); err != nil {
+		return nil, err
+	}
+	initial, err := os.Lstat(abs)
+	if err != nil {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	if initial.Mode()&os.ModeSymlink != 0 || !initial.Mode().IsRegular() {
+		return nil, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	file, err := os.Open(abs) // #nosec G304 -- explicit consumer path after lexical safety checks.
+	if err != nil {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	defer func() { _ = file.Close() }()
+	descriptorInfo, err := file.Stat()
+	if err != nil || !descriptorInfo.Mode().IsRegular() || descriptorInfo.Size() > maxArtifactBytes {
+		return nil, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	first, err := readBounded(file)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	second, err := readBounded(file)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(first, second) {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	finalInfo, err := file.Stat()
+	if err != nil || finalInfo.Size() != descriptorInfo.Size() {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	current, err := os.Lstat(abs)
+	if err != nil || current.Mode()&os.ModeSymlink != 0 || !current.Mode().IsRegular() || !os.SameFile(descriptorInfo, current) {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	return first, nil
+}
+
+func readBounded(file *os.File) ([]byte, error) {
+	raw, err := io.ReadAll(io.LimitReader(file, maxArtifactBytes+1))
+	if err != nil {
+		return nil, &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+	}
+	if int64(len(raw)) > maxArtifactBytes {
+		return nil, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	return raw, nil
+}
+
+func rejectSymlinkAncestors(path string) error {
+	current := filepath.Dir(path)
+	for {
+		info, err := os.Lstat(current)
+		if err != nil {
+			return &ValidationError{Reasons: []string{ReasonInputUnreadable}}
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return &ValidationError{Reasons: []string{ReasonMalformed}}
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return nil
+		}
+		current = parent
+	}
+}
+
+func selectionMatchesProposal(selection SelectionEvidence, proposal Proposal) bool {
+	return selection.CandidateCount <= 1 && selection.Current && selection.ArtifactID == proposal.ArtifactID && selection.ArtifactSHA256 == rawDigest(proposal.Raw) && selection.CanonicalContentDigest == proposal.CanonicalContentDigest && selection.ContractID == proposal.ContractID && selection.ContractFamilyID == proposal.ContractFamilyID && selection.Revision == proposal.Revision
+}
+
+func parseUTCInstant(value string) (time.Time, error) {
+	parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(value))
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed.UTC(), nil
+}
+
+// ParseSelectionManifest parses the Gait current-selection manifest shape and
+// returns one exact selection assertion for proposal. It rejects ambiguous,
+// stale, superseded, and digest-mismatched selections.
+func ParseSelectionManifest(raw []byte, proposal Proposal) (SelectionEvidence, error) {
+	if err := rejectDuplicateJSONKeys(raw); err != nil {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	var manifest struct {
+		FixtureVersion string `json:"fixture_version"`
+		Producer       struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"producer"`
+		Schemas struct {
+			Artifact string `json:"artifact"`
+			Contract string `json:"contract"`
+		} `json:"schemas"`
+		Scenarios []struct {
+			ArtifactID             string `json:"artifact_id"`
+			ArtifactSHA256         string `json:"artifact_sha256"`
+			CanonicalContentDigest string `json:"canonical_content_digest"`
+			ContractID             string `json:"contract_id"`
+			ContractFamilyID       string `json:"contract_family_id"`
+			Revision               int    `json:"revision"`
+			Current                bool   `json:"current"`
+		} `json:"scenarios"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonMalformed}}
+	}
+	if manifest.FixtureVersion != "1" || manifest.Producer.Name != ProposalProducer || manifest.Schemas.Artifact != ProposalSchemaVersion || manifest.Schemas.Contract != ProposalContractVersion {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionMismatch}}
+	}
+	var selected SelectionEvidence
+	found := 0
+	maxRevision := 0
+	for _, scenario := range manifest.Scenarios {
+		if scenario.ContractFamilyID == proposal.ContractFamilyID && scenario.Revision > maxRevision {
+			maxRevision = scenario.Revision
+		}
+		if scenario.ArtifactID != proposal.ArtifactID && scenario.ContractID != proposal.ContractID {
+			continue
+		}
+		found++
+		selected = SelectionEvidence{
+			ArtifactID: scenario.ArtifactID, ArtifactSHA256: scenario.ArtifactSHA256,
+			CanonicalContentDigest: scenario.CanonicalContentDigest, ContractID: scenario.ContractID,
+			ContractFamilyID: scenario.ContractFamilyID, Revision: scenario.Revision,
+			Current: scenario.Current, CandidateCount: found,
+		}
+	}
+	if found == 0 {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionRequired}}
+	}
+	if found > 1 {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionAmbiguous}}
+	}
+	if !selected.Current || maxRevision > selected.Revision {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionNotCurrent}}
+	}
+	if !selectionMatchesProposal(selected, proposal) {
+		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionMismatch}}
+	}
+	return selected, nil
+}
+
+// ReadSelectionManifest reads one explicit, stable current-selection
+// manifest and binds it to proposal without scanning for alternatives.
+func ReadSelectionManifest(path string, proposal Proposal) (SelectionEvidence, error) {
+	raw, err := readStableArtifact(path)
+	if err != nil {
+		return SelectionEvidence{}, err
+	}
+	return ParseSelectionManifest(raw, proposal)
 }
 
 func ValidateActivation(activation Activation, options ValidationOptions) ValidationResult {
@@ -374,11 +571,27 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 	if activation.SchemaID != ActivationSchemaID || activation.SchemaVersion != ActivationSchemaVersion || activation.Producer.Name != "gait" || activation.Producer.ArtifactSchemaVersion != ActivationSchemaVersion || activation.Producer.ContractSchemaVersion != ActivationContractVersion || activation.ReportOnly {
 		add(ReasonUnsupportedSchema)
 	}
+	if activation.DevelopmentSigning {
+		if !options.AllowDevelopmentSigning {
+			add(ReasonDevelopmentSigning)
+		} else {
+			add(ReasonDevelopmentUnverified)
+		}
+	}
 	if !activationIDPattern.MatchString(activation.ArtifactID) || !contractIDPattern.MatchString(activation.ContractID) || !familyIDPattern.MatchString(activation.ContractFamilyID) || activation.Revision < 1 || activation.PolicyDigest == "" || activation.ActivatingPrincipal == "" || len(nonEmpty(activation.AuthorityRefs)) == 0 || activation.Target == "" || activation.Environment == "" {
 		add(ReasonIdentity)
 	}
 	if activation.Proposal.ContractID != activation.ContractID || activation.Proposal.ContractFamilyID != activation.ContractFamilyID || activation.Proposal.Revision != activation.Revision || activation.Proposal.SchemaID != ProposalSchemaID || activation.Proposal.SchemaVersion != ProposalSchemaVersion || activation.Proposal.ContractSchemaVersion != ProposalContractVersion {
 		add(ReasonBinding)
+	}
+	if options.Selection == nil {
+		add(ReasonSelectionRequired)
+	} else if options.Selection.CandidateCount > 1 {
+		add(ReasonSelectionAmbiguous)
+	} else if !options.Selection.Current {
+		add(ReasonSelectionNotCurrent)
+	} else if options.Proposal == nil || !selectionMatchesProposal(*options.Selection, *options.Proposal) {
+		add(ReasonSelectionMismatch)
 	}
 	if options.Proposal == nil {
 		add(ReasonSignatureUnverifiable)
@@ -391,19 +604,22 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 	if activation.ActivationMode != "context_only" && activation.ActivationMode != "enforce_floor" && activation.ActivationMode != "required" {
 		add(ReasonIdentity)
 	}
-	if parsed, err := time.Parse(time.RFC3339, activation.Validity.NotBefore); err != nil {
+	if options.Now.IsZero() {
+		add(ReasonEvaluationTime)
+	}
+	if parsed, err := parseUTCInstant(activation.Validity.NotBefore); err != nil {
 		add(ReasonValidity)
-	} else if !options.Now.IsZero() && options.Now.Before(parsed) {
+	} else if !options.Now.IsZero() && options.Now.UTC().Before(parsed) {
 		add(ReasonNotYetValid)
 	}
 	if activation.Validity.NotAfter != "" {
-		if parsed, err := time.Parse(time.RFC3339, activation.Validity.NotAfter); err != nil {
+		if parsed, err := parseUTCInstant(activation.Validity.NotAfter); err != nil {
 			add(ReasonValidity)
-		} else if !options.Now.IsZero() && !options.Now.Before(parsed) {
+		} else if !options.Now.IsZero() && !options.Now.UTC().Before(parsed) {
 			add(ReasonExpired)
 		}
-		if before, beforeErr := time.Parse(time.RFC3339, activation.Validity.NotBefore); beforeErr == nil {
-			if after, afterErr := time.Parse(time.RFC3339, activation.Validity.NotAfter); afterErr == nil && !after.After(before) {
+		if before, beforeErr := parseUTCInstant(activation.Validity.NotBefore); beforeErr == nil {
+			if after, afterErr := parseUTCInstant(activation.Validity.NotAfter); afterErr == nil && !after.After(before) {
 				add(ReasonValidity)
 			}
 		}
@@ -430,7 +646,7 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 		add(ReasonSignatureUnverifiable)
 	}
 	result.ReasonCodes = sortedUnique(reasons)
-	result.Valid = len(result.ReasonCodes) == 0
+	result.Valid = len(result.ReasonCodes) == 0 && !activation.DevelopmentSigning
 	if result.Valid {
 		result.Status = StatusPass
 	}

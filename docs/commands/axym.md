@@ -104,6 +104,7 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --gait-pack <path> --json`: ingests Gait native/proof packs plus authorization bundles and structured control artifacts with deterministic translation and bundle counts.
 - `axym action-contract consume <path> --json`: consumes one report-only Wrkr proposal; it never treats the proposal as execution authority and does not claim execution/effect/containment evidence.
+- Action Contract verification is fail-closed for symlinked paths, stale/ambiguous selection evidence, absent evaluation time, and development signing; machine-readable reasons are stable and never contain filesystem/parser text.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.
 - `axym gaps --frameworks eu-ai-act,soc2 --json`: ranks `covered`, `partial`, and `gap` outcomes with remediation and effort.
 - `axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: captures deterministic baseline coverage.

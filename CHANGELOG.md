@@ -9,6 +9,7 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 ### Added
 
 - Bounded Action Contract interoperability: exact Wrkr v3 proposal ingestion, Gait activation binding verification, deterministic conformance classifications, pinned producer fixtures, and the `WRKR_AXYM_ACTION_CONTRACT_CONSUMER` receipt entrypoint.
+- Action Contract verification hardening: Go 1.26.6 pin, explicit current-selection/evaluation-time requirements, development-signing quarantine, stable reason codes, descriptor-bound artifact reads, and value-based conformance classification.
 - `init --sample-pack <dir>` for a supported offline first-value path that produces non-empty local evidence and compliance results.
 - Launch-facing docs that separate `smoke test`, `sample proof path`, and `real integration path`.
 - Root `LICENSE`, governance assets, issue templates, and PR template for the public OSS baseline.

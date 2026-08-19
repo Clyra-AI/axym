@@ -14,7 +14,7 @@ import (
 
 func main() {
 	if len(os.Args) != 2 || os.Args[1] == "" {
-		fmt.Fprintln(os.Stderr, "usage: axym-action-contract-consumer <one-proposed-action-contract.json>")
+		writeReceipt(actioncontract.Receipt{Consumer: actioncontract.ConsumerName, Version: actioncontract.ConsumerVersion, ScenarioID: "unknown", ArtifactSHA256: actioncontract.RawDigest(nil), Status: actioncontract.StatusInvalid, SelfAttestation: false, SchemaVersions: map[string]string{"artifact": actioncontract.ProposalSchemaVersion, "contract": actioncontract.ProposalContractVersion}, SemanticResult: actioncontract.SemanticResult{Classification: actioncontract.ClassUnverifiable, ReasonCodes: []string{actioncontract.ReasonSelectionRequired}, ExecutionClaim: false, EffectClaim: false}})
 		os.Exit(6)
 	}
 	path := os.Args[1]
@@ -27,12 +27,15 @@ func main() {
 				artifactDigest = actioncontract.RawDigest(raw)
 			}
 		}
-		writeReceipt(actioncontract.Receipt{Consumer: actioncontract.ConsumerName, Version: actioncontract.ConsumerVersion, ScenarioID: filepath.Base(filepath.Dir(path)), ArtifactSHA256: artifactDigest, Status: actioncontract.StatusInvalid, SelfAttestation: false, SchemaVersions: map[string]string{"artifact": actioncontract.ProposalSchemaVersion, "contract": actioncontract.ProposalContractVersion}, SemanticResult: actioncontract.SemanticResult{Classification: actioncontract.ClassUnverifiable, ReasonCodes: []string{err.Error()}, ExecutionClaim: false, EffectClaim: false}})
+		writeReceipt(actioncontract.Receipt{Consumer: actioncontract.ConsumerName, Version: actioncontract.ConsumerVersion, ScenarioID: filepath.Base(filepath.Dir(path)), ArtifactSHA256: artifactDigest, Status: actioncontract.StatusInvalid, SelfAttestation: false, SchemaVersions: map[string]string{"artifact": actioncontract.ProposalSchemaVersion, "contract": actioncontract.ProposalContractVersion}, SemanticResult: actioncontract.SemanticResult{Classification: actioncontract.ClassUnverifiable, ReasonCodes: actioncontract.StableReasonCodes(err), ExecutionClaim: false, EffectClaim: false}})
+		if codes := actioncontract.StableReasonCodes(err); len(codes) > 0 && codes[0] == actioncontract.ReasonInputUnreadable {
+			os.Exit(6)
+		}
 		os.Exit(2)
 	}
 	validation := actioncontract.ValidateProposal(proposal, actioncontract.ValidationOptions{})
-	status := actioncontract.StatusPass
-	if !validation.Valid {
+	status := validation.Status
+	if status == "" {
 		status = actioncontract.StatusInvalid
 	}
 	correlationRefs := append([]string(nil), proposal.SourceScanRefs...)
