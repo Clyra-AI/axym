@@ -142,6 +142,7 @@ type SelectionEvidence struct {
 type ValidationResult struct {
 	Valid                  bool     `json:"valid"`
 	Status                 string   `json:"status"`
+	SignatureVerified      bool     `json:"signature_verified"`
 	ReasonCodes            []string `json:"reason_codes,omitempty"`
 	CanonicalContentDigest string   `json:"canonical_content_digest,omitempty"`
 	RawSHA256              string   `json:"artifact_sha256,omitempty"`

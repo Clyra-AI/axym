@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -143,7 +144,10 @@ func TestAxymReceiptSchemaAcceptsDeterministicConsumerReceipt(t *testing.T) {
 	}
 }
 
-func TestActivationBindingAndConformanceAreDeterministic(t *testing.T) {
+// TestActivationBindingAndConformanceUnit uses an in-memory producer-shaped
+// value only for local API behavior. Producer compatibility is covered by
+// TestGaitActivationFixturePackUsesExactRawProducerBytes below.
+func TestActivationBindingAndConformanceUnit(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1", "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -193,6 +197,173 @@ func TestActivationBindingAndConformanceAreDeterministic(t *testing.T) {
 	if got := CompareProposalActivation(proposal, activation2, ValidateProposal(proposal, ValidationOptions{}), ValidateActivation(activation2, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: selection, PublicKey: publicKey})); got.Classification != contextual.Classification || got.Valid != contextual.Valid {
 		t.Fatalf("non-deterministic conformance: got %+v want %+v", got, contextual)
 	}
+}
+
+func TestGaitActivationFixturePackUsesExactRawProducerBytes(t *testing.T) {
+	root := filepath.Join("..", "..", "..", "testdata", "action-contract-interop", "v1")
+	manifestRaw, err := os.ReadFile(filepath.Join(root, "expected", "activation-fixture-manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		FixtureVersion string `json:"fixture_version"`
+		Producer       struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"producer"`
+		Schemas struct {
+			Artifact string `json:"artifact"`
+			Contract string `json:"contract"`
+		} `json:"schemas"`
+		Signing struct {
+			Development bool   `json:"development_signing"`
+			KeyID       string `json:"key_id"`
+			PublicPath  string `json:"public_key_path"`
+		} `json:"signing"`
+		Scenarios []struct {
+			ScenarioID           string   `json:"scenario_id"`
+			ProposalPath         string   `json:"proposal_path"`
+			ProposalSHA256       string   `json:"proposal_sha256"`
+			CanonicalDigest      string   `json:"canonical_content_digest"`
+			ProposalArtifactID   string   `json:"proposal_artifact_id"`
+			ContractID           string   `json:"contract_id"`
+			ContractFamilyID     string   `json:"contract_family_id"`
+			Revision             int      `json:"revision"`
+			Current              bool     `json:"current"`
+			ActivationPath       string   `json:"activation_path"`
+			ActivationSHA256     string   `json:"activation_sha256"`
+			ActivationArtifactID string   `json:"activation_artifact_id"`
+			ActivationStatus     string   `json:"activation_status"`
+			ActivationReasons    []string `json:"activation_reason_codes"`
+			DevelopmentSigning   bool     `json:"development_signing"`
+		} `json:"scenarios"`
+	}
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.FixtureVersion != "1" || manifest.Producer.Name != "gait" || manifest.Producer.Version != "v1.4.0" || manifest.Schemas.Artifact != "1" || manifest.Schemas.Contract != "1" || !manifest.Signing.Development || len(manifest.Scenarios) != 9 {
+		t.Fatalf("unexpected Gait fixture provenance: %+v", manifest)
+	}
+	publicRaw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(manifest.Signing.PublicPath, "testdata/action-contract-interop/v1/"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(publicRaw)))
+	if err != nil || len(publicBytes) != ed25519.PublicKeySize {
+		t.Fatalf("invalid fixture public key: %v", err)
+	}
+	publicKey := ed25519.PublicKey(publicBytes)
+	keySum := sha256.Sum256(publicKey)
+	if got := hex.EncodeToString(keySum[:]); got != manifest.Signing.KeyID {
+		t.Fatalf("fixture key id mismatch: got %s want %s", got, manifest.Signing.KeyID)
+	}
+	selectionProposal, selectionRaw, err := readFixtureProposal(filepath.Join(root, "expected", "customer-data-to-egress", "pac-6dcee5a6d9a65e8c.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection, err := ParseSelectionManifest(manifestRaw, selectionProposal)
+	if err != nil || !selection.Current || selection.ArtifactSHA256 != RawDigest(selectionRaw) {
+		t.Fatalf("Gait activation manifest selection did not bind exact proposal: %v %+v", err, selection)
+	}
+	goldens, err := filepath.Glob(filepath.Join(root, "expected", "*", "activated-action-contract.json"))
+	if err != nil || len(goldens) != 6 {
+		t.Fatalf("fixture file set must contain exactly six activation goldens: %v %v", err, goldens)
+	}
+	manifestGoldens := map[string]struct{}{}
+	for _, scenario := range manifest.Scenarios {
+		if scenario.ActivationPath != "" {
+			manifestGoldens[filepath.FromSlash(scenario.ActivationPath)] = struct{}{}
+		}
+	}
+	if len(manifestGoldens) != len(goldens) {
+		t.Fatalf("manifest/file-set mismatch: manifest=%d files=%d", len(manifestGoldens), len(goldens))
+	}
+	for _, golden := range goldens {
+		relative, err := filepath.Rel(root, golden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := manifestGoldens[relative]; !ok {
+			t.Fatalf("unmanifested activation golden: %s", relative)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "fixture-signing-key.private.b64")); !os.IsNotExist(err) {
+		t.Fatalf("private fixture signing key must not be committed: %v", err)
+	}
+	activated := 0
+	for _, scenario := range manifest.Scenarios {
+		proposalPath := filepath.Join(root, filepath.FromSlash(scenario.ProposalPath))
+		proposal, rawProposal, err := readFixtureProposal(proposalPath)
+		if err != nil {
+			t.Fatalf("read proposal %s: %v", scenario.ScenarioID, err)
+		}
+		if RawDigest(rawProposal) != scenario.ProposalSHA256 || proposal.CanonicalContentDigest != scenario.CanonicalDigest || proposal.ArtifactID != scenario.ProposalArtifactID || proposal.ContractID != scenario.ContractID || proposal.ContractFamilyID != scenario.ContractFamilyID || proposal.Revision != scenario.Revision {
+			t.Fatalf("proposal provenance mismatch for %s", scenario.ScenarioID)
+		}
+		selection := &SelectionEvidence{ArtifactID: proposal.ArtifactID, ArtifactSHA256: RawDigest(rawProposal), CanonicalContentDigest: proposal.CanonicalContentDigest, ContractID: proposal.ContractID, ContractFamilyID: proposal.ContractFamilyID, Revision: proposal.Revision, Current: scenario.Current}
+		if scenario.ActivationStatus != "activated" {
+			if scenario.ActivationPath != "" || len(scenario.ActivationReasons) == 0 {
+				t.Fatalf("rejection disposition missing for %s", scenario.ScenarioID)
+			}
+			result := ValidateProposal(proposal, ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)})
+			if result.Valid || len(scenario.ActivationReasons) == 0 || !containsReason(result.ReasonCodes, scenario.ActivationReasons[0]) {
+				t.Fatalf("non-activated scenario rejection disposition mismatch: %s %+v", scenario.ScenarioID, result)
+			}
+			continue
+		}
+		activated++
+		activationRaw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(scenario.ActivationPath)))
+		if err != nil {
+			t.Fatalf("read activation %s: %v", scenario.ScenarioID, err)
+		}
+		if RawDigest(activationRaw) != scenario.ActivationSHA256 {
+			t.Fatalf("activation byte digest mismatch for %s", scenario.ScenarioID)
+		}
+		activation, err := ReadActivation(filepath.Join(root, filepath.FromSlash(scenario.ActivationPath)))
+		if err != nil {
+			t.Fatalf("parse activation %s: %v", scenario.ScenarioID, err)
+		}
+		if !bytes.Equal(activation.Raw, activationRaw) {
+			t.Fatalf("stable activation ingest changed producer bytes for %s", scenario.ScenarioID)
+		}
+		if !activation.DevelopmentSigning || activation.ArtifactID != scenario.ActivationArtifactID || activation.ContractID != scenario.ContractID || activation.ContractFamilyID != scenario.ContractFamilyID || activation.Revision != scenario.Revision {
+			t.Fatalf("activation identity/provenance mismatch for %s", scenario.ScenarioID)
+		}
+		options := ValidationOptions{Now: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), Proposal: &proposal, Selection: selection, PublicKey: publicKey, AllowDevelopmentSigning: true}
+		result := ValidateActivation(activation, options)
+		if result.Valid || result.Status != StatusUnverifiable || !result.SignatureVerified || !containsReason(result.ReasonCodes, ReasonDevelopmentUnverified) {
+			t.Fatalf("fixture activation must verify encoding but remain unverifiable: %s %+v", scenario.ScenarioID, result)
+		}
+		defaultResult := ValidateActivation(activation, ValidationOptions{Now: options.Now, Proposal: &proposal, Selection: selection, PublicKey: publicKey})
+		if defaultResult.Valid || defaultResult.SignatureVerified || !containsReason(defaultResult.ReasonCodes, ReasonDevelopmentSigning) {
+			t.Fatalf("development fixture must be rejected by default: %s %+v", scenario.ScenarioID, defaultResult)
+		}
+		tampered := append([]byte(nil), activationRaw...)
+		tampered = bytes.Replace(tampered, []byte(`"target": "target:fixture"`), []byte(`"target": "target:tampered"`), 1)
+		if bytes.Equal(tampered, activationRaw) {
+			t.Fatal("activation tamper marker missing")
+		}
+		tamperedActivation, err := ParseActivation(tampered)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tamperedResult := ValidateActivation(tamperedActivation, options)
+		if tamperedResult.SignatureVerified || containsReason(tamperedResult.ReasonCodes, ReasonDevelopmentUnverified) && tamperedResult.Valid {
+			t.Fatalf("tampered activation unexpectedly verified: %+v", tamperedResult)
+		}
+	}
+	if activated != 6 {
+		t.Fatalf("expected six exact activated goldens, got %d", activated)
+	}
+}
+
+func readFixtureProposal(path string) (Proposal, []byte, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Proposal{}, nil, err
+	}
+	proposal, err := ParseProposal(raw)
+	return proposal, raw, err
 }
 
 func TestActivationTamperFailsSignatureVerification(t *testing.T) {

@@ -36,7 +36,10 @@ export WRKR_AXYM_ACTION_CONTRACT_CONSUMER="$PWD/axym-action-contract-consumer"
 
 Every receipt sets `self_attestation: false` and contains the raw artifact
 SHA-256, producer IDs, revision, correlation references, schema versions, and
-deterministic semantic classification. The exact Gait activation golden is
-blocked until the corresponding Gait v1.4 fixture is committed and released;
-the current generated activation input is unit-test-only and is not claimed as
-producer compatibility evidence.
+deterministic semantic classification. The exact Gait activation fixture pack
+is sourced from PR #170 commit `4509fa7` and targets producer v1.4.0. Its six
+activated goldens and three rejection dispositions are committed byte-for-byte.
+The fixtures are marked development-signed and are used only with the explicit
+fixture option; they remain `unverifiable` and non-authoritative. The generated
+activation helper remains unit-test-only and is not producer compatibility
+evidence.

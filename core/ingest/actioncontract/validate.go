@@ -66,6 +66,8 @@ const (
 	ReasonDevelopmentSigning    = "development_signing_not_allowed"
 	ReasonDevelopmentUnverified = "development_signing_unverifiable"
 	ReasonInputUnreadable       = "artifact_unreadable"
+	ReasonProposalStale         = "proposal_stale"
+	ReasonProposalContradictory = "proposal_contradictory"
 )
 
 type ValidationError struct{ Reasons []string }
@@ -321,6 +323,18 @@ func ValidateProposal(proposal Proposal, options ValidationOptions) ValidationRe
 	if proposal.Revision > 1 && strings.TrimSpace(stringField(proposal.Contract, "supersedes_ref")) == "" {
 		add(ReasonRevision)
 	}
+	for _, observation := range objectArray(proposal.Contract, "lifecycle_observations") {
+		freshness := stringField(observation, "freshness_state")
+		if freshness == "stale" || freshness == "expired" {
+			add(ReasonProposalStale)
+		}
+		if stringField(observation, "kind") == "supersession" && stringField(observation, "evidence_state") == "contradictory" {
+			add(ReasonProposalContradictory)
+		}
+	}
+	if stringField(proposal.Contract, "readiness_state") == "blocked_by_contradiction" || stringField(proposal.Contract, "authority_readiness_state") == "blocked_by_contradiction" {
+		add(ReasonProposalContradictory)
+	}
 	if digest, err := proposalCanonicalDigest(proposal.Data); err != nil || digest != proposal.CanonicalContentDigest {
 		add(ReasonDigest)
 	} else {
@@ -505,6 +519,8 @@ func ParseSelectionManifest(raw []byte, proposal Proposal) (SelectionEvidence, e
 		Scenarios []struct {
 			ArtifactID             string `json:"artifact_id"`
 			ArtifactSHA256         string `json:"artifact_sha256"`
+			ProposalArtifactID     string `json:"proposal_artifact_id"`
+			ProposalSHA256         string `json:"proposal_sha256"`
 			CanonicalContentDigest string `json:"canonical_content_digest"`
 			ContractID             string `json:"contract_id"`
 			ContractFamilyID       string `json:"contract_family_id"`
@@ -515,22 +531,31 @@ func ParseSelectionManifest(raw []byte, proposal Proposal) (SelectionEvidence, e
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonMalformed}}
 	}
-	if manifest.FixtureVersion != "1" || manifest.Producer.Name != ProposalProducer || manifest.Schemas.Artifact != ProposalSchemaVersion || manifest.Schemas.Contract != ProposalContractVersion {
+	producerShapeOK := (manifest.Producer.Name == ProposalProducer && manifest.Schemas.Contract == ProposalContractVersion) || (manifest.Producer.Name == "gait" && manifest.Schemas.Contract == ActivationContractVersion)
+	if manifest.FixtureVersion != "1" || !producerShapeOK || manifest.Schemas.Artifact != ProposalSchemaVersion {
 		return SelectionEvidence{}, &ValidationError{Reasons: []string{ReasonSelectionMismatch}}
 	}
 	var selected SelectionEvidence
 	found := 0
 	maxRevision := 0
 	for _, scenario := range manifest.Scenarios {
+		artifactID := scenario.ArtifactID
+		if artifactID == "" {
+			artifactID = scenario.ProposalArtifactID
+		}
+		artifactSHA256 := scenario.ArtifactSHA256
+		if artifactSHA256 == "" {
+			artifactSHA256 = scenario.ProposalSHA256
+		}
 		if scenario.ContractFamilyID == proposal.ContractFamilyID && scenario.Revision > maxRevision {
 			maxRevision = scenario.Revision
 		}
-		if scenario.ArtifactID != proposal.ArtifactID && scenario.ContractID != proposal.ContractID {
+		if artifactID != proposal.ArtifactID && scenario.ContractID != proposal.ContractID {
 			continue
 		}
 		found++
 		selected = SelectionEvidence{
-			ArtifactID: scenario.ArtifactID, ArtifactSHA256: scenario.ArtifactSHA256,
+			ArtifactID: artifactID, ArtifactSHA256: artifactSHA256,
 			CanonicalContentDigest: scenario.CanonicalContentDigest, ContractID: scenario.ContractID,
 			ContractFamilyID: scenario.ContractFamilyID, Revision: scenario.Revision,
 			Current: scenario.Current, CandidateCount: found,
@@ -627,7 +652,7 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 	if options.ExpectedRevision > 0 && options.ExpectedRevision != activation.Revision {
 		add(ReasonCurrentRevision)
 	}
-	if len(options.PublicKey) == ed25519.PublicKeySize && len(reasons) == 0 {
+	if len(options.PublicKey) == ed25519.PublicKeySize && signatureChecksAllowed(reasons) {
 		digest, err := activationSignableDigest(activation)
 		if err != nil {
 			add(ReasonSignature)
@@ -635,6 +660,8 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 			add(ReasonSignature)
 		} else if valid, err := proofsign.VerifyDigestHex(options.PublicKey, activation.Signature); err != nil || !valid {
 			add(ReasonSignature)
+		} else {
+			result.SignatureVerified = true
 		}
 		if len(reasons) == 0 {
 			wantID := "gact-" + strings.TrimPrefix(digest, "sha256:")[:16]
@@ -651,6 +678,15 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 		result.Status = StatusPass
 	}
 	return result
+}
+
+func signatureChecksAllowed(reasons []string) bool {
+	for _, reason := range reasons {
+		if reason != ReasonDevelopmentUnverified {
+			return false
+		}
+	}
+	return true
 }
 
 func activationSignableDigest(activation Activation) (string, error) {
