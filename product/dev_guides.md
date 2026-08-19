@@ -21,7 +21,7 @@ Treat this document and CI/scripts as one contract.
 ### 2.1 Go
 
 - Version policy: pin in `go.mod`; track latest stable within 2 minor releases.
-- Current pin target: `1.26.3`.
+- Current pin target: `1.26.6`.
 - Module layout: `cmd/<binary>/` entry points, `core/` library packages, `internal/` non-exported packages.
 - Build: `go build ./cmd/axym`.
 - Version injection: `-ldflags "-s -w -X main.version={{ .Version }}"`.
@@ -48,7 +48,7 @@ Axym is part of a shared dependency graph rooted in `Clyra-AI/proof`.
 
 | Component | Version | Scope |
 |---|---|---|
-| Go | `1.26.3` | Axym repo + CI |
+| Go | `1.26.6` | Axym repo + CI |
 | `Clyra-AI/proof` | `v0.5.0` | Axym proof primitive dependency |
 | Python | `3.13` | scripts and tooling |
 | Node | `22` LTS | docs/tooling |

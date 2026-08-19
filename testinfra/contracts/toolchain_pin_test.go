@@ -33,13 +33,26 @@ func TestToolVersionsPinned(t *testing.T) {
 
 	content := readRepoFile(t, ".tool-versions")
 	expected := []string{
-		"golang 1.26.3",
+		"golang 1.26.6",
 		"python 3.13.0",
 		"nodejs 22.0.0",
 	}
 	for _, line := range expected {
 		if !strings.Contains(content, line) {
 			t.Fatalf(".tool-versions missing pinned line: %q", line)
+		}
+	}
+}
+
+func TestGoToolchainPinMatchesModuleAndCI(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(readRepoFile(t, "go.mod"), "go 1.26.6") {
+		t.Fatal("go.mod must pin Go 1.26.6")
+	}
+	for _, workflow := range []string{".github/workflows/main.yml", ".github/workflows/pr.yml", ".github/workflows/nightly.yml", ".github/workflows/release.yml"} {
+		if !strings.Contains(readRepoFile(t, workflow), "go-version-file: go.mod") {
+			t.Fatalf("%s must derive Go from go.mod", workflow)
 		}
 	}
 }
