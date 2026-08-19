@@ -84,6 +84,7 @@ Expected outcome:
 - Manual record append: `axym record add --input <record.json> --json`.
 - Authoritative contract: [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - Sibling ingest: `axym ingest --source wrkr --json --input <path>` and `axym ingest --gait-pack <path> --json`.
+- Action Contract compatibility: `axym action-contract consume <proposed_action_contract.json> --json` validates exactly one Wrkr v3 proposal, preserves producer-native IDs/refs, and reports a non-authoritative receipt conforming to Axym's versioned consumer-receipt schema. The standalone conformance entrypoint is `axym-action-contract-consumer <proposed_action_contract.json>`; see [the versioned schema contract](../../schemas/v1/action_contract/README.md).
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
@@ -102,6 +103,7 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 - `axym record add --input <record.json> --json`: validates the public manual-input contract, normalizes compatibility-only `record_version: "1.0"` payloads to `v1`, then signs and appends the record to the local chain. Shared proof-record semantics remain owned by `Clyra-AI/proof`; see [../../schemas/v1/record/README.md](../../schemas/v1/record/README.md).
 - `axym ingest --source wrkr --json --input <path>`: ingests Wrkr evidence with stateful drift tracking.
 - `axym ingest --gait-pack <path> --json`: ingests Gait native/proof packs plus authorization bundles and structured control artifacts with deterministic translation and bundle counts.
+- `axym action-contract consume <path> --json`: consumes one report-only Wrkr proposal; it never treats the proposal as execution authority and does not claim execution/effect/containment evidence.
 - `axym map --frameworks eu-ai-act,soc2 --json`: deterministically maps chain evidence to framework controls.
 - `axym gaps --frameworks eu-ai-act,soc2 --json`: ranks `covered`, `partial`, and `gap` outcomes with remediation and effort.
 - `axym regress init --baseline ./tmp/regress-baseline.json --frameworks eu-ai-act,soc2 --json`: captures deterministic baseline coverage.

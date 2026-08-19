@@ -107,6 +107,7 @@ Use this when you are wiring Axym into your actual runtime, CI, or sibling gover
 - Manual record append: `./axym record add --input ./my-record.json --json`.
 - Authoritative contract: [schemas/v1/record/README.md](schemas/v1/record/README.md).
 - Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --gait-pack ./gait-pack --json`.
+- Action Contract compatibility: `./axym action-contract consume ./proposed-action-contract.json --json` or the standalone `axym-action-contract-consumer` entrypoint. This is report-only interoperability; it never grants authority or claims execution/effect evidence.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.

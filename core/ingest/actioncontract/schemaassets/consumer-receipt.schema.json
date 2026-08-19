@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/action-contract-consumer-receipt.schema.json",
+  "title": "Axym Action Contract Consumer Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["consumer", "version", "scenario_id", "artifact_sha256", "status", "self_attestation", "schema_versions", "semantic_result"],
+  "properties": {
+    "consumer": {"const": "axym"},
+    "version": {"type": "string", "minLength": 1},
+    "scenario_id": {"type": "string", "minLength": 1},
+    "artifact_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "status": {"enum": ["pass", "invalid"]},
+    "self_attestation": {"const": false},
+    "proposal_artifact_id": {"type": "string"},
+    "contract_id": {"type": "string"},
+    "contract_family_id": {"type": "string"},
+    "revision": {"type": "integer", "minimum": 1},
+    "resolution_key": {"type": "string"},
+    "correlation_refs": {"type": "array", "items": {"type": "string"}},
+    "schema_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact", "contract"],
+      "properties": {"artifact": {"type": "string"}, "contract": {"type": "string"}}
+    },
+    "semantic_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_valid", "activation_ready", "classification", "execution_claim", "effect_claim"],
+      "properties": {
+        "proposal_valid": {"type": "boolean"},
+        "activation_ready": {"type": "boolean"},
+        "classification": {"type": "string"},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "execution_claim": {"const": false},
+        "effect_claim": {"const": false}
+      }
+    }
+  }
+}

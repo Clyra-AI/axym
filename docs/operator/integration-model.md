@@ -55,6 +55,14 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 ## Public surface notes
 
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
+
+### Action Contract compatibility
+
+- Axym can consume exactly one Wrkr v3 `proposed_action_contract` with `./axym action-contract consume <path> --json`.
+- The consumer preserves producer-native bytes, IDs, revisions, supersession, authority/precondition/confirmation/compensation fields, and evidence references.
+- A proposal is report-only evidence, never execution authority. `context_only` activation is explicitly non-binding; `enforce_floor` conformance reports structural preservation/tightening only.
+- Gait `activated_action_contract` artifacts are validated against the Axym-owned schema and can be verified with the typed `core/ingest/actioncontract` package when the activation public key and exact proposal bytes are supplied.
+- Execution, effects, containment, compensation events, and telemetry authenticity remain deferred until corresponding released producer artifacts exist. See [the versioned schema contract](../../schemas/v1/action_contract/README.md).
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
 
