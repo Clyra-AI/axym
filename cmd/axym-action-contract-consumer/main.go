@@ -21,8 +21,9 @@ func main() {
 	proposal, err := actioncontract.ReadProposal(path)
 	if err != nil {
 		artifactDigest := actioncontract.RawDigest(nil)
+		// #nosec G703 -- path is the one explicit artifact path selected by the caller; ReadProposal already applies stable no-follow checks.
 		if info, statErr := os.Lstat(path); statErr == nil && info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			// #nosec G304 -- explicit consumer path.
+			// #nosec G304,G703 -- explicit consumer path selected by the caller; this is diagnostic hashing only.
 			if raw, readErr := os.ReadFile(path); readErr == nil {
 				artifactDigest = actioncontract.RawDigest(raw)
 			}
