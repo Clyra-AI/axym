@@ -237,6 +237,18 @@ func TestActivationRequestBindsExpectedActivation(t *testing.T) {
 	}
 }
 
+func TestExecutionStartBindsExpectedContract(t *testing.T) {
+	expected := Ref{Kind: "action_contract", ID: "pac-expected", Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", SchemaID: ContractSchemaID, SchemaVersion: ContractSchemaVersion, SourceProduct: WrkrProducer}
+	unrelated := expected
+	unrelated.ID = "pac-other"
+	if executionStartBound(EvidenceBinding{CausalRefs: []Ref{unrelated}}, expected) {
+		t.Fatal("execution start accepted with unrelated causal ref")
+	}
+	if !executionStartBound(EvidenceBinding{CausalRefs: []Ref{expected}}, expected) {
+		t.Fatal("execution start rejected with exact contract causal ref")
+	}
+}
+
 func TestParseLifecyclePackRejectsUnknownAndDuplicateFields(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")
 	raw, err := os.ReadFile(filepath.Join(root, "successful-execution-effect-containment", "lifecycle.json"))

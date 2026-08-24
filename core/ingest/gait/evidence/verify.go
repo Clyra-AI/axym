@@ -199,6 +199,10 @@ func VerifyLifecyclePack(pack LifecyclePack, options VerificationOptions) Verifi
 				add(ReasonEvidenceOrder)
 				continue
 			}
+			if !executionStartBound(record.Execution.Binding, options.ExpectedContract) {
+				add(ReasonLineageMismatch)
+				continue
+			}
 			executionStarted = true
 			executionRef = evidenceRef("execution", record.Execution.EvidenceID, record.Execution.CanonicalContentDigest, ExecutionSchemaID)
 			compensationNeeded = record.Execution.CompensationRequired
@@ -369,6 +373,10 @@ func lifecyclePreconditionReady(proposalIngested, activationRequested bool) bool
 
 func activationRequestBound(record LifecycleRecord, expected Ref) bool {
 	return record.ActivationRef != nil && sameRef(*record.ActivationRef, expected)
+}
+
+func executionStartBound(binding EvidenceBinding, expectedContract Ref) bool {
+	return hasCausal(binding, expectedContract)
 }
 
 func finish(result VerificationResult) VerificationResult {
