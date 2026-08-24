@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/Clyra-AI/axym/core/ingest/gait"
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
+	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
 	"github.com/Clyra-AI/axym/core/ingest/stitch"
 	"github.com/Clyra-AI/axym/core/ingest/wrkr"
 	"github.com/Clyra-AI/axym/core/review/sessiongap"
@@ -21,6 +23,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	var source string
 	var inputPaths []string
 	var gaitPacks []string
+	var gaitLifecycleVerification string
 	var storeDir string
 	var stateDir string
 	var sessionGapThreshold time.Duration
@@ -41,9 +44,34 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if selectedSource == "" {
 				return emitIngestInvalidInput("source is required (wrkr|gait), or provide --gait-pack", stdout, stderr, global)
 			}
+			if strings.TrimSpace(gaitLifecycleVerification) != "" && selectedSource != "gait" {
+				return emitIngestInvalidInput("--gait-lifecycle-verification may only be used with --source gait", stdout, stderr, global)
+			}
 			resolvedStateDir := strings.TrimSpace(stateDir)
 			if resolvedStateDir == "" {
 				resolvedStateDir = storeDir
+			}
+			var lifecycleVerification *evidence.VerificationOptions
+			if selectedSource == "gait" && strings.TrimSpace(gaitLifecycleVerification) != "" {
+				options, configErr := evidence.LoadVerificationConfig(gaitLifecycleVerification)
+				if configErr != nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonInvalidInput, Message: "load Gait lifecycle verification config", Err: configErr}, stdout, stderr, global)
+				}
+				lifecycleVerification = &options
+			}
+			if selectedSource == "gait" {
+				hasLifecycle, preflightErr := pack.ContainsLifecyclePaths(inputPaths)
+				if preflightErr != nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle inputs", Err: preflightErr}, stdout, stderr, global)
+				}
+				if hasLifecycle && lifecycleVerification == nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonLifecycleVerificationRequired, Message: "--gait-lifecycle-verification is required when lifecycle.json is present"}, stdout, stderr, global)
+				}
+				if hasLifecycle {
+					if preflightErr := preflightGaitLifecycle(inputPaths, *lifecycleVerification); preflightErr != nil {
+						return emitIngestError(preflightErr, stdout, stderr, global)
+					}
+				}
 			}
 
 			evidenceStore, err := store.New(store.Config{RootDir: storeDir})
@@ -86,8 +114,9 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				return nil
 			case "gait":
 				result, err := gait.Ingest(cmd.Context(), gait.Request{
-					InputPaths: inputPaths,
-					Store:      evidenceStore,
+					InputPaths:            inputPaths,
+					Store:                 evidenceStore,
+					LifecycleVerification: lifecycleVerification,
 				})
 				if err != nil {
 					return emitIngestError(err, stdout, stderr, global)
@@ -120,6 +149,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait)")
 	cmd.Flags().StringSliceVar(&inputPaths, "input", nil, "Input file or directory path(s)")
 	cmd.Flags().StringSliceVar(&gaitPacks, "gait-pack", nil, "Gait pack or source artifact path(s); implies --source gait")
+	cmd.Flags().StringVar(&gaitLifecycleVerification, "gait-lifecycle-verification", "", "Caller-owned JSON verification context for Gait v1.5 lifecycle evidence")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "Path to ingest state directory (defaults to --store-dir)")
 	cmd.Flags().DurationVar(&sessionGapThreshold, "session-gap-threshold", 30*time.Minute, "Maximum allowed time between adjacent records before signaling CHAIN_SESSION_GAP")
@@ -142,6 +172,33 @@ func buildStitchSummary(st *store.Store, threshold time.Duration) (map[string]an
 		"gaps":           stitchResult.Gaps,
 		"review_signals": signals,
 	}, nil
+}
+
+func preflightGaitLifecycle(paths []string, options evidence.VerificationOptions) error {
+	for _, path := range paths {
+		present, err := pack.ContainsLifecycle(path)
+		if err != nil {
+			return &gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle input", Err: err}
+		}
+		if !present {
+			continue
+		}
+		packResult, err := pack.Read(path)
+		if err != nil {
+			var lifecycleErr *pack.LifecycleError
+			if errors.As(err, &lifecycleErr) {
+				return &gait.Error{ReasonCode: lifecycleErr.ReasonCode, Message: "preflight Gait lifecycle input", Err: lifecycleErr}
+			}
+			return &gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle input", Err: err}
+		}
+		for _, lifecycle := range packResult.LifecyclePacks {
+			verification := evidence.VerifyLifecyclePack(lifecycle, options)
+			if !verification.Valid {
+				return &gait.Error{ReasonCode: gait.ReasonLifecycleVerificationFailed, Message: "preflight Gait lifecycle verification failed", ReasonCodes: append([]string(nil), verification.ReasonCodes...)}
+			}
+		}
+	}
+	return nil
 }
 
 func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
@@ -172,15 +229,22 @@ func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *glob
 				OK:      false,
 				Command: "ingest",
 				Error: &errorEnvelope{
-					Reason:  gaitErr.ReasonCode,
-					Message: gaitErr.Message,
+					Reason:      gaitErr.ReasonCode,
+					Message:     gaitErr.Message,
+					ReasonCodes: gaitErr.ReasonCodes,
 				},
 			})
 		} else if !global.Quiet {
 			_, _ = fmt.Fprintln(stderr, gaitErr.Error())
 		}
 		code := exitRuntimeFailure
-		if gaitInvalidInputReason(gaitErr.ReasonCode) {
+		if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationRequired {
+			code = exitInvalidInput
+		} else if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationFailed {
+			code = exitVerificationFailed
+		} else if gaitSchemaViolationReason(gaitErr.ReasonCode) {
+			code = exitPolicyViolation
+		} else if gaitInvalidInputReason(gaitErr.ReasonCode) {
 			code = exitInvalidInput
 		}
 		return &cliError{code: code, msg: gaitErr.Error()}
@@ -234,6 +298,15 @@ func gaitInvalidInputReason(reason string) bool {
 		"GAIT_UNSUPPORTED_ARTIFACT_TYPE",
 		"GAIT_UNSUPPORTED_AUTHORIZATION_PROFILE_VERSION",
 		"GAIT_UNVERIFIABLE_LINKED_REFS":
+		return true
+	default:
+		return false
+	}
+}
+
+func gaitSchemaViolationReason(reason string) bool {
+	switch reason {
+	case evidence.ReasonMalformed, evidence.ReasonUnknownField, evidence.ReasonSchemaUnsupported, evidence.ReasonEvidenceMissing:
 		return true
 	default:
 		return false

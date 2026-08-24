@@ -2,6 +2,8 @@ package gait
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/axym/core/store"
 	"github.com/Clyra-AI/proof"
@@ -27,6 +30,123 @@ func TestIngestNoInputReturnsNoInputReason(t *testing.T) {
 	}
 	if len(result.ReasonCodes) != 1 || result.ReasonCodes[0] != ReasonNoInput {
 		t.Fatalf("reason mismatch: %+v", result)
+	}
+}
+
+func TestIngestRejectsLifecycleWithoutExplicitVerification(t *testing.T) {
+	t.Parallel()
+	st, err := store.New(store.Config{RootDir: filepath.Join(t.TempDir(), "store")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Ingest(context.Background(), Request{Store: st, InputPaths: []string{lifecycleFixturePath(t)}})
+	if err == nil {
+		t.Fatal("expected lifecycle verification requirement")
+	}
+	gaitErr, ok := err.(*Error)
+	if !ok || gaitErr.ReasonCode != ReasonLifecycleVerificationRequired {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestIngestVerifiesFixtureLifecycleWithoutAppendingAuthority(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")
+	packRaw, err := os.ReadFile(lifecycleFixturePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pack, err := evidence.ParseLifecyclePack(packRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyRaw, err := os.ReadFile(filepath.Join(root, "fixture-signing-key.public.b64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(keyRaw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := lifecycleFixtureVerificationOptions(pack, ed25519.PublicKey(keyBytes))
+	st, err := store.New(store.Config{RootDir: filepath.Join(t.TempDir(), "store")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Ingest(context.Background(), Request{Store: st, InputPaths: []string{lifecycleFixturePath(t)}, LifecycleVerification: &options})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.LifecycleParsed != 1 || result.LifecycleVerified != 1 || len(result.LifecycleEvidenceSets) != 1 {
+		t.Fatalf("verification result mismatch: %+v", result)
+	}
+	if result.LifecycleAuthoritative != 0 || result.LifecycleTranslated != 0 || result.LifecycleEvidenceSets[0].Authoritative || !result.LifecycleEvidenceSets[0].FixtureOnly || result.Appended != 0 {
+		t.Fatalf("fixture authority or append leak: %+v", result)
+	}
+	chain, err := st.LoadChain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chain.Records) != 0 {
+		t.Fatalf("lifecycle evidence became proof records: %d", len(chain.Records))
+	}
+}
+
+func TestIngestStagesEarlierPathsBeforeLaterLifecycleFailure(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	first := filepath.Join(root, "first")
+	if err := os.MkdirAll(first, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeProofJSONL(t, filepath.Join(first, "proof_records.jsonl"))
+	lifecycleRaw, err := os.ReadFile(lifecycleFixturePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycle, err := evidence.ParseLifecyclePack(lifecycleRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := lifecycleFixtureVerificationOptions(lifecycle, make(ed25519.PublicKey, ed25519.PublicKeySize))
+	st, err := store.New(store.Config{RootDir: filepath.Join(root, "store")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Ingest(context.Background(), Request{Store: st, InputPaths: []string{first, lifecycleFixturePath(t)}, LifecycleVerification: &options})
+	if err == nil {
+		t.Fatal("expected later lifecycle failure")
+	}
+	chain, err := st.LoadChain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chain.Records) != 0 {
+		t.Fatalf("earlier path was appended before validation completed: %d", len(chain.Records))
+	}
+}
+
+func lifecycleFixturePath(t *testing.T) string {
+	t.Helper()
+	return filepath.Join("..", "..", "..", "testdata", "gait-action-contract-evidence", "v1", "successful-execution-effect-containment", "lifecycle.json")
+}
+
+func lifecycleFixtureVerificationOptions(pack evidence.LifecyclePack, key ed25519.PublicKey) evidence.VerificationOptions {
+	first := pack.Records[0]
+	activation := evidence.Ref{}
+	for _, record := range pack.Records {
+		if record.ActivationRef != nil {
+			activation = *record.ActivationRef
+			break
+		}
+	}
+	return evidence.VerificationOptions{
+		TrustedPublicKey: key, EvaluationTime: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), AllowFixtureOnly: true,
+		ExpectedContract: first.ContractRef, ExpectedFamily: first.ContractFamilyID, ExpectedRevision: first.Revision, ExpectedActivation: activation,
+		ExpectedRuntimeDigest: "sha256:ffdb7187847ee43434cf0bc428d9defc9b407da4595be1bdfab4c16a47a801e1", ExpectedReadinessDigest: "sha256:5537a606ce771336b50c0f6f6ca978d8d310cb7e8d59eff47d7ac698264b4305",
+		ExpectedPolicyDigest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", ExpectedTarget: "target:fixture", ExpectedEnvironment: "test",
+		ExpectedProducerVersion: evidence.FixtureTag, ExpectedSourceCommit: evidence.FixtureCommit, ExpectedLifecycleDigest: pack.SourceArtifactDigest,
+		ActivationNotBefore: time.Date(2026, 7, 19, 0, 0, 0, 0, time.UTC), ActivationNotAfter: time.Date(2027, 7, 19, 0, 0, 0, 0, time.UTC),
 	}
 }
 

@@ -14,15 +14,98 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/proof"
 )
 
 type Result struct {
-	ProofRecords  []*proof.Record
-	NativeRecords []translate.NativeRecord
-	Artifacts     []translate.SourceArtifact
-	ReasonCodes   []string
+	ProofRecords   []*proof.Record
+	NativeRecords  []translate.NativeRecord
+	Artifacts      []translate.SourceArtifact
+	LifecyclePacks []evidence.LifecyclePack
+	ReasonCodes    []string
+}
+
+type LifecycleError struct {
+	ReasonCode string
+	Message    string
+	Err        error
+}
+
+func (e *LifecycleError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Err == nil {
+		return fmt.Sprintf("%s: %s", e.ReasonCode, e.Message)
+	}
+	return fmt.Sprintf("%s: %s: %v", e.ReasonCode, e.Message, e.Err)
+}
+
+func (e *LifecycleError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+// ContainsLifecycle reports lifecycle.json presence without parsing, writing,
+// or initializing any store. It accepts an explicit lifecycle file, a
+// recursive directory pack, or a zip pack.
+func ContainsLifecycle(path string) (bool, error) {
+	cleaned := strings.TrimSpace(path)
+	if cleaned == "" {
+		return false, nil
+	}
+	info, err := os.Stat(cleaned)
+	if err != nil {
+		return false, fmt.Errorf("stat gait lifecycle preflight path: %w", err)
+	}
+	if info.IsDir() {
+		found := false
+		err := filepath.WalkDir(cleaned, func(candidate string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if !entry.IsDir() && strings.EqualFold(entry.Name(), "lifecycle.json") {
+				found = true
+				return nil
+			}
+			return nil
+		})
+		return found, err
+	}
+	if strings.EqualFold(filepath.Base(cleaned), "lifecycle.json") {
+		return true, nil
+	}
+	if strings.EqualFold(filepath.Ext(cleaned), ".zip") {
+		reader, err := zip.OpenReader(cleaned)
+		if err != nil {
+			return false, fmt.Errorf("open gait lifecycle preflight zip: %w", err)
+		}
+		defer func() { _ = reader.Close() }()
+		for _, entry := range reader.File {
+			if !entry.FileInfo().IsDir() && strings.EqualFold(filepath.Base(entry.Name), "lifecycle.json") {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// ContainsLifecyclePaths reports whether any input contains lifecycle.json.
+func ContainsLifecyclePaths(paths []string) (bool, error) {
+	for _, path := range paths {
+		found, err := ContainsLifecycle(path)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func Read(path string) (Result, error) {
@@ -46,6 +129,17 @@ func Read(path string) (Result, error) {
 			return Result{}, err
 		}
 		return Result{ProofRecords: proofRecords}, nil
+	}
+	if strings.EqualFold(filepath.Base(cleaned), "lifecycle.json") {
+		raw, err := os.ReadFile(cleaned) // #nosec G304 -- explicit user-provided pack path.
+		if err != nil {
+			return Result{}, fmt.Errorf("read lifecycle evidence: %w", err)
+		}
+		lifecycle, err := parseLifecycle(raw)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{LifecyclePacks: []evidence.LifecyclePack{lifecycle}}, nil
 	}
 	if strings.EqualFold(filepath.Ext(cleaned), ".json") {
 		artifacts, err := parseSourceArtifactFile(cleaned, filepath.ToSlash(filepath.Base(cleaned)))
@@ -110,6 +204,17 @@ func readDirectory(dir string) (Result, error) {
 				return Result{}, parseErr
 			}
 			result.NativeRecords = append(result.NativeRecords, nativeRecords...)
+		case name == "lifecycle.json":
+			foundSupportedEntry = true
+			raw, parseErr := os.ReadFile(entry) // #nosec G304 -- discovered below the explicit pack root.
+			if parseErr != nil {
+				return Result{}, fmt.Errorf("read lifecycle evidence: %w", parseErr)
+			}
+			lifecycle, parseErr := parseLifecycle(raw)
+			if parseErr != nil {
+				return Result{}, parseErr
+			}
+			result.LifecyclePacks = append(result.LifecyclePacks, lifecycle)
 		case strings.EqualFold(filepath.Ext(entry), ".json"):
 			artifacts, reasons, parseErr := parseSourceArtifactEntryFile(entry, rel)
 			if parseErr != nil {
@@ -148,7 +253,7 @@ func readZip(path string) (Result, error) {
 	for _, entry := range entries {
 		name := strings.ToLower(filepath.Base(entry.Name))
 		switch {
-		case name == "proof_records.jsonl", name == "native_records.jsonl", strings.EqualFold(filepath.Ext(entry.Name), ".json"):
+		case name == "proof_records.jsonl", name == "native_records.jsonl", name == "lifecycle.json", strings.EqualFold(filepath.Ext(entry.Name), ".json"):
 			fh, err := entry.Open()
 			if err != nil {
 				return Result{}, fmt.Errorf("open zip entry %s: %w", entry.Name, err)
@@ -171,6 +276,12 @@ func readZip(path string) (Result, error) {
 					return Result{}, parseErr
 				}
 				result.NativeRecords = append(result.NativeRecords, records...)
+			case "lifecycle.json":
+				lifecycle, parseErr := parseLifecycle(data)
+				if parseErr != nil {
+					return Result{}, parseErr
+				}
+				result.LifecyclePacks = append(result.LifecyclePacks, lifecycle)
 			default:
 				artifacts, reasons, parseErr := parseSourceArtifactData(data, filepath.ToSlash(entry.Name))
 				if parseErr != nil {
@@ -186,6 +297,21 @@ func readZip(path string) (Result, error) {
 	}
 	result.ReasonCodes = uniqueSorted(result.ReasonCodes)
 	return result, nil
+}
+
+func parseLifecycle(raw []byte) (evidence.LifecyclePack, error) {
+	lifecycle, err := evidence.ParseLifecyclePack(raw)
+	if err == nil {
+		return lifecycle, nil
+	}
+	reason := evidence.ReasonMalformed
+	for _, candidate := range []string{evidence.ReasonUnknownField, evidence.ReasonSchemaUnsupported, evidence.ReasonEvidenceMissing, evidence.ReasonMalformed} {
+		if strings.Contains(err.Error(), candidate) {
+			reason = candidate
+			break
+		}
+	}
+	return evidence.LifecyclePack{}, &LifecycleError{ReasonCode: reason, Message: "parse Gait lifecycle evidence", Err: err}
 }
 
 func parseProofJSONLFile(path string) ([]*proof.Record, error) {

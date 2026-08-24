@@ -3,7 +3,7 @@ module github.com/Clyra-AI/axym
 go 1.26.6
 
 require (
-	github.com/Clyra-AI/proof v0.5.0
+	github.com/Clyra-AI/proof v0.6.1
 	github.com/gowebpki/jcs v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.8.1

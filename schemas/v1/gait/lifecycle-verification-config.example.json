@@ -1,0 +1,33 @@
+{
+  "trusted_public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "expected_contract": {
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "id": "pac-00000000",
+    "kind": "action_contract",
+    "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json",
+    "schema_version": "3",
+    "source_product": "wrkr"
+  },
+  "expected_family": "pacf-00000000",
+  "expected_revision": 1,
+  "expected_activation": {
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "id": "gact-0000000000000000",
+    "kind": "activated_action_contract",
+    "schema_id": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json",
+    "schema_version": "1",
+    "source_product": "gait"
+  },
+  "expected_runtime_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_readiness_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_target": "target:example",
+  "expected_environment": "example",
+  "expected_producer_version": "v1.5.0",
+  "expected_source_commit": "0000000000000000000000000000000000000000",
+  "expected_lifecycle_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "evaluation_time": "2026-01-01T00:00:00Z",
+  "activation_not_before": "2025-01-01T00:00:00Z",
+  "activation_not_after": "2027-01-01T00:00:00Z",
+  "allow_fixture_only": false
+}
