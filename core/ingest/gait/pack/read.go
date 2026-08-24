@@ -27,6 +27,29 @@ type Result struct {
 	ReasonCodes    []string
 }
 
+type LifecycleError struct {
+	ReasonCode string
+	Message    string
+	Err        error
+}
+
+func (e *LifecycleError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Err == nil {
+		return fmt.Sprintf("%s: %s", e.ReasonCode, e.Message)
+	}
+	return fmt.Sprintf("%s: %s: %v", e.ReasonCode, e.Message, e.Err)
+}
+
+func (e *LifecycleError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 func Read(path string) (Result, error) {
 	cleaned := strings.TrimSpace(path)
 	if cleaned == "" {
@@ -54,7 +77,7 @@ func Read(path string) (Result, error) {
 		if err != nil {
 			return Result{}, fmt.Errorf("read lifecycle evidence: %w", err)
 		}
-		lifecycle, err := evidence.ParseLifecyclePack(raw)
+		lifecycle, err := parseLifecycle(raw)
 		if err != nil {
 			return Result{}, err
 		}
@@ -129,7 +152,7 @@ func readDirectory(dir string) (Result, error) {
 			if parseErr != nil {
 				return Result{}, fmt.Errorf("read lifecycle evidence: %w", parseErr)
 			}
-			lifecycle, parseErr := evidence.ParseLifecyclePack(raw)
+			lifecycle, parseErr := parseLifecycle(raw)
 			if parseErr != nil {
 				return Result{}, parseErr
 			}
@@ -196,7 +219,7 @@ func readZip(path string) (Result, error) {
 				}
 				result.NativeRecords = append(result.NativeRecords, records...)
 			case "lifecycle.json":
-				lifecycle, parseErr := evidence.ParseLifecyclePack(data)
+				lifecycle, parseErr := parseLifecycle(data)
 				if parseErr != nil {
 					return Result{}, parseErr
 				}
@@ -216,6 +239,21 @@ func readZip(path string) (Result, error) {
 	}
 	result.ReasonCodes = uniqueSorted(result.ReasonCodes)
 	return result, nil
+}
+
+func parseLifecycle(raw []byte) (evidence.LifecyclePack, error) {
+	lifecycle, err := evidence.ParseLifecyclePack(raw)
+	if err == nil {
+		return lifecycle, nil
+	}
+	reason := evidence.ReasonMalformed
+	for _, candidate := range []string{evidence.ReasonUnknownField, evidence.ReasonSchemaUnsupported, evidence.ReasonEvidenceMissing, evidence.ReasonMalformed} {
+		if strings.Contains(err.Error(), candidate) {
+			reason = candidate
+			break
+		}
+	}
+	return evidence.LifecyclePack{}, &LifecycleError{ReasonCode: reason, Message: "parse Gait lifecycle evidence", Err: err}
 }
 
 func parseProofJSONLFile(path string) ([]*proof.Record, error) {

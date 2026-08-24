@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/proof"
 )
@@ -203,6 +204,30 @@ func TestReadDirectoryPackRejectsEmptyDirectory(t *testing.T) {
 	_, err := Read(t.TempDir())
 	if err == nil {
 		t.Fatal("expected error for empty gait pack directory")
+	}
+}
+
+func TestReadLifecycleSchemaErrorsAreTyped(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, raw, reason string
+	}{
+		{"empty", `{"records":[]}`, evidence.ReasonEvidenceMissing},
+		{"unknown", `{"unknown":true,"records":[]}`, evidence.ReasonUnknownField},
+		{"duplicate", `{"records":[],"records":[]}`, evidence.ReasonMalformed},
+		{"malformed", `{`, evidence.ReasonMalformed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "lifecycle.json")
+			if err := os.WriteFile(path, []byte(tc.raw), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Read(path)
+			lifecycleErr, ok := err.(*LifecycleError)
+			if !ok || lifecycleErr.ReasonCode != tc.reason {
+				t.Fatalf("unexpected typed error: %T %v", err, err)
+			}
+		})
 	}
 }
 

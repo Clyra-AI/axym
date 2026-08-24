@@ -50,6 +50,14 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if resolvedStateDir == "" {
 				resolvedStateDir = storeDir
 			}
+			var lifecycleVerification *evidence.VerificationOptions
+			if selectedSource == "gait" && strings.TrimSpace(gaitLifecycleVerification) != "" {
+				options, configErr := evidence.LoadVerificationConfig(gaitLifecycleVerification)
+				if configErr != nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonInvalidInput, Message: "load Gait lifecycle verification config", Err: configErr}, stdout, stderr, global)
+				}
+				lifecycleVerification = &options
+			}
 
 			evidenceStore, err := store.New(store.Config{RootDir: storeDir})
 			if err != nil {
@@ -90,14 +98,6 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				}
 				return nil
 			case "gait":
-				var lifecycleVerification *evidence.VerificationOptions
-				if strings.TrimSpace(gaitLifecycleVerification) != "" {
-					options, configErr := evidence.LoadVerificationConfig(gaitLifecycleVerification)
-					if configErr != nil {
-						return emitIngestError(&gait.Error{ReasonCode: gait.ReasonInvalidInput, Message: "load Gait lifecycle verification config", Err: configErr}, stdout, stderr, global)
-					}
-					lifecycleVerification = &options
-				}
 				result, err := gait.Ingest(cmd.Context(), gait.Request{
 					InputPaths:            inputPaths,
 					Store:                 evidenceStore,
@@ -198,6 +198,8 @@ func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *glob
 		code := exitRuntimeFailure
 		if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationFailed {
 			code = exitVerificationFailed
+		} else if gaitSchemaViolationReason(gaitErr.ReasonCode) {
+			code = exitPolicyViolation
 		} else if gaitInvalidInputReason(gaitErr.ReasonCode) {
 			code = exitInvalidInput
 		}
@@ -252,6 +254,15 @@ func gaitInvalidInputReason(reason string) bool {
 		"GAIT_UNSUPPORTED_ARTIFACT_TYPE",
 		"GAIT_UNSUPPORTED_AUTHORIZATION_PROFILE_VERSION",
 		"GAIT_UNVERIFIABLE_LINKED_REFS":
+		return true
+	default:
+		return false
+	}
+}
+
+func gaitSchemaViolationReason(reason string) bool {
+	switch reason {
+	case evidence.ReasonMalformed, evidence.ReasonUnknownField, evidence.ReasonSchemaUnsupported, evidence.ReasonEvidenceMissing:
 		return true
 	default:
 		return false

@@ -92,6 +92,40 @@ func TestIngestVerifiesFixtureLifecycleWithoutAppendingAuthority(t *testing.T) {
 	}
 }
 
+func TestIngestStagesEarlierPathsBeforeLaterLifecycleFailure(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	first := filepath.Join(root, "first")
+	if err := os.MkdirAll(first, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeProofJSONL(t, filepath.Join(first, "proof_records.jsonl"))
+	lifecycleRaw, err := os.ReadFile(lifecycleFixturePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycle, err := evidence.ParseLifecyclePack(lifecycleRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := lifecycleFixtureVerificationOptions(lifecycle, make(ed25519.PublicKey, ed25519.PublicKeySize))
+	st, err := store.New(store.Config{RootDir: filepath.Join(root, "store")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Ingest(context.Background(), Request{Store: st, InputPaths: []string{first, lifecycleFixturePath(t)}, LifecycleVerification: &options})
+	if err == nil {
+		t.Fatal("expected later lifecycle failure")
+	}
+	chain, err := st.LoadChain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chain.Records) != 0 {
+		t.Fatalf("earlier path was appended before validation completed: %d", len(chain.Records))
+	}
+}
+
 func lifecycleFixturePath(t *testing.T) string {
 	t.Helper()
 	return filepath.Join("..", "..", "..", "testdata", "gait-action-contract-evidence", "v1", "successful-execution-effect-containment", "lifecycle.json")

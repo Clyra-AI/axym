@@ -196,6 +196,55 @@ func TestIngestRejectsLifecycleVerificationConfigForWrkr(t *testing.T) {
 	}
 }
 
+func TestIngestLoadsLifecycleConfigBeforeStoreInitialization(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, raw string }{{"missing", ""}, {"malformed", "{"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			storeDir := filepath.Join(root, "store")
+			configPath := filepath.Join(root, "verification.json")
+			if tc.raw != "" {
+				if err := os.WriteFile(configPath, []byte(tc.raw), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var stdout, stderr bytes.Buffer
+			exit := execute([]string{"ingest", "--source", "gait", "--gait-lifecycle-verification", configPath, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+			if exit != exitInvalidInput {
+				t.Fatalf("exit mismatch: got %d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+			}
+			if _, err := os.Stat(storeDir); !os.IsNotExist(err) {
+				t.Fatalf("store initialized on config failure: %v", err)
+			}
+		})
+	}
+}
+
+func TestIngestRejectsMalformedLifecycleAsSchemaViolation(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	inputDir := filepath.Join(root, "gait")
+	if err := os.MkdirAll(inputDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inputDir, "lifecycle.json"), []byte(`{"records":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--source", "gait", "--input", inputDir, "--store-dir", filepath.Join(root, "store"), "--json"}, &stdout, &stderr)
+	if exit != exitPolicyViolation {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitPolicyViolation, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != gaitevidence.ReasonEvidenceMissing {
+		t.Fatalf("schema reason mismatch: %s", stdout.String())
+	}
+}
+
 func TestIngestRejectsLifecycleVerificationBeforeWrkrMutation(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
