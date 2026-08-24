@@ -172,13 +172,13 @@ func VerifyLifecyclePack(pack LifecyclePack, options VerificationOptions) Verifi
 			}
 			activationRequested = true
 		case "precondition_evaluated":
-			if !proposalIngested || preconditionEvaluated || len(record.PreconditionRefs) == 0 {
+			if !lifecyclePreconditionReady(proposalIngested, activationRequested) || preconditionEvaluated || len(record.PreconditionRefs) == 0 {
 				add(ReasonEvidenceOrder)
 				continue
 			}
 			preconditionEvaluated = true
 		case "decision_ready":
-			if !proposalIngested || !preconditionEvaluated || decisionReady || len(record.Decision) == 0 {
+			if !proposalIngested || !activationRequested || !preconditionEvaluated || decisionReady || len(record.Decision) == 0 {
 				add(ReasonEvidenceOrder)
 				continue
 			}
@@ -361,6 +361,10 @@ func VerifyLifecyclePack(pack LifecyclePack, options VerificationOptions) Verifi
 		}
 	}
 	return finish(result)
+}
+
+func lifecyclePreconditionReady(proposalIngested, activationRequested bool) bool {
+	return proposalIngested && activationRequested
 }
 
 func finish(result VerificationResult) VerificationResult {

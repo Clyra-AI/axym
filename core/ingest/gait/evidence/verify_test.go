@@ -213,6 +213,15 @@ func TestVerificationRequiresCallerOwnedBindingsAndLifecycleOrder(t *testing.T) 
 	}
 }
 
+func TestPreconditionRequiresActivationRequest(t *testing.T) {
+	if lifecyclePreconditionReady(true, false) {
+		t.Fatal("precondition accepted before activation request")
+	}
+	if !lifecyclePreconditionReady(true, true) {
+		t.Fatal("precondition rejected after proposal and activation request")
+	}
+}
+
 func TestParseLifecyclePackRejectsUnknownAndDuplicateFields(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")
 	raw, err := os.ReadFile(filepath.Join(root, "successful-execution-effect-containment", "lifecycle.json"))
