@@ -92,6 +92,30 @@ func TestPublicVerificationConfigSchemaAcceptsExample(t *testing.T) {
 	}
 }
 
+func TestRuntimeEnforcesPublicVerificationConfigSchema(t *testing.T) {
+	key, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		field string
+		value any
+	}{
+		{"producer version", "expected_producer_version", "release"},
+		{"contract id", "expected_contract", map[string]any{"kind": "action_contract", "id": "arbitrary", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "schema_id": ContractSchemaID, "schema_version": ContractSchemaVersion, "source_product": WrkrProducer}},
+		{"uppercase commit", "expected_source_commit", strings.ToUpper(FixtureCommit)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := validVerificationConfig(key)
+			config[tc.field] = tc.value
+			if _, err := ParseVerificationConfig(mustMarshalConfig(config)); err == nil || !strings.Contains(err.Error(), ReasonConfigInvalid) {
+				t.Fatalf("schema-invalid config accepted: %v", err)
+			}
+		})
+	}
+}
+
 func validVerificationConfig(key ed25519.PublicKey) map[string]any {
 	digest := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	ref := func(kind, id, schema, version, source string) map[string]any {

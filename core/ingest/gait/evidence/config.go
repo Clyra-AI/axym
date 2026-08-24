@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	gaitschema "github.com/Clyra-AI/axym/schemas/v1/gait"
 	proofsign "github.com/Clyra-AI/proof/signing"
 )
 
@@ -75,6 +76,9 @@ func LoadVerificationConfig(path string) (VerificationOptions, error) {
 func ParseVerificationConfig(raw []byte) (VerificationOptions, error) {
 	if err := rejectDuplicateKeys(raw); err != nil {
 		return VerificationOptions{}, configError("duplicate or malformed JSON")
+	}
+	if err := gaitschema.ValidateLifecycleVerificationConfig(raw); err != nil {
+		return VerificationOptions{}, configError("schema validation failed")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
