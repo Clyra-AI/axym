@@ -51,6 +51,7 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - Invoked with `./axym ingest --source wrkr --input <path> --json` or `./axym ingest --gait-pack <path> --json`.
 - Best when you already have compatible evidence or translated packs from other Clyra products and need one normalized identity-chain view across them.
 - `--gait-pack` is the source-of-truth path for Gait authorization bundles and structured control artifacts.
+- Gait v1.5 lifecycle evidence requires `--gait-lifecycle-verification <config.json>` containing caller-owned trusted-key, exact lineage, digest, time-window, and fixture-policy fields; Axym never derives verification authority from the lifecycle pack.
 
 ## Public surface notes
 

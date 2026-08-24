@@ -106,7 +106,7 @@ Use this when you are wiring Axym into your actual runtime, CI, or sibling gover
 - Plugin collectors: `./axym collect --json --plugin "./my-collector"`.
 - Manual record append: `./axym record add --input ./my-record.json --json`.
 - Authoritative contract: [schemas/v1/record/README.md](schemas/v1/record/README.md).
-- Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --gait-pack ./gait-pack --json`.
+- Sibling ingest: `./axym ingest --source wrkr --json --input ./wrkr-records.jsonl` and `./axym ingest --gait-pack ./gait-pack --json`. Gait v1.5 lifecycle evidence is accepted by the typed Go ingest API only with explicit trusted-key, proposal, activation, runtime, readiness, policy, target, environment, and activation-window bindings; fixture-signed packs remain non-authoritative and are never appended as ordinary Proof records.
 - Action Contract compatibility: `./axym action-contract consume ./proposed-action-contract.json --json` or the standalone `axym-action-contract-consumer` entrypoint. This is report-only interoperability; it never grants authority or claims execution/effect evidence.
 - Stable today: built-in collection, plugin collection, manual record append, sibling ingest, and `map`/`gaps`/`bundle`/`verify`.
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
@@ -145,7 +145,7 @@ Axym validates the manual input envelope locally, normalizes compatibility-only 
 
 `ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes, authorization bundles, and structured control artifacts through `--gait-pack`.
 
-`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes. Proof `v0.5.0` evidence sets are alternatives; one set must satisfy all of its record-type, source-product, field, and frequency requirements. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and the selected closest alternative is identified by `evidence_set=<id>` in the rationale.
+`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes. Proof `v0.6.1` evidence sets are alternatives; one set must satisfy all of its record-type, source-product, field, and frequency requirements. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and the selected closest alternative is identified by `evidence_set=<id>` in the rationale.
 
 `gaps` ranks `partial` and `gap` controls with deterministic remediation and auditability grade output.
 

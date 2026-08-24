@@ -14,6 +14,11 @@ import (
 const (
 	LifecycleSchemaID      = "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json"
 	LifecycleSchemaVersion = "1"
+	ContractSchemaID       = "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json"
+	ContractSchemaVersion  = "3"
+	ActivationSchemaID     = "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json"
+	RuntimeActionSchemaID  = "https://gait.dev/schemas/v1/runtime-action.schema.json"
+	ReadinessSchemaID      = "https://gait.dev/schemas/v1/runtime-readiness.schema.json"
 	ExecutionSchemaID      = "https://gait.dev/schemas/v1/action-contract/execution-evidence.schema.json"
 	EffectSchemaID         = "https://gait.dev/schemas/v1/action-contract/effect-event.schema.json"
 	ContainmentSchemaID    = "https://gait.dev/schemas/v1/action-contract/containment-evidence.schema.json"
@@ -24,6 +29,7 @@ const (
 	DigestBound            = "digest_bound"
 	FixtureTag             = "v1.5.0"
 	FixtureCommit          = "10f8b91b316c30c2202a580847dfdd3509bff458"
+	FixtureKeyID           = "42571c8843a10df565fd17a97a236c3552e8e4b7ff2a0b48bf524409279771d9"
 )
 
 const (
@@ -49,6 +55,7 @@ const (
 	ReasonReadinessInvalid        = "gait_readiness_invalid"
 	ReasonRuntimeInvalid          = "gait_runtime_invalid"
 	ReasonScenarioInvalid         = "gait_scenario_invalid"
+	ReasonSourceProvenanceInvalid = "gait_source_provenance_invalid"
 )
 
 type Ref struct {
@@ -182,7 +189,8 @@ type LifecycleRecord struct {
 }
 
 type LifecyclePack struct {
-	Records []LifecycleRecord `json:"records"`
+	Records              []LifecycleRecord `json:"records"`
+	SourceArtifactDigest string            `json:"-"`
 }
 
 type VerificationOptions struct {
@@ -198,6 +206,9 @@ type VerificationOptions struct {
 	ExpectedPolicyDigest    string
 	ExpectedTarget          string
 	ExpectedEnvironment     string
+	ExpectedProducerVersion string
+	ExpectedSourceCommit    string
+	ExpectedLifecycleDigest string
 	ActivationNotBefore     time.Time
 	ActivationNotAfter      time.Time
 }
@@ -211,19 +222,21 @@ type Snapshot struct {
 }
 
 type EvidenceSet struct {
-	EvidenceSetID         string   `json:"evidence_set_id"`
-	SourceProduct         string   `json:"source_product"`
-	ProducerVersion       string   `json:"producer_version"`
-	Execution             string   `json:"gait_execution,omitempty"`
-	Effect                string   `json:"gait_effect,omitempty"`
-	ContainmentStatus     string   `json:"containment_status,omitempty"`
-	CompensationStatus    string   `json:"compensation_status,omitempty"`
-	Verified              bool     `json:"verified"`
-	Authoritative         bool     `json:"authoritative"`
-	FixtureOnly           bool     `json:"fixture_only"`
-	VerificationState     string   `json:"verification_state"`
-	SourceArtifactDigests []string `json:"source_artifact_digests"`
-	ReasonCodes           []string `json:"reason_codes,omitempty"`
+	EvidenceSetID          string   `json:"evidence_set_id"`
+	SourceProduct          string   `json:"source_product"`
+	ProducerVersion        string   `json:"producer_version"`
+	SourceCommit           string   `json:"source_commit"`
+	Execution              string   `json:"gait_execution,omitempty"`
+	Effect                 string   `json:"gait_effect,omitempty"`
+	ContainmentStatus      string   `json:"containment_status,omitempty"`
+	CompensationStatus     string   `json:"compensation_status,omitempty"`
+	Verified               bool     `json:"verified"`
+	Authoritative          bool     `json:"authoritative"`
+	FixtureOnly            bool     `json:"fixture_only"`
+	VerificationState      string   `json:"verification_state"`
+	SourceArtifactDigests  []string `json:"source_artifact_digests"`
+	DerivedEvidenceDigests []string `json:"derived_evidence_digests"`
+	ReasonCodes            []string `json:"reason_codes,omitempty"`
 }
 
 type VerificationResult struct {

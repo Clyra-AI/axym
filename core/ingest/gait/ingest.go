@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/axym/core/normalize"
@@ -16,19 +17,22 @@ import (
 )
 
 const (
-	ReasonNoInput             = "NO_INPUT"
-	ReasonInvalidInput        = "GAIT_INVALID_INPUT"
-	ReasonPackReadFailed      = "GAIT_PACK_READ_FAILED"
-	ReasonTranslationFailed   = "GAIT_TRANSLATION_FAILED"
-	ReasonAppendFailed        = "GAIT_CHAIN_APPEND_FAILED"
-	ReasonUnsupportedNative   = "GAIT_UNSUPPORTED_NATIVE_TYPE"
-	ReasonInvalidNativeRecord = "GAIT_INVALID_NATIVE_RECORD"
-	ReasonContextCanceled     = "GAIT_CONTEXT_CANCELED"
+	ReasonNoInput                       = "NO_INPUT"
+	ReasonInvalidInput                  = "GAIT_INVALID_INPUT"
+	ReasonPackReadFailed                = "GAIT_PACK_READ_FAILED"
+	ReasonTranslationFailed             = "GAIT_TRANSLATION_FAILED"
+	ReasonAppendFailed                  = "GAIT_CHAIN_APPEND_FAILED"
+	ReasonUnsupportedNative             = "GAIT_UNSUPPORTED_NATIVE_TYPE"
+	ReasonInvalidNativeRecord           = "GAIT_INVALID_NATIVE_RECORD"
+	ReasonContextCanceled               = "GAIT_CONTEXT_CANCELED"
+	ReasonLifecycleVerificationRequired = "GAIT_LIFECYCLE_VERIFICATION_REQUIRED"
+	ReasonLifecycleVerificationFailed   = "GAIT_LIFECYCLE_VERIFICATION_FAILED"
 )
 
 type Request struct {
-	InputPaths []string
-	Store      *store.Store
+	InputPaths            []string
+	Store                 *store.Store
+	LifecycleVerification *evidence.VerificationOptions
 }
 
 type Result struct {
@@ -40,6 +44,10 @@ type Result struct {
 	AuthorizationProfiles     int                      `json:"authorization_profiles"`
 	ControlArtifacts          int                      `json:"control_artifacts"`
 	LifecycleParsed           int                      `json:"lifecycle_parsed"`
+	LifecycleVerified         int                      `json:"lifecycle_verified"`
+	LifecycleAuthoritative    int                      `json:"lifecycle_authoritative"`
+	LifecycleTranslated       int                      `json:"lifecycle_translated"`
+	LifecycleEvidenceSets     []evidence.EvidenceSet   `json:"lifecycle_evidence_sets,omitempty"`
 	Appended                  int                      `json:"appended"`
 	Deduped                   int                      `json:"deduped"`
 	Rejected                  int                      `json:"rejected"`
@@ -106,6 +114,31 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 		result.NativeParsed += len(packResult.NativeRecords)
 		result.LifecycleParsed += len(packResult.LifecyclePacks)
 		result.ReasonCodes = append(result.ReasonCodes, packResult.ReasonCodes...)
+		translatedLifecycle := make([]*proof.Record, 0, len(packResult.LifecyclePacks))
+		if len(packResult.LifecyclePacks) > 0 {
+			if req.LifecycleVerification == nil {
+				return Result{}, &Error{ReasonCode: ReasonLifecycleVerificationRequired, Message: "lifecycle evidence requires explicit trusted verification options"}
+			}
+			for _, lifecycle := range packResult.LifecyclePacks {
+				verification := evidence.VerifyLifecyclePack(lifecycle, *req.LifecycleVerification)
+				result.ReasonCodes = append(result.ReasonCodes, verification.ReasonCodes...)
+				if !verification.Valid {
+					return Result{}, &Error{ReasonCode: ReasonLifecycleVerificationFailed, Message: "lifecycle evidence verification failed"}
+				}
+				result.LifecycleVerified++
+				if verification.Authoritative {
+					result.LifecycleAuthoritative++
+					record, translateErr := translate.TranslateLifecycle(verification, lifecycle)
+					if translateErr != nil {
+						return Result{}, wrapTranslateError("translate verified Gait lifecycle evidence", translateErr)
+					}
+					translatedLifecycle = append(translatedLifecycle, record)
+					result.LifecycleTranslated++
+					result.Translated++
+				}
+				result.LifecycleEvidenceSets = append(result.LifecycleEvidenceSets, verification.EvidenceSet)
+			}
+		}
 
 		translatedNative := make([]*proof.Record, 0, len(packResult.NativeRecords))
 		for _, native := range packResult.NativeRecords {
@@ -144,6 +177,12 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 			}
 			correlationRecords = append(correlationRecords, *translated)
 		}
+		for _, translated := range translatedLifecycle {
+			if translated == nil {
+				continue
+			}
+			correlationRecords = append(correlationRecords, *translated)
+		}
 		translatedArtifacts := make([]*proof.Record, 0, len(packResult.Artifacts))
 		for _, artifact := range packResult.Artifacts {
 			incrementArtifactCounts(&result, artifact)
@@ -166,6 +205,12 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 			}
 		}
 		for _, record := range translatedNative {
+			appendIdentityView(&result, normalize.IdentityViewFromRecord(record))
+			if err := appendRecord(req.Store, record, &result); err != nil {
+				return Result{}, err
+			}
+		}
+		for _, record := range translatedLifecycle {
 			appendIdentityView(&result, normalize.IdentityViewFromRecord(record))
 			if err := appendRecord(req.Store, record, &result); err != nil {
 				return Result{}, err

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Clyra-AI/axym/core/ingest/gait"
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/stitch"
 	"github.com/Clyra-AI/axym/core/ingest/wrkr"
 	"github.com/Clyra-AI/axym/core/review/sessiongap"
@@ -21,6 +22,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	var source string
 	var inputPaths []string
 	var gaitPacks []string
+	var gaitLifecycleVerification string
 	var storeDir string
 	var stateDir string
 	var sessionGapThreshold time.Duration
@@ -65,6 +67,9 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				if err != nil {
 					return emitIngestError(err, stdout, stderr, global)
 				}
+				if strings.TrimSpace(gaitLifecycleVerification) != "" && selectedSource != "gait" {
+					return emitIngestInvalidInput("--gait-lifecycle-verification may only be used with --source gait", stdout, stderr, global)
+				}
 				stitching, stitchErr := buildStitchSummary(evidenceStore, sessionGapThreshold)
 				if stitchErr != nil {
 					return emitIngestError(stitchErr, stdout, stderr, global)
@@ -85,9 +90,18 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				}
 				return nil
 			case "gait":
+				var lifecycleVerification *evidence.VerificationOptions
+				if strings.TrimSpace(gaitLifecycleVerification) != "" {
+					options, configErr := evidence.LoadVerificationConfig(gaitLifecycleVerification)
+					if configErr != nil {
+						return emitIngestError(&gait.Error{ReasonCode: gait.ReasonInvalidInput, Message: "load Gait lifecycle verification config", Err: configErr}, stdout, stderr, global)
+					}
+					lifecycleVerification = &options
+				}
 				result, err := gait.Ingest(cmd.Context(), gait.Request{
-					InputPaths: inputPaths,
-					Store:      evidenceStore,
+					InputPaths:            inputPaths,
+					Store:                 evidenceStore,
+					LifecycleVerification: lifecycleVerification,
 				})
 				if err != nil {
 					return emitIngestError(err, stdout, stderr, global)
@@ -120,6 +134,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait)")
 	cmd.Flags().StringSliceVar(&inputPaths, "input", nil, "Input file or directory path(s)")
 	cmd.Flags().StringSliceVar(&gaitPacks, "gait-pack", nil, "Gait pack or source artifact path(s); implies --source gait")
+	cmd.Flags().StringVar(&gaitLifecycleVerification, "gait-lifecycle-verification", "", "Caller-owned JSON verification context for Gait v1.5 lifecycle evidence")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "Path to ingest state directory (defaults to --store-dir)")
 	cmd.Flags().DurationVar(&sessionGapThreshold, "session-gap-threshold", 30*time.Minute, "Maximum allowed time between adjacent records before signaling CHAIN_SESSION_GAP")

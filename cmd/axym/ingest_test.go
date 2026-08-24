@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	gaitevidence "github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/proof"
 )
 
@@ -123,6 +124,74 @@ func TestIngestGaitNoInputContract(t *testing.T) {
 	reasons, _ := result["reason_codes"].([]any)
 	if len(reasons) != 1 || reasons[0] != "NO_INPUT" {
 		t.Fatalf("reason mismatch: %s", stdout.String())
+	}
+}
+
+func TestIngestGaitLifecycleUsesExplicitCallerVerificationConfig(t *testing.T) {
+	t.Parallel()
+	fixtureRoot := filepath.Join("..", "..", "testdata", "gait-action-contract-evidence", "v1")
+	lifecyclePath := filepath.Join(fixtureRoot, "successful-execution-effect-containment", "lifecycle.json")
+	lifecycleRaw, err := os.ReadFile(lifecyclePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pack, err := gaitevidence.ParseLifecyclePack(lifecycleRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyRaw, err := os.ReadFile(filepath.Join(fixtureRoot, "fixture-signing-key.public.b64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := pack.Records[0]
+	activation := gaitevidence.Ref{}
+	for _, record := range pack.Records {
+		if record.ActivationRef != nil {
+			activation = *record.ActivationRef
+			break
+		}
+	}
+	config := map[string]any{
+		"trusted_public_key": strings.TrimSpace(string(keyRaw)), "allow_fixture_only": true,
+		"expected_contract": first.ContractRef, "expected_family": first.ContractFamilyID, "expected_revision": first.Revision, "expected_activation": activation,
+		"expected_runtime_digest": "sha256:ffdb7187847ee43434cf0bc428d9defc9b407da4595be1bdfab4c16a47a801e1", "expected_readiness_digest": "sha256:5537a606ce771336b50c0f6f6ca978d8d310cb7e8d59eff47d7ac698264b4305",
+		"expected_policy_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "expected_target": "target:fixture", "expected_environment": "test",
+		"expected_producer_version": gaitevidence.FixtureTag, "expected_source_commit": gaitevidence.FixtureCommit, "expected_lifecycle_digest": pack.SourceArtifactDigest,
+		"evaluation_time": "2026-07-20T00:00:00Z", "activation_not_before": "2026-07-19T00:00:00Z", "activation_not_after": "2027-07-19T00:00:00Z",
+	}
+	configRaw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	configPath := filepath.Join(root, "verification.json")
+	if err := os.WriteFile(configPath, configRaw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--source", "gait", "--input", lifecyclePath, "--gait-lifecycle-verification", configPath, "--store-dir", filepath.Join(root, "store"), "--json"}, &stdout, &stderr)
+	if exit != exitSuccess {
+		t.Fatalf("exit mismatch: got %d stderr=%s stdout=%s", exit, stderr.String(), stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := payload["data"].(map[string]any)
+	result, _ := data["result"].(map[string]any)
+	if result["lifecycle_verified"] != float64(1) || result["lifecycle_authoritative"] != float64(0) || result["lifecycle_translated"] != float64(0) || result["appended"] != float64(0) {
+		t.Fatalf("fixture lifecycle authority leaked: %s", stdout.String())
+	}
+}
+
+func TestIngestRejectsLifecycleVerificationConfigForWrkr(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--source", "wrkr", "--gait-lifecycle-verification", filepath.Join(t.TempDir(), "unused.json"), "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
 	}
 }
 

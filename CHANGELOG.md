@@ -8,6 +8,7 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 ### Added
 
+- [semver:minor] Added fail-closed consumption of the exact Gait v1.5.0 Action Contract lifecycle evidence set: strict typed parsing, canonical digest and Ed25519 verification, digest-bound lineage/order/replay checks, deterministic evidence-set projection, and fixture-key quarantine. Lifecycle packs require caller-supplied trusted bindings and are never downgraded into ordinary Proof records.
 - Bounded Action Contract interoperability: exact Wrkr v3 proposal ingestion, Gait activation binding verification, deterministic conformance classifications, pinned producer fixtures, and the `WRKR_AXYM_ACTION_CONTRACT_CONSUMER` receipt entrypoint.
 - Action Contract verification hardening: Go 1.26.6 pin, explicit current-selection/evaluation-time requirements, development-signing quarantine, stable reason codes, descriptor-bound artifact reads, and value-based conformance classification.
 - Added the exact released Gait v1.4.0 activation fixture pack at tag commit `a44fdcf`, traceable to PR #170 fixture-generation commit `4509fa7`: six byte-pinned development-signed goldens, public fixture key, and three manifest rejection dispositions.
@@ -18,7 +19,7 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 ### Changed
 
-- Pinned `Clyra-AI/proof` to `v0.5.0` and added deterministic framework adaptation for both legacy controls and scoped evidence-set alternatives without flattening multi-record requirements into false coverage.
+- Pinned `Clyra-AI/proof` to `v0.6.1` and retained deterministic framework adaptation for both legacy controls and scoped evidence-set alternatives without flattening multi-record requirements into false coverage.
 - Updated the public first-value contract for Proof `v0.5.0`'s expanded evidence-set framework catalog: `4` governance-event captures, `6` total sample records, `6/10` covered controls, four partial controls, grade `C`, and truthful `complete=false` / `weak_record_count=1` messaging.
 - Corrected public install guidance so Homebrew users verify with `axym version --json` while source builds and unpacked release binaries use `./axym version --json`.
 - Clarified contributor full-gate and release-local prerequisites, plus the explicit private and fallback public security reporting paths.
