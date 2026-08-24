@@ -78,7 +78,7 @@ func ParseVerificationConfig(raw []byte) (VerificationOptions, error) {
 		return VerificationOptions{}, configError("duplicate or malformed JSON")
 	}
 	if err := gaitschema.ValidateLifecycleVerificationConfig(raw); err != nil {
-		return VerificationOptions{}, configError("schema validation failed")
+		return VerificationOptions{}, configError("schema validation failed" + gaitschema.SafeValidationDetail(err))
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()

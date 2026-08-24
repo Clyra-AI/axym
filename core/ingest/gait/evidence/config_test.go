@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,18 +99,19 @@ func TestRuntimeEnforcesPublicVerificationConfigSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name  string
-		field string
-		value any
+		name       string
+		field      string
+		value      any
+		wantDetail string
 	}{
-		{"producer version", "expected_producer_version", "release"},
-		{"contract id", "expected_contract", map[string]any{"kind": "action_contract", "id": "arbitrary", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "schema_id": ContractSchemaID, "schema_version": ContractSchemaVersion, "source_product": WrkrProducer}},
-		{"uppercase commit", "expected_source_commit", strings.ToUpper(FixtureCommit)},
+		{"producer version", "expected_producer_version", "release", "/expected_producer_version (pattern)"},
+		{"contract id", "expected_contract", map[string]any{"kind": "action_contract", "id": "arbitrary", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "schema_id": ContractSchemaID, "schema_version": ContractSchemaVersion, "source_product": WrkrProducer}, "/expected_contract/id (pattern)"},
+		{"uppercase commit", "expected_source_commit", strings.ToUpper(FixtureCommit), "/expected_source_commit (pattern)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			config := validVerificationConfig(key)
 			config[tc.field] = tc.value
-			if _, err := ParseVerificationConfig(mustMarshalConfig(config)); err == nil || !strings.Contains(err.Error(), ReasonConfigInvalid) {
+			if _, err := ParseVerificationConfig(mustMarshalConfig(config)); err == nil || !strings.Contains(err.Error(), ReasonConfigInvalid) || !strings.Contains(err.Error(), tc.wantDetail) || strings.Contains(err.Error(), fmt.Sprint(tc.value)) {
 				t.Fatalf("schema-invalid config accepted: %v", err)
 			}
 		})

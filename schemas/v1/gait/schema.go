@@ -5,6 +5,7 @@ package gaitschema
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -36,6 +37,31 @@ func ValidateLifecycleVerificationConfig(data []byte) error {
 		return fmt.Errorf("validate Gait lifecycle verification config: %w", err)
 	}
 	return nil
+}
+
+// SafeValidationDetail returns only the failing JSON pointer and schema
+// keyword. It intentionally excludes the rejected value and validator message.
+func SafeValidationDetail(err error) string {
+	var validationErr *jsonschema.ValidationError
+	if !errors.As(err, &validationErr) {
+		return ""
+	}
+	leaf := validationErr
+	for len(leaf.Causes) > 0 {
+		leaf = leaf.Causes[0]
+	}
+	field := strings.TrimSpace(leaf.InstanceLocation)
+	if field == "" {
+		field = "/"
+	}
+	keyword := strings.TrimSpace(leaf.KeywordLocation)
+	if index := strings.LastIndex(keyword, "/"); index >= 0 {
+		keyword = keyword[index+1:]
+	}
+	if keyword == "" {
+		keyword = "schema"
+	}
+	return fmt.Sprintf(" at %s (%s)", field, keyword)
 }
 
 func compiledSchema() (*jsonschema.Schema, error) {
