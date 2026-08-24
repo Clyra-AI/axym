@@ -166,7 +166,7 @@ func VerifyLifecyclePack(pack LifecyclePack, options VerificationOptions) Verifi
 			}
 			proposalIngested = true
 		case "activation_requested":
-			if !proposalIngested || activationRequested || record.ProposalRef == nil {
+			if !proposalIngested || activationRequested || record.ProposalRef == nil || !activationRequestBound(*record, options.ExpectedActivation) {
 				add(ReasonEvidenceOrder)
 				continue
 			}
@@ -365,6 +365,10 @@ func VerifyLifecyclePack(pack LifecyclePack, options VerificationOptions) Verifi
 
 func lifecyclePreconditionReady(proposalIngested, activationRequested bool) bool {
 	return proposalIngested && activationRequested
+}
+
+func activationRequestBound(record LifecycleRecord, expected Ref) bool {
+	return record.ActivationRef != nil && sameRef(*record.ActivationRef, expected)
 }
 
 func finish(result VerificationResult) VerificationResult {
@@ -630,6 +634,9 @@ func validateRecordLineage(record LifecycleRecord, options VerificationOptions, 
 	}
 	if record.ProposalRef != nil && !sameRef(*record.ProposalRef, record.ContractRef) {
 		return errors.New(ReasonLineageMismatch)
+	}
+	if record.Kind == "activation_requested" && record.ActivationRef == nil {
+		return errors.New(ReasonLineageMissing)
 	}
 	if strings.HasPrefix(record.Kind, "execution_") || strings.HasPrefix(record.Kind, "effect_") || strings.HasPrefix(record.Kind, "containment_") || strings.HasPrefix(record.Kind, "compensation_") || record.Kind == "activated" {
 		if record.ActivationRef == nil {

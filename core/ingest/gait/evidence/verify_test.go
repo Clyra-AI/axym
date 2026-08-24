@@ -222,6 +222,21 @@ func TestPreconditionRequiresActivationRequest(t *testing.T) {
 	}
 }
 
+func TestActivationRequestBindsExpectedActivation(t *testing.T) {
+	expected := Ref{Kind: "activated_action_contract", ID: "gact-expected", Digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", SchemaID: ActivationSchemaID, SchemaVersion: EvidenceSchemaVersion, SourceProduct: GaitProducer}
+	if activationRequestBound(LifecycleRecord{}, expected) {
+		t.Fatal("activation request without activation ref accepted")
+	}
+	wrong := expected
+	wrong.ID = "gact-other"
+	if activationRequestBound(LifecycleRecord{ActivationRef: &wrong}, expected) {
+		t.Fatal("activation request bound to a different activation accepted")
+	}
+	if !activationRequestBound(LifecycleRecord{ActivationRef: &expected}, expected) {
+		t.Fatal("exact activation request binding rejected")
+	}
+}
+
 func TestParseLifecyclePackRejectsUnknownAndDuplicateFields(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")
 	raw, err := os.ReadFile(filepath.Join(root, "successful-execution-effect-containment", "lifecycle.json"))
