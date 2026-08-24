@@ -14,15 +14,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
 	"github.com/Clyra-AI/proof"
 )
 
 type Result struct {
-	ProofRecords  []*proof.Record
-	NativeRecords []translate.NativeRecord
-	Artifacts     []translate.SourceArtifact
-	ReasonCodes   []string
+	ProofRecords   []*proof.Record
+	NativeRecords  []translate.NativeRecord
+	Artifacts      []translate.SourceArtifact
+	LifecyclePacks []evidence.LifecyclePack
+	ReasonCodes    []string
 }
 
 func Read(path string) (Result, error) {
@@ -46,6 +48,17 @@ func Read(path string) (Result, error) {
 			return Result{}, err
 		}
 		return Result{ProofRecords: proofRecords}, nil
+	}
+	if strings.EqualFold(filepath.Base(cleaned), "lifecycle.json") {
+		raw, err := os.ReadFile(cleaned) // #nosec G304 -- explicit user-provided pack path.
+		if err != nil {
+			return Result{}, fmt.Errorf("read lifecycle evidence: %w", err)
+		}
+		lifecycle, err := evidence.ParseLifecyclePack(raw)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{LifecyclePacks: []evidence.LifecyclePack{lifecycle}}, nil
 	}
 	if strings.EqualFold(filepath.Ext(cleaned), ".json") {
 		artifacts, err := parseSourceArtifactFile(cleaned, filepath.ToSlash(filepath.Base(cleaned)))
@@ -110,6 +123,17 @@ func readDirectory(dir string) (Result, error) {
 				return Result{}, parseErr
 			}
 			result.NativeRecords = append(result.NativeRecords, nativeRecords...)
+		case name == "lifecycle.json":
+			foundSupportedEntry = true
+			raw, parseErr := os.ReadFile(entry) // #nosec G304 -- discovered below the explicit pack root.
+			if parseErr != nil {
+				return Result{}, fmt.Errorf("read lifecycle evidence: %w", parseErr)
+			}
+			lifecycle, parseErr := evidence.ParseLifecyclePack(raw)
+			if parseErr != nil {
+				return Result{}, parseErr
+			}
+			result.LifecyclePacks = append(result.LifecyclePacks, lifecycle)
 		case strings.EqualFold(filepath.Ext(entry), ".json"):
 			artifacts, reasons, parseErr := parseSourceArtifactEntryFile(entry, rel)
 			if parseErr != nil {
@@ -148,7 +172,7 @@ func readZip(path string) (Result, error) {
 	for _, entry := range entries {
 		name := strings.ToLower(filepath.Base(entry.Name))
 		switch {
-		case name == "proof_records.jsonl", name == "native_records.jsonl", strings.EqualFold(filepath.Ext(entry.Name), ".json"):
+		case name == "proof_records.jsonl", name == "native_records.jsonl", name == "lifecycle.json", strings.EqualFold(filepath.Ext(entry.Name), ".json"):
 			fh, err := entry.Open()
 			if err != nil {
 				return Result{}, fmt.Errorf("open zip entry %s: %w", entry.Name, err)
@@ -171,6 +195,12 @@ func readZip(path string) (Result, error) {
 					return Result{}, parseErr
 				}
 				result.NativeRecords = append(result.NativeRecords, records...)
+			case "lifecycle.json":
+				lifecycle, parseErr := evidence.ParseLifecyclePack(data)
+				if parseErr != nil {
+					return Result{}, parseErr
+				}
+				result.LifecyclePacks = append(result.LifecyclePacks, lifecycle)
 			default:
 				artifacts, reasons, parseErr := parseSourceArtifactData(data, filepath.ToSlash(entry.Name))
 				if parseErr != nil {

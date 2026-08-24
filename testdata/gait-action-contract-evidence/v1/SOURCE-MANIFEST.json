@@ -1,0 +1,21 @@
+{
+  "source_product": "gait",
+  "source_tag": "v1.5.0",
+  "source_commit": "10f8b91b316c30c2202a580847dfdd3509bff458",
+  "fixture_root": "testdata/action-contract-evidence/v1",
+  "fixture_manifest_sha256": "sha256:b5c26f73ad82e990b7f38b6488c74bd4aa2b1ade55f898e9314251a990ae5853",
+  "public_key_sha256": "sha256:4244369efbbbe9c1bea2f6eca00ba26d5a5a968e212788813558590089d28d24",
+  "files": {
+    "blocked-before-execution/lifecycle.json": "sha256:9a6a4f917a0a8bc1d91e676d4b757ce7c3184720b9593f9214124c9fdb7339ef",
+    "compensation-required-started-completed/lifecycle.json": "sha256:087367b4a021b6c80fb3894bdec3df4ec07be6fb33c47bed9bd8ded4f17f699b",
+    "failed-execution-compensation/lifecycle.json": "sha256:4119d59c5680b02c72566d75d64db29d10bf7611584043fb69b1905dc1fcd02a",
+    "identifier-only-correlation/lifecycle.json": "sha256:f5bb0a80abd5d1f4cda07c3768f8c4a7b2cd2dd81803f948606908af1c02862e",
+    "partial-containment/lifecycle.json": "sha256:c377ea478ee3bd97893079f598668c92b9c25fc2999652f4548e25c0360668ab",
+    "replay-mismatched-lineage/lifecycle.json": "sha256:ae405e39982570f419251e05d095fd06bc9cb22fc2eacfcce7513da36a0170ab",
+    "runtime-action.json": "sha256:507daa556b2ef4c2c9a21904ec3440aaaf0d1acd45f766471a4a0a475a07c041",
+    "runtime-readiness.json": "sha256:fca36c7c629017e9f2420426f5fcfc1a1860ea4e4e89b16cc4b3305ca48abc73",
+    "stale-activation/lifecycle.json": "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2",
+    "successful-execution-effect-containment/lifecycle.json": "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2",
+    "unresolved-containment/lifecycle.json": "sha256:9e5a7f3670a56fd9e8a8d3434b575a9de3ea0a190f9f9b0efc6bf603b166931f"
+  }
+}

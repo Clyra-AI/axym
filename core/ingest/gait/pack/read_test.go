@@ -206,6 +206,26 @@ func TestReadDirectoryPackRejectsEmptyDirectory(t *testing.T) {
 	}
 }
 
+func TestReadDirectoryDetectsLifecycleEvidence(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")
+	packDir := t.TempDir()
+	raw, err := os.ReadFile(filepath.Join(root, "successful-execution-effect-containment", "lifecycle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packDir, "lifecycle.json"), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Read(packDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.LifecyclePacks) != 1 || len(result.LifecyclePacks[0].Records) != 11 {
+		t.Fatalf("lifecycle pack mismatch: %+v", result)
+	}
+}
+
 func writeProofFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(buildProofLine(t)+"\n"), 0o600); err != nil {

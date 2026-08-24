@@ -39,6 +39,7 @@ type Result struct {
 	AuthorizationBundles      int                      `json:"authorization_bundles"`
 	AuthorizationProfiles     int                      `json:"authorization_profiles"`
 	ControlArtifacts          int                      `json:"control_artifacts"`
+	LifecycleParsed           int                      `json:"lifecycle_parsed"`
 	Appended                  int                      `json:"appended"`
 	Deduped                   int                      `json:"deduped"`
 	Rejected                  int                      `json:"rejected"`
@@ -103,6 +104,7 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 		result.ProofParsed += len(packResult.ProofRecords)
 		result.Passthrough += len(packResult.ProofRecords)
 		result.NativeParsed += len(packResult.NativeRecords)
+		result.LifecycleParsed += len(packResult.LifecyclePacks)
 		result.ReasonCodes = append(result.ReasonCodes, packResult.ReasonCodes...)
 
 		translatedNative := make([]*proof.Record, 0, len(packResult.NativeRecords))
