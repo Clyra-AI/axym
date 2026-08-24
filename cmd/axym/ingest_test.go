@@ -230,8 +230,12 @@ func TestIngestRejectsMalformedLifecycleAsSchemaViolation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inputDir, "lifecycle.json"), []byte(`{"records":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	configPath := filepath.Join(root, "verification.json")
+	if err := os.WriteFile(configPath, fixtureVerificationConfigRaw(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	var stdout, stderr bytes.Buffer
-	exit := execute([]string{"ingest", "--source", "gait", "--input", inputDir, "--store-dir", filepath.Join(root, "store"), "--json"}, &stdout, &stderr)
+	exit := execute([]string{"ingest", "--source", "gait", "--input", inputDir, "--gait-lifecycle-verification", configPath, "--store-dir", filepath.Join(root, "store"), "--json"}, &stdout, &stderr)
 	if exit != exitPolicyViolation {
 		t.Fatalf("exit mismatch: got %d want %d stdout=%s stderr=%s", exit, exitPolicyViolation, stdout.String(), stderr.String())
 	}
@@ -242,6 +246,35 @@ func TestIngestRejectsMalformedLifecycleAsSchemaViolation(t *testing.T) {
 	errObj, _ := payload["error"].(map[string]any)
 	if errObj["reason"] != gaitevidence.ReasonEvidenceMissing {
 		t.Fatalf("schema reason mismatch: %s", stdout.String())
+	}
+}
+
+func TestIngestLifecyclePreflightRejectsMissingConfigBeforeStore(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	inputDir := filepath.Join(root, "gait")
+	if err := os.MkdirAll(inputDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inputDir, "lifecycle.json"), []byte(`{"records":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	storeDir := filepath.Join(root, "store")
+	var stdout, stderr bytes.Buffer
+	exit := execute([]string{"ingest", "--source", "gait", "--input", inputDir, "--store-dir", storeDir, "--json"}, &stdout, &stderr)
+	if exit != exitInvalidInput {
+		t.Fatalf("exit mismatch: got %d want %d stdout=%s", exit, exitInvalidInput, stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["reason"] != gait.ReasonLifecycleVerificationRequired {
+		t.Fatalf("reason mismatch: %s", stdout.String())
+	}
+	if _, err := os.Stat(storeDir); !os.IsNotExist(err) {
+		t.Fatalf("store initialized during lifecycle preflight: %v", err)
 	}
 }
 
@@ -478,4 +511,43 @@ func writeWrkrInput(t *testing.T, path string) {
 	if err := os.WriteFile(path, []byte(strings.TrimSpace(string(raw))+"\n"), 0o600); err != nil {
 		t.Fatalf("write input: %v", err)
 	}
+}
+
+func fixtureVerificationConfigRaw(t *testing.T) []byte {
+	t.Helper()
+	fixtureRoot := filepath.Join("..", "..", "testdata", "gait-action-contract-evidence", "v1")
+	lifecyclePath := filepath.Join(fixtureRoot, "successful-execution-effect-containment", "lifecycle.json")
+	lifecycleRaw, err := os.ReadFile(lifecyclePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pack, err := gaitevidence.ParseLifecyclePack(lifecycleRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyRaw, err := os.ReadFile(filepath.Join(fixtureRoot, "fixture-signing-key.public.b64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := pack.Records[0]
+	activation := gaitevidence.Ref{}
+	for _, record := range pack.Records {
+		if record.ActivationRef != nil {
+			activation = *record.ActivationRef
+			break
+		}
+	}
+	config := map[string]any{
+		"trusted_public_key": strings.TrimSpace(string(keyRaw)), "allow_fixture_only": true,
+		"expected_contract": first.ContractRef, "expected_family": first.ContractFamilyID, "expected_revision": first.Revision, "expected_activation": activation,
+		"expected_runtime_digest": "sha256:ffdb7187847ee43434cf0bc428d9defc9b407da4595be1bdfab4c16a47a801e1", "expected_readiness_digest": "sha256:5537a606ce771336b50c0f6f6ca978d8d310cb7e8d59eff47d7ac698264b4305",
+		"expected_policy_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "expected_target": "target:fixture", "expected_environment": "test",
+		"expected_producer_version": gaitevidence.FixtureTag, "expected_source_commit": gaitevidence.FixtureCommit, "expected_lifecycle_digest": pack.SourceArtifactDigest,
+		"evaluation_time": "2026-07-20T00:00:00Z", "activation_not_before": "2026-07-19T00:00:00Z", "activation_not_after": "2027-07-19T00:00:00Z",
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }

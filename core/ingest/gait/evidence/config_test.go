@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 func TestParseVerificationConfigStrictAndCallerBound(t *testing.T) {
@@ -57,6 +59,36 @@ func TestParseVerificationConfigRejectsFixtureKeyUnlessExplicit(t *testing.T) {
 	config["expected_lifecycle_digest"] = "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2"
 	if _, err := ParseVerificationConfig(mustMarshalConfig(config)); err != nil {
 		t.Fatalf("explicit exact released fixture config rejected: %v", err)
+	}
+}
+
+func TestPublicVerificationConfigSchemaAcceptsExample(t *testing.T) {
+	root := filepath.Join("..", "..", "..", "..", "schemas", "v1", "gait")
+	schemaRaw, err := os.ReadFile(filepath.Join(root, "lifecycle-verification-config-v1.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exampleRaw, err := os.ReadFile(filepath.Join(root, "lifecycle-verification-config.example.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource("lifecycle-verification-config-v1.schema.json", strings.NewReader(string(schemaRaw))); err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := compiler.Compile("lifecycle-verification-config-v1.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var example any
+	if err := json.Unmarshal(exampleRaw, &example); err != nil {
+		t.Fatal(err)
+	}
+	if err := compiled.Validate(example); err != nil {
+		t.Fatalf("public example does not satisfy schema: %v", err)
+	}
+	if _, err := ParseVerificationConfig(exampleRaw); err != nil {
+		t.Fatalf("public example does not satisfy runtime parser: %v", err)
 	}
 }
 

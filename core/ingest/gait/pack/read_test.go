@@ -231,6 +231,61 @@ func TestReadLifecycleSchemaErrorsAreTyped(t *testing.T) {
 	}
 }
 
+func TestContainsLifecycleHandlesFileDirectoryAndZipReadOnly(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	filePath := filepath.Join(root, "lifecycle.json")
+	if err := os.WriteFile(filePath, []byte(`{"records":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found, err := ContainsLifecycle(filePath)
+	if err != nil || !found {
+		t.Fatalf("standalone detection: found=%v err=%v", found, err)
+	}
+	dir := filepath.Join(root, "nested")
+	if err := os.MkdirAll(filepath.Join(dir, "a", "b"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a", "b", "lifecycle.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found, err = ContainsLifecycle(dir)
+	if err != nil || !found {
+		t.Fatalf("directory detection: found=%v err=%v", found, err)
+	}
+	zipPath := filepath.Join(root, "pack.zip")
+	file, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	entry, err := writer.Create("evidence/lifecycle.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write([]byte("{}")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	found, err = ContainsLifecycle(zipPath)
+	if err != nil || !found {
+		t.Fatalf("zip detection: found=%v err=%v", found, err)
+	}
+	ordinary := filepath.Join(root, "ordinary.json")
+	if err := os.WriteFile(ordinary, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found, err = ContainsLifecycle(ordinary)
+	if err != nil || found {
+		t.Fatalf("ordinary file behavior: found=%v err=%v", found, err)
+	}
+}
+
 func TestReadDirectoryDetectsLifecycleEvidence(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join("..", "..", "..", "..", "testdata", "gait-action-contract-evidence", "v1")

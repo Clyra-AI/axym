@@ -50,6 +50,64 @@ func (e *LifecycleError) Unwrap() error {
 	return e.Err
 }
 
+// ContainsLifecycle reports lifecycle.json presence without parsing, writing,
+// or initializing any store. It accepts an explicit lifecycle file, a
+// recursive directory pack, or a zip pack.
+func ContainsLifecycle(path string) (bool, error) {
+	cleaned := strings.TrimSpace(path)
+	if cleaned == "" {
+		return false, nil
+	}
+	info, err := os.Stat(cleaned)
+	if err != nil {
+		return false, fmt.Errorf("stat gait lifecycle preflight path: %w", err)
+	}
+	if info.IsDir() {
+		found := false
+		err := filepath.WalkDir(cleaned, func(candidate string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if !entry.IsDir() && strings.EqualFold(entry.Name(), "lifecycle.json") {
+				found = true
+				return nil
+			}
+			return nil
+		})
+		return found, err
+	}
+	if strings.EqualFold(filepath.Base(cleaned), "lifecycle.json") {
+		return true, nil
+	}
+	if strings.EqualFold(filepath.Ext(cleaned), ".zip") {
+		reader, err := zip.OpenReader(cleaned)
+		if err != nil {
+			return false, fmt.Errorf("open gait lifecycle preflight zip: %w", err)
+		}
+		defer func() { _ = reader.Close() }()
+		for _, entry := range reader.File {
+			if !entry.FileInfo().IsDir() && strings.EqualFold(filepath.Base(entry.Name), "lifecycle.json") {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// ContainsLifecyclePaths reports whether any input contains lifecycle.json.
+func ContainsLifecyclePaths(paths []string) (bool, error) {
+	for _, path := range paths {
+		found, err := ContainsLifecycle(path)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func Read(path string) (Result, error) {
 	cleaned := strings.TrimSpace(path)
 	if cleaned == "" {

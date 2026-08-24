@@ -9,6 +9,7 @@ import (
 
 	"github.com/Clyra-AI/axym/core/ingest/gait"
 	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
+	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
 	"github.com/Clyra-AI/axym/core/ingest/stitch"
 	"github.com/Clyra-AI/axym/core/ingest/wrkr"
 	"github.com/Clyra-AI/axym/core/review/sessiongap"
@@ -57,6 +58,20 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonInvalidInput, Message: "load Gait lifecycle verification config", Err: configErr}, stdout, stderr, global)
 				}
 				lifecycleVerification = &options
+			}
+			if selectedSource == "gait" {
+				hasLifecycle, preflightErr := pack.ContainsLifecyclePaths(inputPaths)
+				if preflightErr != nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle inputs", Err: preflightErr}, stdout, stderr, global)
+				}
+				if hasLifecycle && lifecycleVerification == nil {
+					return emitIngestError(&gait.Error{ReasonCode: gait.ReasonLifecycleVerificationRequired, Message: "--gait-lifecycle-verification is required when lifecycle.json is present"}, stdout, stderr, global)
+				}
+				if hasLifecycle {
+					if preflightErr := preflightGaitLifecycle(inputPaths, *lifecycleVerification); preflightErr != nil {
+						return emitIngestError(preflightErr, stdout, stderr, global)
+					}
+				}
 			}
 
 			evidenceStore, err := store.New(store.Config{RootDir: storeDir})
@@ -159,6 +174,33 @@ func buildStitchSummary(st *store.Store, threshold time.Duration) (map[string]an
 	}, nil
 }
 
+func preflightGaitLifecycle(paths []string, options evidence.VerificationOptions) error {
+	for _, path := range paths {
+		present, err := pack.ContainsLifecycle(path)
+		if err != nil {
+			return &gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle input", Err: err}
+		}
+		if !present {
+			continue
+		}
+		packResult, err := pack.Read(path)
+		if err != nil {
+			var lifecycleErr *pack.LifecycleError
+			if errors.As(err, &lifecycleErr) {
+				return &gait.Error{ReasonCode: lifecycleErr.ReasonCode, Message: "preflight Gait lifecycle input", Err: lifecycleErr}
+			}
+			return &gait.Error{ReasonCode: gait.ReasonPackReadFailed, Message: "preflight Gait lifecycle input", Err: err}
+		}
+		for _, lifecycle := range packResult.LifecyclePacks {
+			verification := evidence.VerifyLifecyclePack(lifecycle, options)
+			if !verification.Valid {
+				return &gait.Error{ReasonCode: gait.ReasonLifecycleVerificationFailed, Message: "preflight Gait lifecycle verification failed", ReasonCodes: append([]string(nil), verification.ReasonCodes...)}
+			}
+		}
+	}
+	return nil
+}
+
 func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
 	var ingestErr *wrkr.Error
 	if errors.As(err, &ingestErr) {
@@ -196,7 +238,9 @@ func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *glob
 			_, _ = fmt.Fprintln(stderr, gaitErr.Error())
 		}
 		code := exitRuntimeFailure
-		if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationFailed {
+		if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationRequired {
+			code = exitInvalidInput
+		} else if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationFailed {
 			code = exitVerificationFailed
 		} else if gaitSchemaViolationReason(gaitErr.ReasonCode) {
 			code = exitPolicyViolation

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/gait/lifecycle-verification-config-v1.schema.json",
+  "title": "Axym Gait v1.5 Lifecycle Verification Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trusted_public_key", "expected_contract", "expected_family", "expected_revision",
+    "expected_activation", "expected_runtime_digest", "expected_readiness_digest",
+    "expected_policy_digest", "expected_target", "expected_environment",
+    "expected_producer_version", "expected_source_commit", "expected_lifecycle_digest",
+    "evaluation_time", "activation_not_before", "activation_not_after", "allow_fixture_only"
+  ],
+  "properties": {
+    "trusted_public_key": { "type": "string", "pattern": "^[A-Za-z0-9+/]{43}=$" },
+    "expected_contract": { "$ref": "#/$defs/contractRef" },
+    "expected_family": { "type": "string", "pattern": "^pacf-[a-f0-9]{8,64}$" },
+    "expected_revision": { "type": "integer", "minimum": 1 },
+    "expected_activation": { "$ref": "#/$defs/activationRef" },
+    "expected_runtime_digest": { "$ref": "#/$defs/digest" },
+    "expected_readiness_digest": { "$ref": "#/$defs/digest" },
+    "expected_policy_digest": { "$ref": "#/$defs/digest" },
+    "expected_target": { "type": "string", "minLength": 1 },
+    "expected_environment": { "type": "string", "minLength": 1 },
+    "expected_producer_version": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "expected_source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "expected_lifecycle_digest": { "$ref": "#/$defs/digest" },
+    "evaluation_time": { "type": "string", "format": "date-time" },
+    "activation_not_before": { "type": "string", "format": "date-time" },
+    "activation_not_after": { "type": "string", "format": "date-time" },
+    "allow_fixture_only": { "type": "boolean" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "contractRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["digest", "id", "kind", "schema_id", "schema_version", "source_product"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/digest" },
+        "id": { "type": "string", "pattern": "^pac-[a-f0-9]{8,64}$" },
+        "kind": { "const": "action_contract" },
+        "schema_id": { "const": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json" },
+        "schema_version": { "const": "3" },
+        "source_product": { "const": "wrkr" }
+      }
+    },
+    "activationRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["digest", "id", "kind", "schema_id", "schema_version", "source_product"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/digest" },
+        "id": { "type": "string", "pattern": "^gact-[a-f0-9]{16}$" },
+        "kind": { "const": "activated_action_contract" },
+        "schema_id": { "const": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json" },
+        "schema_version": { "const": "1" },
+        "source_product": { "const": "gait" }
+      }
+    }
+  }
+}
