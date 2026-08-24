@@ -20,10 +20,11 @@ type envelope struct {
 }
 
 type errorEnvelope struct {
-	Reason     string `json:"reason"`
-	Message    string `json:"message"`
-	BreakIndex *int   `json:"break_index,omitempty"`
-	BreakPoint string `json:"break_point,omitempty"`
+	Reason      string   `json:"reason"`
+	Message     string   `json:"message"`
+	ReasonCodes []string `json:"reason_codes,omitempty"`
+	BreakIndex  *int     `json:"break_index,omitempty"`
+	BreakPoint  string   `json:"break_point,omitempty"`
 }
 
 func printJSON(w io.Writer, payload any) error {

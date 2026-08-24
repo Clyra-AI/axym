@@ -61,9 +61,10 @@ type Result struct {
 }
 
 type Error struct {
-	ReasonCode string
-	Message    string
-	Err        error
+	ReasonCode  string
+	Message     string
+	ReasonCodes []string
+	Err         error
 }
 
 func (e *Error) Error() string {
@@ -123,7 +124,7 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 				verification := evidence.VerifyLifecyclePack(lifecycle, *req.LifecycleVerification)
 				result.ReasonCodes = append(result.ReasonCodes, verification.ReasonCodes...)
 				if !verification.Valid {
-					return Result{}, &Error{ReasonCode: ReasonLifecycleVerificationFailed, Message: "lifecycle evidence verification failed"}
+					return Result{}, &Error{ReasonCode: ReasonLifecycleVerificationFailed, Message: "lifecycle evidence verification failed", ReasonCodes: append([]string(nil), verification.ReasonCodes...)}
 				}
 				result.LifecycleVerified++
 				if verification.Authoritative {

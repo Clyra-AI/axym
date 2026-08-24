@@ -43,6 +43,9 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			if selectedSource == "" {
 				return emitIngestInvalidInput("source is required (wrkr|gait), or provide --gait-pack", stdout, stderr, global)
 			}
+			if strings.TrimSpace(gaitLifecycleVerification) != "" && selectedSource != "gait" {
+				return emitIngestInvalidInput("--gait-lifecycle-verification may only be used with --source gait", stdout, stderr, global)
+			}
 			resolvedStateDir := strings.TrimSpace(stateDir)
 			if resolvedStateDir == "" {
 				resolvedStateDir = storeDir
@@ -66,9 +69,6 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				})
 				if err != nil {
 					return emitIngestError(err, stdout, stderr, global)
-				}
-				if strings.TrimSpace(gaitLifecycleVerification) != "" && selectedSource != "gait" {
-					return emitIngestInvalidInput("--gait-lifecycle-verification may only be used with --source gait", stdout, stderr, global)
 				}
 				stitching, stitchErr := buildStitchSummary(evidenceStore, sessionGapThreshold)
 				if stitchErr != nil {
@@ -187,15 +187,18 @@ func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *glob
 				OK:      false,
 				Command: "ingest",
 				Error: &errorEnvelope{
-					Reason:  gaitErr.ReasonCode,
-					Message: gaitErr.Message,
+					Reason:      gaitErr.ReasonCode,
+					Message:     gaitErr.Message,
+					ReasonCodes: gaitErr.ReasonCodes,
 				},
 			})
 		} else if !global.Quiet {
 			_, _ = fmt.Fprintln(stderr, gaitErr.Error())
 		}
 		code := exitRuntimeFailure
-		if gaitInvalidInputReason(gaitErr.ReasonCode) {
+		if gaitErr.ReasonCode == gait.ReasonLifecycleVerificationFailed {
+			code = exitVerificationFailed
+		} else if gaitInvalidInputReason(gaitErr.ReasonCode) {
 			code = exitInvalidInput
 		}
 		return &cliError{code: code, msg: gaitErr.Error()}
