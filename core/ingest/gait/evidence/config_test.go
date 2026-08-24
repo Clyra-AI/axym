@@ -118,6 +118,24 @@ func TestRuntimeEnforcesPublicVerificationConfigSchema(t *testing.T) {
 	}
 }
 
+func TestRuntimeReportsMissingRequiredConfigFields(t *testing.T) {
+	key, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootMissing := validVerificationConfig(key)
+	delete(rootMissing, "expected_target")
+	if _, err := ParseVerificationConfig(mustMarshalConfig(rootMissing)); err == nil || !strings.Contains(err.Error(), "/expected_target (required)") {
+		t.Fatalf("root missing-field detail unavailable: %v", err)
+	}
+	nestedMissing := validVerificationConfig(key)
+	contract := nestedMissing["expected_contract"].(map[string]any)
+	delete(contract, "id")
+	if _, err := ParseVerificationConfig(mustMarshalConfig(nestedMissing)); err == nil || !strings.Contains(err.Error(), "/expected_contract/id (required)") {
+		t.Fatalf("nested missing-field detail unavailable: %v", err)
+	}
+}
+
 func validVerificationConfig(key ed25519.PublicKey) map[string]any {
 	digest := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	ref := func(kind, id, schema, version, source string) map[string]any {

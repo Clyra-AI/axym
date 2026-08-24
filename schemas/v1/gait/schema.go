@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
+
+var missingPropertyPattern = regexp.MustCompile(`^missing properties: '([a-z][a-z0-9_]*)'`)
 
 //go:embed lifecycle-verification-config-v1.schema.json
 var schemaFS embed.FS
@@ -60,6 +63,15 @@ func SafeValidationDetail(err error) string {
 	}
 	if keyword == "" {
 		keyword = "schema"
+	}
+	if keyword == "required" {
+		if match := missingPropertyPattern.FindStringSubmatch(leaf.Message); len(match) == 2 {
+			if field == "/" {
+				field += match[1]
+			} else {
+				field += "/" + match[1]
+			}
+		}
 	}
 	return fmt.Sprintf(" at %s (%s)", field, keyword)
 }
