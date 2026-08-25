@@ -24,6 +24,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 		if strings.TrimSpace(input) == "" || strings.TrimSpace(kind) == "" {
 			return emitGovernanceInvalid("--input and --kind are required", stdout, stderr, global)
 		}
+		// #nosec G304 -- input path is explicit operator input.
 		raw, err := os.ReadFile(input)
 		if err != nil {
 			return emitGovernanceInvalid(err.Error(), stdout, stderr, global)
@@ -97,6 +98,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 		if strings.TrimSpace(input) == "" || strings.TrimSpace(kind) == "" || strings.TrimSpace(emitStore) == "" {
 			return emitGovernanceInvalid("--input, --kind, and --store-dir are required", stdout, stderr, global)
 		}
+		// #nosec G304 -- input path is explicit operator input.
 		raw, err := os.ReadFile(input)
 		if err != nil {
 			return emitGovernanceInvalid(err.Error(), stdout, stderr, global)
