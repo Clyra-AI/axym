@@ -49,6 +49,7 @@ func newRootCmd(stdout io.Writer, stderr io.Writer) *cobra.Command {
 	root.AddCommand(newBundleCmd(stdout, stderr, flags))
 	root.AddCommand(newVerifyCmd(stdout, stderr, flags))
 	root.AddCommand(newActionContractCmd(stdout, stderr, flags))
+	root.AddCommand(newGovernanceCmd(stdout, stderr, flags))
 	return root
 }
 

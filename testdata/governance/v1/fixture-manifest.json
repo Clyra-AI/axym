@@ -1,0 +1,14 @@
+{
+  "fixture_version":"1",
+  "sources":{"gait":{"product":"gait","version":"v1.5.0","commit":"eb4c599a5c1a24dbb270c39a5a513d78f253506d","schema_id":"https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json","schema_version":"1"},"wrkr":{"product":"wrkr","version":"v1.15.1","commit":"6b8db233e33f92fe502aecf250a6ddeb3c3e1497","schema_id":"https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json","schema_version":"3"},"proof":{"product":"proof","version":"v0.6.1","commit":"21647a4911aa28bb823a5539c4748e9c4ff8b31a","schema_id":"https://github.com/Clyra-AI/proof/schemas/v1/proof-record-v1.schema.json","schema_version":"1.0"}},
+  "scenarios":[
+    {"id":"successful-execution-effect-containment","path":"testdata/gait-action-contract-evidence/v1/successful-execution-effect-containment/lifecycle.json","sha256":"sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2","expected":"complete"},
+    {"id":"blocked-before-execution","path":"testdata/gait-action-contract-evidence/v1/blocked-before-execution/lifecycle.json","sha256":"sha256:9a6a4f917a0a8bc1d91e676d4b757ce7c3184720b9593f9214124c9fdb7339ef","expected":"partial"},
+    {"id":"failed-execution-compensation","path":"testdata/gait-action-contract-evidence/v1/failed-execution-compensation/lifecycle.json","sha256":"sha256:4119d59c5680b02c72566d75d64db29d10bf7611584043fb69b1905dc1fcd02a","expected":"complete"},
+    {"id":"partial-containment","path":"testdata/gait-action-contract-evidence/v1/partial-containment/lifecycle.json","sha256":"sha256:c377ea478ee3bd97893079f598668c92b9c25fc2999652f4548e25c0360668ab","expected":"partial"},
+    {"id":"unresolved-containment","path":"testdata/gait-action-contract-evidence/v1/unresolved-containment/lifecycle.json","sha256":"sha256:9e5a7f3670a56fd9e8a8d3434b575a9de3ea0a190f9f9b0efc6bf603b166931f","expected":"gap"},
+    {"id":"stale-activation","path":"testdata/gait-action-contract-evidence/v1/stale-activation/lifecycle.json","sha256":"sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2","expected":"partial"},
+    {"id":"replay-mismatched-lineage","path":"testdata/gait-action-contract-evidence/v1/replay-mismatched-lineage/lifecycle.json","sha256":"sha256:ae405e39982570f419251e05d095fd06bc9cb22fc2eacfcce7513da36a0170ab","expected":"unverifiable"},
+    {"id":"identifier-only-correlation","path":"testdata/gait-action-contract-evidence/v1/identifier-only-correlation/lifecycle.json","sha256":"sha256:f5bb0a80abd5d1f4cda07c3768f8c4a7b2cd2dd81803f948606908af1c02862e","expected":"partial"}
+  ]
+}

@@ -69,3 +69,34 @@ func TestApplyRejectsUnsupportedAction(t *testing.T) {
 		t.Fatal("expected unsupported action error")
 	}
 }
+
+func TestApplyRedactsArrayElements(t *testing.T) {
+	event := map[string]any{"items": []any{map[string]any{"token": "one"}, map[string]any{"token": "two"}}}
+	got, _, err := Apply(event, nil, Config{EventRules: []Rule{{Path: "items.*.token", Action: ActionMask}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range got["items"].([]any) {
+		if item.(map[string]any)["token"] != "***" {
+			t.Fatalf("array item was not redacted: %#v", item)
+		}
+	}
+}
+
+func TestApplyActionContractRefsAndSecretsInNestedArrays(t *testing.T) {
+	event := map[string]any{"evidence": []any{map[string]any{"trace_id": "trace-secret", "provenance": map[string]any{"token": "secret"}, "ref": "stable"}}}
+	got, _, err := Apply(event, nil, Config{EventRules: []Rule{{Path: "evidence.*.trace_id", Action: ActionHash}, {Path: "evidence.*.provenance.token", Action: ActionOmit}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := got["evidence"].([]any)[0].(map[string]any)
+	if item["trace_id"] == "trace-secret" {
+		t.Fatal("trace id not hashed")
+	}
+	if _, ok := item["provenance"].(map[string]any)["token"]; ok {
+		t.Fatal("provenance secret retained")
+	}
+	if item["ref"] != "stable" {
+		t.Fatal("non-sensitive reference changed")
+	}
+}
