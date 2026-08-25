@@ -11,6 +11,7 @@ import (
 	"io"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -114,9 +115,15 @@ func IngestTelemetry(raw []byte, now time.Time, maxAge time.Duration, contractID
 	}
 	out := TelemetryResult{Spans: doc.Spans, Attestations: doc.Attestations, SourceDigests: []string{rawDigest(raw)}}
 	for _, s := range out.Spans {
-		if !traceIDPattern.MatchString(s.TraceID) || !spanIDPattern.MatchString(s.SpanID) || !validDigest(s.Digest) {
+		if !traceIDPattern.MatchString(s.TraceID) || !spanIDPattern.MatchString(s.SpanID) || !validDigest(s.Digest) || s.Source == "" {
 			out.ReasonCodes = append(out.ReasonCodes, ReasonMalformed)
 			continue
+		}
+		check := s
+		check.Digest = ""
+		expected, _ := Digest(check)
+		if expected != s.Digest {
+			out.ReasonCodes = append(out.ReasonCodes, ReasonTampered)
 		}
 		st, e1 := time.Parse(time.RFC3339Nano, s.StartTime)
 		et, e2 := time.Parse(time.RFC3339Nano, s.EndTime)
@@ -126,7 +133,7 @@ func IngestTelemetry(raw []byte, now time.Time, maxAge time.Duration, contractID
 		if !now.IsZero() && maxAge > 0 && now.Sub(et) > maxAge {
 			out.ReasonCodes = append(out.ReasonCodes, ReasonStale)
 		}
-		if contractID != "" && s.Attributes["contract.id"] != "" && s.Attributes["contract.id"] != contractID {
+		if contractID != "" && (s.Attributes["contract.id"] == "" || s.Attributes["contract.id"] != contractID) {
 			out.ReasonCodes = append(out.ReasonCodes, ReasonOutOfScope)
 		}
 	}
@@ -189,6 +196,9 @@ func VerifyBoundary(a BoundaryAttestation, pub ed25519.PublicKey, now time.Time,
 	if d != a.Digest {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
+	if a.Signature.SignedDigest != strings.TrimPrefix(a.Digest, "sha256:") {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
 	ok, e := proofsign.VerifyDigestHex(pub, a.Signature)
 	if e != nil || !ok {
 		return fmt.Errorf("%s", ReasonTampered)
@@ -211,6 +221,9 @@ func VerifyJudge(j JudgeEvidence, pub ed25519.PublicKey, now time.Time, contract
 	c.Signature = proofsign.Signature{}
 	d, _ := Digest(c)
 	if d != j.Digest {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
+	if j.Signature.SignedDigest != strings.TrimPrefix(j.Digest, "sha256:") {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
 	ok, e := proofsign.VerifyDigestHex(pub, j.Signature)

@@ -46,7 +46,10 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			if e != nil {
 				return emitGovernanceInvalid("--trusted-key is required", stdout, stderr, global)
 			}
-			vt, _ := time.Parse(time.RFC3339Nano, verifyAt)
+			vt, e := parseGovernanceTime(verifyAt)
+			if e != nil {
+				return emitGovernanceInvalid(e.Error(), stdout, stderr, global)
+			}
 			if e = governance.VerifyBoundary(a, pub, vt, contractID); e != nil {
 				return emitGovernanceVerifyError(e, stdout, stderr, global)
 			}
@@ -66,7 +69,10 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			if e != nil {
 				return emitGovernanceInvalid("--trusted-key is required and must be a public-key artifact", stdout, stderr, global)
 			}
-			vt, _ := time.Parse(time.RFC3339Nano, verifyAt)
+			vt, e := parseGovernanceTime(verifyAt)
+			if e != nil {
+				return emitGovernanceInvalid(e.Error(), stdout, stderr, global)
+			}
 			if e = governance.VerifyJudge(evidence, pub, vt, contractID); e != nil {
 				return emitGovernanceVerifyError(e, stdout, stderr, global)
 			}
@@ -163,16 +169,23 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			if e != nil {
 				return emitGovernanceError(e, stdout, stderr, global)
 			}
-			for _, r := range t.ReasonCodes {
-				if r == governance.ReasonTampered {
-					return emitGovernanceError(fmt.Errorf("%s", r), stdout, stderr, global)
-				}
+			if len(t.ReasonCodes) > 0 {
+				return emitGovernanceError(fmt.Errorf("%s", strings.Join(t.ReasonCodes, ",")), stdout, stderr, global)
 			}
 			for _, s := range t.Spans {
 				tm, e := time.Parse(time.RFC3339Nano, s.StartTime)
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
 				}
+				attrs := map[string]string{}
+				for k, v := range s.Attributes {
+					lk := strings.ToLower(k)
+					if strings.Contains(lk, "secret") || strings.Contains(lk, "token") || strings.Contains(lk, "password") || strings.Contains(lk, "api_key") {
+						continue
+					}
+					attrs[k] = v
+				}
+				s.Attributes = attrs
 				rec, e := governance.ToProofRecord("tool_invocation", s.Source, "telemetry", s.SpanID, tm, map[string]any{"trace": s}, []governance.Ref{{Kind: "evidence", ID: s.SpanID, Digest: s.Digest, Source: s.Source, SourceProduct: "telemetry", SchemaID: "https://axym.dev/schemas/v1/governance/trace-span.schema.json", SchemaVersion: "v1"}})
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
@@ -213,6 +226,13 @@ func loadGovernanceKey(path string) (ed25519.PublicKey, error) {
 		return nil, err
 	}
 	return ed25519.PublicKey(pk.Public), nil
+}
+func parseGovernanceTime(v string) (time.Time, error) {
+	t, e := time.Parse(time.RFC3339Nano, v)
+	if e != nil {
+		return time.Time{}, fmt.Errorf("verify-at must be RFC3339Nano: %w", e)
+	}
+	return t, nil
 }
 
 func emitGovernanceInvalid(message string, stdout, stderr io.Writer, global *globalFlags) error {

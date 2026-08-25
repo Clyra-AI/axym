@@ -96,7 +96,7 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 
 ### Governance evidence projections
 
-`axym governance ingest --kind telemetry --input <otlp.json> --json` ingests
+`axym governance ingest --kind otlp --input <otlp.json> --json` ingests
 offline OTLP/third-party trace and boundary-attestation JSON into a
 digest-bound, read-only projection. `--kind judge` accepts Judge evidence as
 an advisory projection only: it cannot establish execution authority, override

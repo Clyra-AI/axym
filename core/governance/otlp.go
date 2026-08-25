@@ -110,11 +110,20 @@ func IngestOTLP(raw []byte, opt OTLPOptions) (TelemetryResult, error) {
 	out := TelemetryResult{Spans: spans, SourceDigests: []string{rawDigest(raw)}}
 	if opt.ContractID != "" {
 		for _, s := range spans {
-			if id := s.Attributes["axym.contract.id"]; id != "" && id != opt.ContractID {
+			if id := s.Attributes["axym.contract.id"]; id == "" || id != opt.ContractID {
 				out.ReasonCodes = append(out.ReasonCodes, ReasonOutOfScope)
 			}
 		}
 	}
+	if !opt.Now.IsZero() && opt.MaxAge > 0 {
+		for _, s := range spans {
+			et, _ := time.Parse(time.RFC3339Nano, s.EndTime)
+			if opt.Now.Sub(et) > opt.MaxAge {
+				out.ReasonCodes = append(out.ReasonCodes, ReasonStale)
+			}
+		}
+	}
+	sort.Strings(out.ReasonCodes)
 	return out, nil
 }
 func limit(v, d int) int {
