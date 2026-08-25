@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## [0.1.0] - 2026-08-25
+
 ### Added
 
 - [semver:minor] Added fail-closed consumption of the exact Gait v1.5.0 Action Contract lifecycle evidence set: strict typed parsing, canonical digest and Ed25519 verification, digest-bound lineage/order/replay checks, deterministic evidence-set projection, and fixture-key quarantine. Lifecycle packs require caller-supplied trusted bindings and are never downgraded into ordinary Proof records.
