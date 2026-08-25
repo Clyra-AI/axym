@@ -165,6 +165,9 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			}
 			results = append(results, a)
 		} else {
+			if strings.ToLower(kind) != "telemetry" && strings.ToLower(kind) != "otlp" {
+				return emitGovernanceInvalid("--kind must be one of: otlp, telemetry, boundary, judge", stdout, stderr, global)
+			}
 			var t governance.TelemetryResult
 			var e error
 			if strings.ToLower(kind) == "otlp" {
@@ -179,12 +182,19 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 				return emitGovernanceError(fmt.Errorf("%s", strings.Join(t.ReasonCodes, ",")), stdout, stderr, global)
 			}
 			for _, s := range t.Spans {
+				originalDigest := s.Digest
 				tm, e := time.Parse(time.RFC3339Nano, s.StartTime)
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
 				}
 				s = governance.RedactTelemetrySpan(s)
-				rec, e := governance.ToProofRecord("tool_invocation", s.Source, "telemetry", s.SpanID, tm, map[string]any{"trace": s}, []governance.Ref{{Kind: "evidence", ID: s.SpanID, Digest: s.Digest, Source: s.Source, SourceProduct: "telemetry", SchemaID: "https://axym.dev/schemas/v1/governance/trace-span.schema.json", SchemaVersion: "v1"}})
+				s.Digest = ""
+				redactedDigest, e := governance.Digest(s)
+				if e != nil {
+					return emitGovernanceError(e, stdout, stderr, global)
+				}
+				s.Digest = redactedDigest
+				rec, e := governance.ToProofRecord("tool_invocation", s.Source, "telemetry", s.SpanID, tm, map[string]any{"trace": s, "source_digest": originalDigest}, []governance.Ref{{Kind: "evidence", ID: s.SpanID, Digest: originalDigest, Source: s.Source, SourceProduct: "telemetry", SchemaID: "https://axym.dev/schemas/v1/governance/trace-span.schema.json", SchemaVersion: "v1"}})
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
 				}

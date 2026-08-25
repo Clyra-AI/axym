@@ -26,3 +26,16 @@ func TestRedactTelemetrySpanSensitiveOTLPClasses(t *testing.T) {
 		t.Fatal("safe attribute changed")
 	}
 }
+
+func TestRedactedTelemetryDigestRecomputes(t *testing.T) {
+	s := TraceSpan{TraceID: "0123456789abcdef0123456789abcdef", SpanID: "0123456789abcdef", StartTime: "2026-01-01T00:00:00Z", EndTime: "2026-01-01T00:00:01Z", Source: "otel", Attributes: map[string]string{"authorization": "raw"}}
+	r := RedactTelemetrySpan(s)
+	r.Digest = ""
+	d, e := Digest(r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if d == "" {
+		t.Fatal("missing redacted digest")
+	}
+}
