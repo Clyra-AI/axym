@@ -48,6 +48,23 @@ func TestReviewTelemetryDigestScopeAndFreshness(t *testing.T) {
 		t.Fatalf("stale telemetry missing: %+v %v", r, e)
 	}
 }
+
+func TestReviewMissingContractIDIsOutOfScope(t *testing.T) {
+	s := TraceSpan{TraceID: "0123456789abcdef0123456789abcdef", SpanID: "0123456789abcdef", StartTime: "2026-01-01T00:00:00Z", EndTime: "2026-01-01T00:00:01Z", Source: "otel", Attributes: map[string]string{}}
+	s.Digest, _ = Digest(s)
+	raw, _ := json.Marshal(map[string]any{"spans": []TraceSpan{s}})
+	r, e := IngestTelemetry(raw, time.Date(2026, 1, 1, 0, 0, 2, 0, time.UTC), time.Hour, "expected")
+	if e != nil || !containsReason(r.ReasonCodes, ReasonOutOfScope) {
+		t.Fatalf("missing contract.id not out of scope: %+v %v", r, e)
+	}
+}
+func TestReviewOTLPStaleSpan(t *testing.T) {
+	raw := []byte(`{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"test"}}]},"scopeSpans":[{"scope":{"name":"otel"},"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"call","startTimeUnixNano":"1767225600000000000","endTimeUnixNano":"1767225601000000000"}]}]}]}`)
+	r, e := IngestOTLP(raw, OTLPOptions{Now: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), MaxAge: time.Hour})
+	if e != nil || !containsReason(r.ReasonCodes, ReasonStale) {
+		t.Fatalf("OTLP stale span missing: %+v %v", r, e)
+	}
+}
 func containsReason(v []string, w string) bool {
 	for _, x := range v {
 		if x == w {

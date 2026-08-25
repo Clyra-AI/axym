@@ -35,7 +35,11 @@ func TestRedactedTelemetryDigestRecomputes(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if d == "" {
-		t.Fatal("missing redacted digest")
+	r.Digest = d
+	check := r
+	check.Digest = ""
+	again, e := Digest(check)
+	if e != nil || again != d {
+		t.Fatalf("redacted digest mismatch: %s %s %v", d, again, e)
 	}
 }
