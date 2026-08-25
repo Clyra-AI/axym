@@ -55,6 +55,12 @@ func TestReleaseWorkflowContainsIntegrityGates(t *testing.T) {
 		"Provenance",
 		"Verify release integrity",
 	}
+	if !strings.Contains(release, "syft scan dir:dist -o spdx-json=dist/axym.spdx.json") || !strings.Contains(release, "test -s dist/axym.spdx.json") {
+		t.Fatal("release workflow must generate a deterministic workspace SBOM")
+	}
+	if strings.Contains(release, "find . -maxdepth 2 -name '*.spdx.json'") || strings.Contains(release, "Normalize SBOM path") {
+		t.Fatal("release workflow must not use temp/action SBOM normalization")
+	}
 	for _, step := range requiredSteps {
 		if !strings.Contains(release, step) {
 			t.Fatalf("release workflow missing integrity gate: %s", step)
