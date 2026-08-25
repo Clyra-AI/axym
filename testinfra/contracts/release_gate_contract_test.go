@@ -18,6 +18,9 @@ func TestReleaseGoNoGoScriptSyntaxAndCoverage(t *testing.T) {
 	script := readRepoFile(t, "scripts/release_go_nogo.sh")
 	required := []string{
 		"sha256sum -c",
+		"cd \"$dist_dir\"",
+		"certificate-identity",
+		"certificate-oidc-issuer",
 		"cosign verify-blob",
 		"brew install Clyra-AI/tap/axym",
 		"go build -o",
@@ -93,5 +96,14 @@ func TestReleaseWorkflowInstallsSyftBeforeGoReleaser(t *testing.T) {
 	}
 	if strings.Index(release, syft) > strings.Index(release, "name: Build") {
 		t.Fatalf("Syft installation must precede GoReleaser Build")
+	}
+}
+
+func TestReleaseWorkflowVerifiesChecksumsFromDistDirectory(t *testing.T) {
+	t.Parallel()
+	release := readRepoFile(t, ".github/workflows/release.yml")
+	needle := "- name: Verify checksums\n        run: sha256sum -c checksums.txt\n        working-directory: dist"
+	if !strings.Contains(release, needle) {
+		t.Fatalf("release checksum verification must run inside dist: %q", needle)
 	}
 }

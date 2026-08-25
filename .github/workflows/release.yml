@@ -43,7 +43,8 @@ jobs:
           version: v2.14.1
           args: release --clean --skip publish
       - name: Verify checksums
-        run: sha256sum -c dist/checksums.txt
+        run: sha256sum -c checksums.txt
+        working-directory: dist
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:

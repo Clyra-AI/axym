@@ -8,6 +8,13 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 No unreleased changes yet.
 
+## [0.1.2] - 2026-08-25
+
+### Fixed
+
+- Corrected hosted release checksum verification to run from the `dist` directory, matching GoReleaser's basename entries in `checksums.txt`.
+- Hardened downstream release integrity checks to resolve basename checksum manifests from `dist` and require explicit keyless Cosign certificate identity and issuer verification.
+
 ## [0.1.1] - 2026-08-25
 
 ### Fixed
