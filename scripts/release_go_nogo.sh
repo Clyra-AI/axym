@@ -56,14 +56,20 @@ release_binary_smoke() {
 
 verify_checksums() {
   require_file "$dist_dir/checksums.txt"
-  PATH="$(pwd)/scripts:$PATH" sha256sum -c "$dist_dir/checksums.txt" >/dev/null
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  (cd "$dist_dir" && PATH="$script_dir:$PATH" sha256sum -c checksums.txt >/dev/null)
 }
 
 verify_signature() {
   require_file "$dist_dir/checksums.txt"
   require_file "$dist_dir/checksums.txt.sig"
   if [[ -f "$dist_dir/checksums.txt.pem" ]]; then
-    cosign verify-blob --certificate "$dist_dir/checksums.txt.pem" --signature "$dist_dir/checksums.txt.sig" "$dist_dir/checksums.txt" >/dev/null
+    local issuer identity
+    issuer="${COSIGN_CERTIFICATE_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
+    identity="${COSIGN_CERTIFICATE_IDENTITY:-https://github.com/${GITHUB_REPOSITORY:-}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME:-}}"
+    [[ "$identity" != *"//.github/"* && "$identity" != *"@refs/tags/" ]] || fail "missing keyless certificate identity inputs" 7
+    cosign verify-blob --certificate "$dist_dir/checksums.txt.pem" --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" --signature "$dist_dir/checksums.txt.sig" "$dist_dir/checksums.txt" >/dev/null
     return
   fi
   if [[ -f "$dist_dir/local-cosign.pub" ]]; then
