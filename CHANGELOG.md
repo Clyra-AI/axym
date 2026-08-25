@@ -8,6 +8,12 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 No unreleased changes yet.
 
+## [0.1.1] - 2026-08-25
+
+### Fixed
+
+- Installed pinned Syft before GoReleaser in the hosted release workflow so archive-level SBOM generation succeeds reliably; retained the later aggregate SBOM normalization and verification steps.
+
 ## [0.1.0] - 2026-08-25
 
 ### Added

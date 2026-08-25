@@ -83,3 +83,15 @@ func TestReleaseWorkflowUsesPinnedToolingAndHostedVerificationPaths(t *testing.T
 		}
 	}
 }
+
+func TestReleaseWorkflowInstallsSyftBeforeGoReleaser(t *testing.T) {
+	t.Parallel()
+	release := readRepoFile(t, ".github/workflows/release.yml")
+	syft := "uses: anchore/sbom-action/download-syft@v0"
+	if !strings.Contains(release, syft) || !strings.Contains(release, "syft-version: v1.18.0") {
+		t.Fatalf("release workflow must install pinned Syft before GoReleaser")
+	}
+	if strings.Index(release, syft) > strings.Index(release, "name: Build") {
+		t.Fatalf("Syft installation must precede GoReleaser Build")
+	}
+}
