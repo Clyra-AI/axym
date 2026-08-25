@@ -94,6 +94,21 @@ Public docs should also not position Axym as an IAM/PAM/IGA replacement or widen
 
 ## Commands
 
+### Governance evidence projections
+
+`axym governance ingest --kind telemetry --input <otlp.json> --json` ingests
+offline OTLP/third-party trace and boundary-attestation JSON into a
+digest-bound, read-only projection. `--kind judge` accepts Judge evidence as
+an advisory projection only: it cannot establish execution authority, override
+Axym compliance results, or be translated into an execution record. Both paths
+fail closed for malformed, stale, tampered, and out-of-scope input.
+
+Released Gait v1.5 control-extension fixtures are mirrored under
+`testdata/governance/v1/gait-control` by the offline import/check generator.
+They are explicitly synthetic, quarantined, and non-authoritative; Axym
+preserves their causal references and statuses without creating execution or
+compliance authority.
+
 - `axym init --json`: creates local store scaffolding and policy defaults.
 - `axym init --sample-pack ./axym-sample --json`: creates the local store plus a deterministic sample pack with machine-readable created files and next steps.
 - `axym collect --dry-run --json`: validates fixture and environment readiness without writes and preserves per-source `reason_codes`, including `governanceevent: ["NO_INPUT"]` when no governance-event files are supplied.

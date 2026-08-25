@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Clyra-AI/proof"
@@ -76,20 +77,42 @@ func applyRules(obj map[string]any, rules []Rule) error {
 }
 
 func applyRule(node map[string]any, segments []string, action Action) error {
+	return applyValue(node, segments, action)
+}
+
+// applyValue supports object paths and array-safe selectors. A path segment
+// `*` applies to every array element (numeric segments address one element),
+// so contract/evidence arrays can be scrubbed without flattening structure.
+func applyValue(value any, segments []string, action Action) error {
 	if len(segments) == 0 {
 		return nil
 	}
+	if items, ok := value.([]any); ok {
+		if segments[0] == "*" {
+			for i := range items {
+				if err := applyValue(items[i], segments[1:], action); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		idx, err := strconv.Atoi(segments[0])
+		if err != nil || idx < 0 || idx >= len(items) {
+			return fmt.Errorf("redaction path %q references invalid array index", strings.Join(segments, "."))
+		}
+		return applyValue(items[idx], segments[1:], action)
+	}
+	node, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf("redaction path %q references non-object value", strings.Join(segments, "."))
+	}
 	key := segments[0]
-	value, exists := node[key]
+	child, exists := node[key]
 	if !exists {
 		return nil
 	}
 	if len(segments) > 1 {
-		next, ok := value.(map[string]any)
-		if !ok {
-			return fmt.Errorf("redaction path %q references non-object value", strings.Join(segments, "."))
-		}
-		return applyRule(next, segments[1:], action)
+		return applyValue(child, segments[1:], action)
 	}
 
 	switch action {
@@ -98,7 +121,7 @@ func applyRule(node map[string]any, segments []string, action Action) error {
 	case ActionMask:
 		node[key] = "***"
 	case ActionHash:
-		h, err := hashValue(value)
+		h, err := hashValue(child)
 		if err != nil {
 			return err
 		}
