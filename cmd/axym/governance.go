@@ -82,7 +82,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			}
 			data = result
 		default:
-			return emitGovernanceInvalid("--kind must be one of: telemetry, boundary, judge", stdout, stderr, global)
+			return emitGovernanceInvalid("--kind must be one of: otlp, telemetry, boundary, judge", stdout, stderr, global)
 		}
 		if global.JSON {
 			return printJSON(stdout, envelope{OK: true, Command: "governance ingest", Data: data})
@@ -93,7 +93,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 		return nil
 	}}
 	ingest.Flags().StringVar(&input, "input", "", "JSON input path")
-	ingest.Flags().StringVar(&kind, "kind", "", "Input kind (telemetry|boundary|judge)")
+	ingest.Flags().StringVar(&kind, "kind", "", "Input kind (otlp|telemetry|boundary|judge)")
 	ingest.Flags().StringVar(&contractID, "contract-id", "", "Expected Action Contract ID")
 	ingest.Flags().DurationVar(&maxAge, "max-age", 24*time.Hour, "Maximum telemetry age")
 	ingest.Flags().StringVar(&trustedKey, "trusted-key", "", "Trusted public-key artifact for Judge/boundary verification")
@@ -165,7 +165,13 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 			}
 			results = append(results, a)
 		} else {
-			t, e := governance.IngestTelemetry(raw, time.Now().UTC(), maxAge, contractID)
+			var t governance.TelemetryResult
+			var e error
+			if strings.ToLower(kind) == "otlp" {
+				t, e = governance.IngestOTLP(raw, governance.OTLPOptions{Now: time.Now().UTC(), MaxAge: maxAge, ContractID: contractID})
+			} else {
+				t, e = governance.IngestTelemetry(raw, time.Now().UTC(), maxAge, contractID)
+			}
 			if e != nil {
 				return emitGovernanceError(e, stdout, stderr, global)
 			}
@@ -177,15 +183,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
 				}
-				attrs := map[string]string{}
-				for k, v := range s.Attributes {
-					lk := strings.ToLower(k)
-					if strings.Contains(lk, "secret") || strings.Contains(lk, "token") || strings.Contains(lk, "password") || strings.Contains(lk, "api_key") {
-						continue
-					}
-					attrs[k] = v
-				}
-				s.Attributes = attrs
+				s = governance.RedactTelemetrySpan(s)
 				rec, e := governance.ToProofRecord("tool_invocation", s.Source, "telemetry", s.SpanID, tm, map[string]any{"trace": s}, []governance.Ref{{Kind: "evidence", ID: s.SpanID, Digest: s.Digest, Source: s.Source, SourceProduct: "telemetry", SchemaID: "https://axym.dev/schemas/v1/governance/trace-span.schema.json", SchemaVersion: "v1"}})
 				if e != nil {
 					return emitGovernanceError(e, stdout, stderr, global)
@@ -205,7 +203,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 		return nil
 	}}
 	emit.Flags().StringVar(&input, "input", "", "JSON input path")
-	emit.Flags().StringVar(&kind, "kind", "", "Input kind (telemetry|judge)")
+	emit.Flags().StringVar(&kind, "kind", "", "Input kind (otlp|telemetry|boundary|judge)")
 	emit.Flags().StringVar(&contractID, "contract-id", "", "Expected Action Contract ID")
 	emit.Flags().DurationVar(&maxAge, "max-age", 24*time.Hour, "Maximum telemetry age")
 	emit.Flags().StringVar(&emitStore, "store-dir", "", "Explicit local chain store (required for writes)")
