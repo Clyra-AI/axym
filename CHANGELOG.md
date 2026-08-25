@@ -8,6 +8,12 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 No unreleased changes yet.
 
+## [0.1.4] - 2026-08-25
+
+### Fixed
+
+- Pinned hosted Cosign to v2.6.5 so release checksum signing continues to emit the established separate `.sig` and `.pem` artifacts.
+
 ## [0.1.3] - 2026-08-25
 
 ### Fixed
