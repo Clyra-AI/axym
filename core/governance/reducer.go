@@ -71,7 +71,7 @@ func ReduceChecked(contractID string, events []Event) (State, error) {
 		default:
 			return s, fmt.Errorf("%s: unknown lifecycle kind %s", ReasonMalformed, e.Kind)
 		}
-		if !allowed[s.Status][e.Kind] && !(s.Status == "unknown" && e.Kind == "registered") {
+		if !allowed[s.Status][e.Kind] && (s.Status != "unknown" || e.Kind != "registered") {
 			return s, fmt.Errorf("%s: illegal transition %s -> %s", ReasonMalformed, s.Status, e.Kind)
 		}
 		seen[e.ID] = true

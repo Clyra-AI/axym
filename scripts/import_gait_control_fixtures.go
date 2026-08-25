@@ -47,6 +47,7 @@ func main() {
 	}
 	entries := []map[string]any{}
 	for _, n := range names {
+		// #nosec G304 -- scenario names are fixed by the importer and source is explicit operator input.
 		b, e := os.ReadFile(filepath.Join(*src, n, "lifecycle.json"))
 		if e != nil {
 			panic(e)
@@ -55,6 +56,7 @@ func main() {
 		if e = os.MkdirAll(filepath.Dir(p), 0700); e != nil {
 			panic(e)
 		}
+		// #nosec G304 -- destination is explicit fixture output and scenario path is fixed.
 		if e = os.WriteFile(p, b, 0600); e != nil {
 			panic(e)
 		}
@@ -67,15 +69,18 @@ func main() {
 	if e := os.WriteFile(filepath.Join(*dst, "manifest.json"), append(raw, '\n'), 0600); e != nil {
 		panic(e)
 	}
+	// #nosec G304 -- source is explicit public fixture input.
 	k, e := os.ReadFile(filepath.Join(*src, "fixture-signing-key.public.b64"))
 	if e != nil {
 		panic(e)
 	}
+	// #nosec G304 -- destination is explicit fixture output.
 	if e = os.WriteFile(filepath.Join(*dst, "fixture-signing-key.public.b64"), k, 0600); e != nil {
 		panic(e)
 	}
 }
 func check(dst string) error {
+	// #nosec G304 -- destination is explicit managed fixture output.
 	raw, e := os.ReadFile(filepath.Join(dst, "manifest.json"))
 	if e != nil {
 		return e
@@ -91,6 +96,7 @@ func check(dst string) error {
 		return e
 	}
 	for _, s := range m.Scenarios {
+		// #nosec G304 -- paths are read from the checked-in manifest under explicit fixture root.
 		b, e := os.ReadFile(filepath.Join(dst, s.Path))
 		if e != nil {
 			return e

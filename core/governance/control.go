@@ -110,19 +110,6 @@ func verifyControlPhase(c map[string]any, prior map[string]map[string]any) error
 	return fmt.Errorf("%s", ReasonMalformed)
 }
 func sameString(a, b any) bool { sa, _ := a.(string); sb, _ := b.(string); return sa != "" && sa == sb }
-func sameControlRef(a, b any) bool {
-	am, aok := a.(map[string]any)
-	bm, bok := b.(map[string]any)
-	if !aok || !bok {
-		return false
-	}
-	for _, k := range []string{"id", "digest", "schema_id", "schema_version", "source_product"} {
-		if am[k] != bm[k] {
-			return false
-		}
-	}
-	return true
-}
 func sameControlEvidenceRef(a any, prev map[string]any) bool {
 	m, ok := a.(map[string]any)
 	if !ok {

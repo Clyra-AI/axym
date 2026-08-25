@@ -201,6 +201,7 @@ func newGovernanceCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *
 }
 
 func loadGovernanceKey(path string) (ed25519.PublicKey, error) {
+	// #nosec G304 -- trusted-key path is explicit operator input.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -216,7 +217,7 @@ func emitGovernanceInvalid(message string, stdout, stderr io.Writer, global *glo
 	if global.JSON {
 		_ = printJSON(stdout, envelope{OK: false, Command: "governance ingest", Error: &errorEnvelope{Reason: "invalid_input", Message: message}})
 	} else if !global.Quiet {
-		fmt.Fprintln(stderr, message)
+		_, _ = fmt.Fprintln(stderr, message)
 	}
 	return &cliError{code: exitInvalidInput, msg: message}
 }
@@ -228,7 +229,7 @@ func emitGovernanceError(err error, stdout, stderr io.Writer, global *globalFlag
 	if global.JSON {
 		_ = printJSON(stdout, envelope{OK: false, Command: "governance ingest", Error: &errorEnvelope{Reason: reason, Message: err.Error()}})
 	} else if !global.Quiet {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 	}
 	return &cliError{code: exitInvalidInput, msg: err.Error()}
 }
@@ -236,7 +237,7 @@ func emitGovernanceVerifyError(err error, stdout, stderr io.Writer, global *glob
 	if global.JSON {
 		_ = printJSON(stdout, envelope{OK: false, Command: "governance ingest", Error: &errorEnvelope{Reason: "verification_failed", Message: err.Error()}})
 	} else if !global.Quiet {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 	}
 	return &cliError{code: exitVerificationFailed, msg: err.Error()}
 }
