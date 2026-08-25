@@ -85,6 +85,12 @@ func TestReleaseWorkflowUsesPinnedToolingAndHostedVerificationPaths(t *testing.T
 			t.Fatalf("release workflow missing hosted verification snippet %q", snippet)
 		}
 	}
+	if !strings.Contains(release, "sigstore/cosign-installer@v4.1.0") || !strings.Contains(release, "cosign-release: v2.6.5") {
+		t.Fatal("release workflow must pin compatible Cosign v2.6.5")
+	}
+	if !strings.Contains(release, "--output-signature dist/checksums.txt.sig") || !strings.Contains(release, "--output-certificate dist/checksums.txt.pem") {
+		t.Fatal("release workflow must preserve separate Cosign signature and certificate outputs")
+	}
 }
 
 func TestReleaseWorkflowInstallsSyftBeforeGoReleaser(t *testing.T) {
