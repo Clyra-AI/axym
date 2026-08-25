@@ -46,15 +46,9 @@ jobs:
         run: sha256sum -c checksums.txt
         working-directory: dist
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          artifact-name: axym.spdx.json
-          path: dist
-      - name: Normalize SBOM path
         run: |
-          sbom_path="$(find . -maxdepth 2 -name '*.spdx.json' | head -n 1)"
-          test -n "${sbom_path}"
-          cp "${sbom_path}" dist/axym.spdx.json
+          syft scan dir:dist -o spdx-json=dist/axym.spdx.json
+          test -s dist/axym.spdx.json
       - name: Build scanner target
         run: mkdir -p .tmp && go build -o .tmp/axym ./cmd/axym
       - name: Vulnerability scan

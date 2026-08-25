@@ -8,6 +8,12 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 No unreleased changes yet.
 
+## [0.1.3] - 2026-08-25
+
+### Fixed
+
+- Replaced temporary/action-upload SBOM generation with deterministic pinned Syft output at `dist/axym.spdx.json`, including a non-empty output assertion for hosted releases.
+
 ## [0.1.2] - 2026-08-25
 
 ### Fixed
