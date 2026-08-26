@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/Clyra-AI/axym/core/governance"
 	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
 	"github.com/Clyra-AI/axym/core/ingest/gait/translate"
@@ -105,6 +107,10 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "load chain for gait correlation", Err: err}
 	}
+	signingKey, err := req.Store.SigningKey()
+	if err != nil {
+		return Result{}, &Error{ReasonCode: ReasonAppendFailed, Message: "load store signing key for lifecycle receipt", Err: err}
+	}
 	correlationRecords := append([]proof.Record(nil), chain.Records...)
 	staged := make([]stagedPack, 0, len(paths))
 	for _, path := range paths {
@@ -140,6 +146,12 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 					record, translateErr := translate.TranslateLifecycle(verification, lifecycle)
 					if translateErr != nil {
 						return Result{}, wrapTranslateError("translate verified Gait lifecycle evidence", translateErr)
+					}
+					// The receipt is attached before the store signs the aggregate.
+					// It binds the exact translated content to this verified ingest
+					// path; record add cannot create an equivalent attestation.
+					if receiptErr := store.SignLifecycleReceipt(record, signingKey, record.Timestamp.UTC().Format(time.RFC3339Nano)); receiptErr != nil {
+						return Result{}, wrapTranslateError("sign Gait lifecycle verification receipt", receiptErr)
 					}
 					stage.lifecycle = append(stage.lifecycle, record)
 					result.LifecycleTranslated++
@@ -199,7 +211,13 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 		ordered := append(append(append(append([]*proof.Record{}, stage.passthrough...), stage.native...), stage.lifecycle...), stage.artifacts...)
 		for _, record := range ordered {
 			appendIdentityView(&result, normalize.IdentityViewFromRecord(record))
-			if err := appendRecord(req.Store, record, &result); err != nil {
+			var register func(proof.Record) error
+			if lifecycle, ok := record.Metadata["evidence_kind"].(string); ok && lifecycle == "gait_lifecycle" {
+				register = func(persisted proof.Record) error {
+					return governance.RegisterVerifiedLifecycle(req.Store.RootDir(), persisted, signingKey)
+				}
+			}
+			if err := appendRecord(req.Store, record, &result, register); err != nil {
 				return Result{}, err
 			}
 		}
@@ -208,14 +226,19 @@ func Ingest(ctx context.Context, req Request) (Result, error) {
 	return result, nil
 }
 
-func appendRecord(st *store.Store, record *proof.Record, result *Result) error {
+func appendRecord(st *store.Store, record *proof.Record, result *Result, register func(proof.Record) error) error {
 	key, err := dedupe.BuildKey(record.SourceProduct, record.RecordType, record.Event)
 	if err != nil {
 		result.Rejected++
 		result.ReasonCodes = append(result.ReasonCodes, ReasonTranslationFailed)
 		return nil
 	}
-	appendResult, err := st.Append(record, key)
+	var appendResult store.AppendResult
+	if lifecycle, ok := record.Metadata["evidence_kind"].(string); ok && lifecycle == "gait_lifecycle" {
+		appendResult, err = st.AppendVerifiedLifecycle(record, key, register)
+	} else {
+		appendResult, err = st.Append(record, key)
+	}
 	if err != nil {
 		return &Error{ReasonCode: ReasonAppendFailed, Message: "append gait record", Err: err}
 	}

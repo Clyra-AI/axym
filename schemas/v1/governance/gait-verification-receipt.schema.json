@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/governance/gait-verification-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "receipt_id", "record_id", "record_content_digest", "source_artifact_digest", "evidence_set_id", "producer_version", "source_commit", "issued_at", "signer_key_id", "signature"],
+  "properties": {
+    "schema_id": {"const": "https://axym.dev/schemas/v1/governance/gait-verification-receipt.schema.json"},
+    "schema_version": {"const": "1"},
+    "receipt_id": {"type": "string", "minLength": 1},
+    "record_id": {"type": "string", "minLength": 1},
+    "record_content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_artifact_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evidence_set_id": {"type": "string", "minLength": 1},
+    "producer_version": {"type": "string", "minLength": 1},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "signer_key_id": {"type": "string", "minLength": 1},
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "key_id", "sig", "signed_digest"],
+      "properties": {
+        "alg": {"const": "ed25519"},
+        "key_id": {"type": "string", "minLength": 1},
+        "sig": {"type": "string", "minLength": 1},
+        "signed_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

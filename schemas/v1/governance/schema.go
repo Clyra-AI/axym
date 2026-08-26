@@ -11,7 +11,7 @@ import (
 // Schemas are embedded so validation and offline consumers use the same
 // versioned assets shipped by Axym.
 //
-//go:embed action-contract-register.schema.json action-contract-evidence-packet.schema.json judge-evidence.schema.json boundary-attestation.schema.json
+//go:embed action-contract-register.schema.json action-contract-evidence-packet.schema.json judge-evidence.schema.json boundary-attestation.schema.json gait-verification-receipt.schema.json
 var assets embed.FS
 
 func RegisterSchema() []byte {
@@ -24,6 +24,10 @@ func PacketSchema() []byte {
 }
 func JudgeSchema() []byte    { b, _ := assets.ReadFile("judge-evidence.schema.json"); return b }
 func BoundarySchema() []byte { b, _ := assets.ReadFile("boundary-attestation.schema.json"); return b }
+func GaitVerificationReceiptSchema() []byte {
+	b, _ := assets.ReadFile("gait-verification-receipt.schema.json")
+	return b
+}
 func ValidJSONSchema(name string) bool {
 	var v any
 	b := RegisterSchema()
@@ -45,6 +49,9 @@ func validate(data []byte, name string) error {
 	c := jsonschema.NewCompiler()
 	registerRaw := RegisterSchema()
 	if err := c.AddResource("action-contract-register.schema.json", strings.NewReader(string(registerRaw))); err != nil {
+		return err
+	}
+	if err := c.AddResource("https://axym.dev/schemas/v1/governance/action-contract-register.schema.json", strings.NewReader(string(registerRaw))); err != nil {
 		return err
 	}
 	if err := c.AddResource(resource, strings.NewReader(string(raw))); err != nil {

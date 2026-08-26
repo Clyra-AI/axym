@@ -68,6 +68,24 @@ func TestBuildRequiresAuditName(t *testing.T) {
 	}
 }
 
+func TestBuildRejectsOutputAliasingEvidenceStore(t *testing.T) {
+	root := t.TempDir()
+	if !pathsAlias(root, root) {
+		t.Fatal("identical store/output paths were not recognized as aliases")
+	}
+	link := filepath.Join(t.TempDir(), "store-link")
+	if err := os.Symlink(root, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if !pathsAlias(root, link) {
+		t.Fatal("symlinked store/output paths were not recognized as aliases")
+	}
+	_, err := Build(BuildRequest{AuditName: "fixture", StoreDir: root, OutputDir: link})
+	if err == nil {
+		t.Fatal("build accepted output directory aliasing evidence store")
+	}
+}
+
 func TestBuildRejectsUnmanagedOutputPath(t *testing.T) {
 	t.Parallel()
 

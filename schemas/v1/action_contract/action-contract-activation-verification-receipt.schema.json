@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/action-contract-activation-verification-receipt.schema.json",
+  "title": "Axym Action Contract Activation Verification Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "raw_sha256", "producer_signature_digest", "conformance_digest", "signer_key_id", "issued_at", "signature"],
+  "properties": {
+    "schema_id": {"const": "https://axym.dev/schemas/v1/action-contract-activation-verification-receipt.schema.json"},
+    "schema_version": {"const": "1"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "raw_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "producer_signature_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "conformance_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "conformance_reason_codes": {"type": "array", "items": {"type": "string"}},
+    "signer_key_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "key_id", "sig", "signed_digest"],
+      "properties": {
+        "alg": {"const": "ed25519"},
+        "key_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "sig": {"type": "string", "minLength": 1},
+        "signed_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

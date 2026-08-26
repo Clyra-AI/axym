@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Clyra-AI/axym/core/ingest/actioncontract"
 	"github.com/Clyra-AI/axym/core/ingest/gait"
 	"github.com/Clyra-AI/axym/core/ingest/gait/evidence"
 	"github.com/Clyra-AI/axym/core/ingest/gait/pack"
@@ -26,6 +27,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 	var gaitLifecycleVerification string
 	var storeDir string
 	var stateDir string
+	var verifyAt string
 	var sessionGapThreshold time.Duration
 
 	cmd := &cobra.Command{
@@ -42,7 +44,7 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				inputPaths = append(append([]string(nil), inputPaths...), normalizedGaitPacks...)
 			}
 			if selectedSource == "" {
-				return emitIngestInvalidInput("source is required (wrkr|gait), or provide --gait-pack", stdout, stderr, global)
+				return emitIngestInvalidInput("source is required (wrkr|gait|action-contract), or provide --gait-pack", stdout, stderr, global)
 			}
 			if strings.TrimSpace(gaitLifecycleVerification) != "" && selectedSource != "gait" {
 				return emitIngestInvalidInput("--gait-lifecycle-verification may only be used with --source gait", stdout, stderr, global)
@@ -84,6 +86,34 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 			}
 
 			switch selectedSource {
+			case "action-contract":
+				if len(inputPaths) == 0 {
+					return emitIngestInvalidInput("--input is required for action-contract ingest", stdout, stderr, global)
+				}
+				evaluationTime, timeErr := parseGovernanceTime(verifyAt)
+				if timeErr != nil {
+					return emitIngestInvalidInput(timeErr.Error(), stdout, stderr, global)
+				}
+				stored := make([]any, 0, len(inputPaths))
+				for _, path := range inputPaths {
+					proposal, parseErr := actioncontract.ReadProposal(path)
+					if parseErr != nil {
+						return emitIngestError(parseErr, stdout, stderr, global)
+					}
+					validation := actioncontract.ValidateProposal(proposal, actioncontract.ValidationOptions{Now: evaluationTime})
+					if !actioncontract.AcceptableSemanticProposal(validation) {
+						return emitIngestError(&actionContractIngestError{message: "producer proposal validation failed", reasons: validation.ReasonCodes}, stdout, stderr, global)
+					}
+					if _, persistErr := actioncontract.PersistProposal(storeDir, proposal); persistErr != nil {
+						return emitIngestError(persistErr, stdout, stderr, global)
+					}
+					stored = append(stored, map[string]any{"artifact_id": proposal.ArtifactID, "contract_id": proposal.ContractID, "revision": proposal.Revision, "artifact_sha256": proposal.RawSHA256, "status": actioncontract.StatusPass, "semantic_reason_codes": validation.ReasonCodes})
+				}
+				if global.JSON {
+					return printJSON(stdout, envelope{OK: true, Command: "ingest", Data: map[string]any{"source": selectedSource, "proposals": stored, "report_only": true, "execution_authority": false}})
+				}
+				printText(stdout, fmt.Sprintf("ingest %s: %d proposal(s)", selectedSource, len(stored)), global.Quiet)
+				return nil
 			case "wrkr":
 				result, err := wrkr.Ingest(cmd.Context(), wrkr.Request{
 					InputPaths: inputPaths,
@@ -141,19 +171,29 @@ func newIngestCmd(stdout io.Writer, stderr io.Writer, global *globalFlags) *cobr
 				}
 				return nil
 			default:
-				return emitIngestInvalidInput("source must be one of: wrkr, gait", stdout, stderr, global)
+				return emitIngestInvalidInput("source must be one of: wrkr, gait, action-contract", stdout, stderr, global)
 			}
 		},
 	}
 
-	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait)")
+	cmd.Flags().StringVar(&source, "source", "", "Sibling source to ingest (wrkr|gait|action-contract)")
 	cmd.Flags().StringSliceVar(&inputPaths, "input", nil, "Input file or directory path(s)")
 	cmd.Flags().StringSliceVar(&gaitPacks, "gait-pack", nil, "Gait pack or source artifact path(s); implies --source gait")
 	cmd.Flags().StringVar(&gaitLifecycleVerification, "gait-lifecycle-verification", "", "Caller-owned JSON verification context for Gait v1.5 lifecycle evidence")
 	cmd.Flags().StringVar(&storeDir, "store-dir", ".axym", "Path to local chain store")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "Path to ingest state directory (defaults to --store-dir)")
+	cmd.Flags().StringVar(&verifyAt, "verify-at", time.Now().UTC().Format(time.RFC3339Nano), "Proposal verification time (RFC3339; used for expires_at)")
 	cmd.Flags().DurationVar(&sessionGapThreshold, "session-gap-threshold", 30*time.Minute, "Maximum allowed time between adjacent records before signaling CHAIN_SESSION_GAP")
 	return cmd
+}
+
+type actionContractIngestError struct {
+	message string
+	reasons []string
+}
+
+func (e *actionContractIngestError) Error() string {
+	return e.message + ": " + strings.Join(e.reasons, ",")
 }
 
 func buildStitchSummary(st *store.Store, threshold time.Duration) (map[string]any, error) {
@@ -202,6 +242,29 @@ func preflightGaitLifecycle(paths []string, options evidence.VerificationOptions
 }
 
 func emitIngestError(err error, stdout io.Writer, stderr io.Writer, global *globalFlags) error {
+	var validationErr *actioncontract.ValidationError
+	if errors.As(err, &validationErr) {
+		reasons := actioncontract.StableReasonCodes(err)
+		reason := "invalid_input"
+		if len(reasons) > 0 {
+			reason = reasons[0]
+		}
+		if global.JSON {
+			_ = printJSON(stdout, envelope{OK: false, Command: "ingest", Error: &errorEnvelope{Reason: reason, Message: err.Error(), ReasonCodes: reasons}})
+		} else if !global.Quiet {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+		}
+		return &cliError{code: exitInvalidInput, msg: err.Error()}
+	}
+	var actionErr *actionContractIngestError
+	if errors.As(err, &actionErr) {
+		if global.JSON {
+			_ = printJSON(stdout, envelope{OK: false, Command: "ingest", Error: &errorEnvelope{Reason: "verification_failed", Message: actionErr.Error(), ReasonCodes: actionErr.reasons}})
+		} else if !global.Quiet {
+			_, _ = fmt.Fprintln(stderr, actionErr.Error())
+		}
+		return &cliError{code: exitVerificationFailed, msg: actionErr.Error()}
+	}
 	var ingestErr *wrkr.Error
 	if errors.As(err, &ingestErr) {
 		if global.JSON {

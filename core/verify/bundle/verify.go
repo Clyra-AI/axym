@@ -13,10 +13,13 @@ import (
 	"github.com/Clyra-AI/axym/core/compliance/coverage"
 	"github.com/Clyra-AI/axym/core/compliance/framework"
 	"github.com/Clyra-AI/axym/core/compliance/match"
+	"github.com/Clyra-AI/axym/core/governance"
 	"github.com/Clyra-AI/axym/core/identitygovernance"
+	"github.com/Clyra-AI/axym/core/ingest/actioncontract"
 	"github.com/Clyra-AI/axym/core/review/grade"
 	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	bundleschema "github.com/Clyra-AI/axym/schemas/v1/bundle"
+	governanceschema "github.com/Clyra-AI/axym/schemas/v1/governance"
 	"github.com/Clyra-AI/proof"
 	"gopkg.in/yaml.v3"
 )
@@ -168,6 +171,9 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	if _, recordID, err := verifysupport.VerifyRecords(chain.Records, publicKey); err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleSignature, Message: "record signature verification failed for " + recordID, ExitCode: 2, Err: err}
 	}
+	if err := governance.VerifyLifecycleRecordsWithRegistry(path, chain.Records, publicKey); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleCompleteness, Message: "Gait lifecycle provenance verification failed", ExitCode: 2, Err: err}
+	}
 
 	matchResult := match.Evaluate(definitions, chain.Records, match.Options{ExcludeInvalidEvidence: true})
 	coverageReport := coverage.Build(matchResult)
@@ -180,6 +186,9 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	}
 	derivedArtifacts, err := verifyDerivedArtifacts(path, *manifest, chain.Records)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := verifyGovernanceArtifacts(path, chain.Records, publicKey); err != nil {
 		return Result{}, err
 	}
 
@@ -212,6 +221,126 @@ func Verify(path string, frameworkIDs []string) (Result, error) {
 	result.DerivedArtifacts = derivedArtifacts
 	result.Compliance = recomputed
 	return result, nil
+}
+
+func verifyGovernanceArtifacts(path string, records []proof.Record, publicKey proof.PublicKey) error {
+	native, err := actioncontract.LoadStored(path)
+	if err != nil {
+		return &Error{ReasonCode: ReasonBundleCompleteness, Message: "stored Action Contract artifact verification failed", ExitCode: 2, Err: err}
+	}
+	if len(native) == 0 {
+		return nil
+	}
+	proposals := make([]actioncontract.Proposal, 0)
+	for _, item := range native {
+		if item.Envelope.ArtifactType != "proposal" {
+			continue
+		}
+		proposal, parseErr := actioncontract.ParseProposal(item.Raw)
+		if parseErr != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "stored proposal is not a valid producer artifact", ExitCode: 2, Err: parseErr}
+		}
+		if !actioncontract.AcceptableSemanticProposal(actioncontract.ValidateProposal(proposal, actioncontract.ValidationOptions{SkipTemporalValidation: true})) {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "stored proposal failed producer envelope validation", ExitCode: 2}
+		}
+		proposals = append(proposals, proposal)
+	}
+	if len(proposals) == 0 {
+		return nil
+	}
+	register, packets, err := governance.RegisterAndPacketsVerifiedWithRegistry(proposals, records, publicKey, path)
+	if err != nil {
+		return &Error{ReasonCode: ReasonBundleCompleteness, Message: "recompute governed Action Contract register", ExitCode: 2, Err: err}
+	}
+	register = governance.RedactRegister(register)
+	// #nosec G304 -- path is the explicit managed bundle root supplied to verification.
+	registerRaw, err := os.ReadFile(filepath.Join(path, "action-contract-register.json"))
+	if err != nil {
+		return &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing governed Action Contract register", ExitCode: 2, Err: err}
+	}
+	if err := governanceschema.ValidateRegister(registerRaw); err != nil {
+		return &Error{ReasonCode: ReasonSchemaViolation, Message: "governed Action Contract register schema validation failed", ExitCode: 3, Err: err}
+	}
+	wantRegister, _ := json.MarshalIndent(register, "", "  ")
+	if string(registerRaw) != string(wantRegister) {
+		return &Error{ReasonCode: ReasonBundleCompleteness, Message: "governed Action Contract register drift", ExitCode: 2}
+	}
+	ids := make([]string, 0, len(packets))
+	for id := range packets {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		pathID := strings.ReplaceAll(id, "/", "_")
+		// #nosec G304 -- pathID is derived from a validated stored contract ID and remains under the explicit bundle root.
+		packetRaw, readErr := os.ReadFile(filepath.Join(path, "action-contract", "packets", pathID+".json"))
+		if readErr != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing governed Action Contract packet " + id, ExitCode: 2, Err: readErr}
+		}
+		var packet governance.Packet
+		if err := json.Unmarshal(packetRaw, &packet); err != nil {
+			return &Error{ReasonCode: ReasonInvalidInput, Message: "decode governed Action Contract packet", ExitCode: 6, Err: err}
+		}
+		if err := governance.VerifySignedPacket(packet, publicKey.Public); err != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "governed Action Contract packet signature verification failed", ExitCode: 2, Err: err}
+		}
+		want := governance.RedactPacket(packets[id])
+		want.Digest = ""
+		want.Signature = nil
+		wantDigest, digestErr := governance.Digest(want)
+		if digestErr != nil || packet.Digest != wantDigest {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "governed Action Contract packet drift", ExitCode: 2}
+		}
+		events := packetTimelineEventsForVerify(packet)
+		timeline, timelineErr := governance.ProjectTimeline(id, events)
+		if timelineErr != nil {
+			timeline = governance.Timeline{ContractID: id, Events: events, State: governance.State{ContractID: id, Status: "gap", Events: eventIDsForVerify(events), SourceDigests: eventDigestsForVerify(events), ReasonCodes: []string{"LIFECYCLE_ILLEGAL_TRANSITION"}}}
+		}
+		graph, graphErr := governance.ProjectGraph(timeline)
+		if graphErr != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "recompute governed Action Contract graph", ExitCode: 2, Err: graphErr}
+		}
+		// #nosec G304 -- pathID is derived from a validated stored contract ID and remains under the explicit bundle root.
+		timelineRaw, readErr := os.ReadFile(filepath.Join(path, "action-contract", "timelines", pathID+".json"))
+		if readErr != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing governed Action Contract timeline", ExitCode: 2, Err: readErr}
+		}
+		wantTimeline, _ := json.MarshalIndent(timeline, "", "  ")
+		if string(timelineRaw) != string(wantTimeline) {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "governed Action Contract timeline drift", ExitCode: 2}
+		}
+		// #nosec G304 -- pathID is derived from a validated stored contract ID and remains under the explicit bundle root.
+		graphRaw, readErr := os.ReadFile(filepath.Join(path, "action-contract", "graphs", pathID+".json"))
+		if readErr != nil {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "missing governed Action Contract graph", ExitCode: 2, Err: readErr}
+		}
+		wantGraph, _ := json.MarshalIndent(graph, "", "  ")
+		if string(graphRaw) != string(wantGraph) {
+			return &Error{ReasonCode: ReasonBundleCompleteness, Message: "governed Action Contract graph drift", ExitCode: 2}
+		}
+	}
+	return nil
+}
+
+func packetTimelineEventsForVerify(packet governance.Packet) []governance.Event {
+	return governance.EventsFromPacket(packet)
+}
+
+func eventIDsForVerify(events []governance.Event) []string {
+	out := make([]string, 0, len(events))
+	for _, e := range events {
+		out = append(out, e.ID)
+	}
+	return out
+}
+func eventDigestsForVerify(events []governance.Event) []string {
+	out := make([]string, 0, len(events))
+	for _, e := range events {
+		if e.SourceDigest != "" {
+			out = append(out, e.SourceDigest)
+		}
+	}
+	return out
 }
 
 func buildCompliance(matchResult match.Result, report coverage.Report, records []proof.Record) Compliance {

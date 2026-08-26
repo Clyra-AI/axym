@@ -145,11 +145,50 @@ func (s *Store) RootDir() string {
 	return s.cfg.RootDir
 }
 
+// SigningKey exposes the managed store identity to trusted ingestion
+// adapters. It is not used by ordinary record insertion.
+func (s *Store) SigningKey() (proof.SigningKey, error) {
+	if s == nil {
+		return proof.SigningKey{}, errors.New("store is nil")
+	}
+	return s.loadSigningKey()
+}
+
 func (s *Store) ChainPath() string {
 	return filepath.Join(s.cfg.RootDir, defaultChainFile)
 }
 
 func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, error) {
+	if isGaitLifecycleRecord(record) {
+		return AppendResult{}, &ValidationError{Message: "verified Gait lifecycle records must use the Gait ingest append boundary"}
+	}
+	return s.append(record, dedupeKey, false, nil)
+}
+
+// AppendVerifiedLifecycle is the only append boundary for the translated
+// Gait lifecycle aggregate. The receipt is created by the verified Gait
+// ingest path and is checked against the aggregate before Axym signs it.
+// Manual record insertion remains report-only and cannot manufacture this
+// provenance by setting caller-controlled metadata.
+func (s *Store) AppendVerifiedLifecycle(record *proof.Record, dedupeKey string, afterAppend ...func(proof.Record) error) (AppendResult, error) {
+	if !isGaitLifecycleRecord(record) {
+		return AppendResult{}, &ValidationError{Message: "record is not a Gait lifecycle aggregate"}
+	}
+	signingKey, err := s.loadSigningKey()
+	if err != nil {
+		return AppendResult{}, err
+	}
+	if _, err := VerifyLifecycleReceipt(record, signingKey.Public); err != nil {
+		return AppendResult{}, &ValidationError{Message: "Gait lifecycle verification receipt is invalid", Err: err}
+	}
+	var callback func(proof.Record) error
+	if len(afterAppend) > 0 {
+		callback = afterAppend[0]
+	}
+	return s.append(record, dedupeKey, true, callback)
+}
+
+func (s *Store) append(record *proof.Record, dedupeKey string, allowGaitLifecycle bool, afterAppend func(proof.Record) error) (AppendResult, error) {
 	if record == nil {
 		return AppendResult{}, errors.New("record is nil")
 	}
@@ -158,6 +197,9 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 	}
 	if strings.TrimSpace(record.RecordID) == "" {
 		return AppendResult{}, errors.New("record_id is required")
+	}
+	if isGaitLifecycleRecord(record) && !allowGaitLifecycle {
+		return AppendResult{}, &ValidationError{Message: "verified Gait lifecycle records must use the Gait ingest append boundary"}
 	}
 
 	s.mu.Lock()
@@ -175,6 +217,21 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 
 	if dedupeKey != "" {
 		if idx.Seen(dedupeKey, now) || chainHasKey(chain, dedupeKey) {
+			if afterAppend != nil {
+				found := false
+				for i := range chain.Records {
+					if chain.Records[i].RecordID == record.RecordID {
+						found = true
+						if err := afterAppend(chain.Records[i]); err != nil {
+							return AppendResult{}, err
+						}
+						break
+					}
+				}
+				if !found {
+					return AppendResult{}, errors.New("deduplicated lifecycle record is missing from chain")
+				}
+			}
 			return AppendResult{
 				Appended:    false,
 				Deduped:     true,
@@ -183,6 +240,12 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 				RecordID:    record.RecordID,
 			}, nil
 		}
+	}
+	beforeChain := *chain
+	beforeChain.Records = append([]proof.Record(nil), chain.Records...)
+	beforeEntries := make(map[string]dedupe.Entry, len(idx.Entries))
+	for key, entry := range idx.Entries {
+		beforeEntries[key] = entry
 	}
 
 	linked := axymrecord.CanonicalizeProofRecord(record)
@@ -217,7 +280,16 @@ func (s *Store) Append(record *proof.Record, dedupeKey string) (AppendResult, er
 		return AppendResult{}, err
 	}
 	if err := s.persistDedupeIndex(idx); err != nil {
+		_ = s.persistChain(&beforeChain)
+		_ = s.persistDedupeIndex(&dedupe.Index{Entries: beforeEntries})
 		return AppendResult{}, err
+	}
+	if afterAppend != nil {
+		if err := afterAppend(*linked); err != nil {
+			_ = s.persistChain(&beforeChain)
+			_ = s.persistDedupeIndex(&dedupe.Index{Entries: beforeEntries})
+			return AppendResult{}, fmt.Errorf("commit lifecycle verification receipt: %w", err)
+		}
 	}
 
 	return AppendResult{

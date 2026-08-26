@@ -159,6 +159,9 @@ func verifyOuterRecord(r map[string]any, pub ed25519.PublicKey) error {
 	if signature.SignedDigest != digest || id != "gait-lr-"+digest[:16] {
 		return fmt.Errorf("%s", ReasonControlSignature)
 	}
+	if signature.KeyID != proofsign.KeyID(pub) {
+		return fmt.Errorf("%s", ReasonControlSignature)
+	}
 	verified, err := proofsign.VerifyDigestHex(pub, signature)
 	if err != nil || !verified {
 		return fmt.Errorf("%s", ReasonControlSignature)
@@ -214,6 +217,9 @@ func verifyNestedControl(c map[string]any, pub ed25519.PublicKey) error {
 	}
 	declaredKey, err := base64.StdEncoding.DecodeString(stringGate(provenance["public_key"]))
 	if err != nil || !bytes.Equal(declaredKey, pub) {
+		return fmt.Errorf("%s", ReasonControlSignature)
+	}
+	if signature.KeyID != proofsign.KeyID(pub) {
 		return fmt.Errorf("%s", ReasonControlSignature)
 	}
 	verified, err := proofsign.VerifyDigestHex(pub, signature)

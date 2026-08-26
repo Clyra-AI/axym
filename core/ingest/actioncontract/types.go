@@ -6,6 +6,7 @@ package actioncontract
 
 import (
 	"crypto/ed25519"
+	"strings"
 	"time"
 
 	proofsign "github.com/Clyra-AI/proof/signing"
@@ -22,8 +23,24 @@ const (
 	ReceiptSchemaID           = "https://axym.dev/schemas/v1/action-contract-consumer-receipt.schema.json"
 	ReceiptSchemaVersion      = "1"
 	ConsumerName              = "axym"
-	ConsumerVersion           = "v0.6.1"
+	// ConsumerVersion is retained as the compatibility default. Executables
+	// inject their release version at startup so receipts never report a
+	// stale product version.
+	ConsumerVersion = "dev"
 )
+
+var consumerVersion = ConsumerVersion
+
+// SetConsumerVersion lets a release build inject the Axym version into
+// receipts without coupling this library package to cmd/axym.
+func SetConsumerVersion(version string) {
+	if strings.TrimSpace(version) != "" {
+		consumerVersion = strings.TrimSpace(version)
+	}
+}
+
+// CurrentConsumerVersion returns the injected build version used in receipts.
+func CurrentConsumerVersion() string { return consumerVersion }
 
 const (
 	StatusPass         = "pass"
@@ -33,7 +50,8 @@ const (
 	ClassExact              = "exact"
 	ClassTightened          = "tightened"
 	ClassContextual         = "contextual"
-	ClassExplicitlyExcepted = "explicitly_excepted"
+	ClassExplicitlyExcepted = "excepted"
+	ClassExcepted           = ClassExplicitlyExcepted
 	ClassMismatched         = "mismatched"
 	ClassWeakened           = "weakened"
 	ClassIncomplete         = "incomplete"
@@ -117,7 +135,11 @@ type Activation struct {
 }
 
 type ValidationOptions struct {
-	Now                     time.Time
+	Now time.Time
+	// SkipTemporalValidation is used only when rechecking an already
+	// persisted, ingest-validated artifact during deterministic bundle
+	// reconstruction. Ingest/consume paths must provide Now instead.
+	SkipTemporalValidation  bool
 	PublicKey               ed25519.PublicKey
 	Proposal                *Proposal
 	Selection               *SelectionEvidence
@@ -146,6 +168,14 @@ type ValidationResult struct {
 	ReasonCodes            []string `json:"reason_codes,omitempty"`
 	CanonicalContentDigest string   `json:"canonical_content_digest,omitempty"`
 	RawSHA256              string   `json:"artifact_sha256,omitempty"`
+}
+
+// ActivationVerification is the trusted producer-validation context handed
+// to native-store persistence. Persisting an activation without this context
+// would retain bytes that have never passed Gait signature verification.
+type ActivationVerification struct {
+	Result    ValidationResult
+	PublicKey ed25519.PublicKey
 }
 
 type ConformanceResult struct {

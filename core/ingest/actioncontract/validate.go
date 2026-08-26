@@ -92,6 +92,26 @@ func StableReasonCodes(err error) []string {
 	return []string{ReasonInputUnreadable}
 }
 
+// AcceptableSemanticProposal reports whether a parsed proposal is still a
+// valid producer envelope. Semantic findings are retained in the receipt;
+// malformed/schema/identity/digest findings must fail the handoff.
+func AcceptableSemanticProposal(result ValidationResult) bool {
+	if result.Valid {
+		return true
+	}
+	if len(result.ReasonCodes) == 0 {
+		return false
+	}
+	for _, reason := range result.ReasonCodes {
+		switch reason {
+		case ReasonProposalStale, ReasonProposalContradictory:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func sortedUnique(values []string) []string {
 	seen := map[string]struct{}{}
 	for _, value := range values {
@@ -204,8 +224,9 @@ func compiledSchemas() (map[string]*jsonschema.Schema, error) {
 		resources := map[string]string{
 			ProposalSchemaID: "proposed-action-contract-artifact.schema.json",
 			"https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json": "proposed-action-contract-v3.schema.json",
-			ActivationSchemaID: "activated-action-contract-artifact.schema.json",
-			ReceiptSchemaID:    "consumer-receipt.schema.json",
+			ActivationSchemaID:        "activated-action-contract-artifact.schema.json",
+			ReceiptSchemaID:           "consumer-receipt.schema.json",
+			ActivationReceiptSchemaID: "action-contract-activation-verification-receipt.schema.json",
 		}
 		for id, file := range resources {
 			raw, err := schemaAssets.ReadFile("schemaassets/" + file)
@@ -351,7 +372,7 @@ func ValidateProposal(proposal Proposal, options ValidationOptions) ValidationRe
 		add(ReasonRevision)
 	}
 	now := options.Now
-	if expires := stringField(proposal.Contract, "expires_at"); expires != "" {
+	if expires := stringField(proposal.Contract, "expires_at"); expires != "" && !options.SkipTemporalValidation {
 		if now.IsZero() {
 			add(ReasonEvaluationTime)
 		} else if parsed, err := parseUTCInstant(expires); err != nil || parsed.Before(now.UTC()) {
@@ -660,6 +681,8 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 			add(ReasonSignature)
 		} else if valid, err := proofsign.VerifyDigestHex(options.PublicKey, activation.Signature); err != nil || !valid {
 			add(ReasonSignature)
+		} else if activation.Signature.KeyID != proofsign.KeyID(options.PublicKey) {
+			add(ReasonSignature)
 		} else {
 			result.SignatureVerified = true
 		}
@@ -678,6 +701,28 @@ func ValidateActivation(activation Activation, options ValidationOptions) Valida
 		result.Status = StatusPass
 	}
 	return result
+}
+
+// VerifyActivationSignature checks the producer signature and artifact ID
+// without applying proposal-selection or temporal policy. It is used when a
+// previously validated native activation is reloaded from the managed store.
+func VerifyActivationSignature(activation Activation, publicKey ed25519.PublicKey) error {
+	if len(publicKey) != ed25519.PublicKeySize {
+		return fmt.Errorf("%s", ReasonSignatureUnverifiable)
+	}
+	digest, err := activationSignableDigest(activation)
+	if err != nil || activation.Signature.SignedDigest != strings.TrimPrefix(digest, "sha256:") {
+		return fmt.Errorf("%s", ReasonSignature)
+	}
+	valid, err := proofsign.VerifyDigestHex(publicKey, activation.Signature)
+	if err != nil || !valid || activation.Signature.KeyID != proofsign.KeyID(publicKey) {
+		return fmt.Errorf("%s", ReasonSignature)
+	}
+	wantID := "gact-" + strings.TrimPrefix(digest, "sha256:")[:16]
+	if activation.ArtifactID != wantID {
+		return fmt.Errorf("%s", ReasonIdentity)
+	}
+	return nil
 }
 
 func signatureChecksAllowed(reasons []string) bool {
