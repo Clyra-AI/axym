@@ -175,6 +175,54 @@ func VerifyGateArtifact(raw []byte, pub ed25519.PublicKey, now time.Time, root m
 	return GateResult{AuthorityLineage: true, TokenID: id, ReasonCodes: []string{}}, nil
 }
 
+// ValidateGateContractBinding checks the optional contract identity fields on
+// a signed gate against the contract whose evidence it is authorizing. The
+// signature is verified separately by VerifyGateArtifact; keeping this check
+// independent also lets callers reject a gate that was not valid at the
+// lifecycle event it purports to authorize.
+func ValidateGateContractBinding(v map[string]any, contractID, contractFamily string, revision int, contractDigest string, lifecycleAt time.Time) error {
+	if value, ok := v["contract_id"]; ok && value != nil {
+		id, valid := value.(string)
+		if !valid || (strings.TrimSpace(id) != "" && id != contractID) {
+			return fmt.Errorf("gate contract lineage mismatch")
+		}
+	}
+	if value, ok := v["contract_family_id"]; ok && value != nil {
+		family, valid := value.(string)
+		if !valid || (strings.TrimSpace(family) != "" && family != contractFamily) {
+			return fmt.Errorf("gate contract family lineage mismatch")
+		}
+	}
+	if value, ok := v["contract_revision"]; ok && value != nil {
+		number, valid := value.(float64)
+		if !valid || number != float64(revision) {
+			return fmt.Errorf("gate contract revision lineage mismatch")
+		}
+	}
+	if value, ok := v["contract_digest"]; ok && value != nil {
+		digest, valid := value.(string)
+		if !valid || strings.TrimSpace(digest) == "" || normalizeGateDigest(digest) != normalizeGateDigest(contractDigest) {
+			return fmt.Errorf("gate contract digest lineage mismatch")
+		}
+	}
+	created, err := time.Parse(time.RFC3339Nano, stringValueGate(v["created_at"]))
+	if err != nil {
+		return fmt.Errorf("%s", ReasonMalformed)
+	}
+	expires, err := time.Parse(time.RFC3339Nano, stringValueGate(v["expires_at"]))
+	if err != nil || !expires.After(created) {
+		return fmt.Errorf("%s", ReasonMalformed)
+	}
+	if !lifecycleAt.IsZero() && (lifecycleAt.Before(created) || !lifecycleAt.Before(expires)) {
+		return fmt.Errorf("%s", ReasonGateExpired)
+	}
+	return nil
+}
+
+func normalizeGateDigest(value string) string {
+	return strings.TrimPrefix(strings.TrimSpace(value), "sha256:")
+}
+
 // validateGateShape enforces the minimum signed gate contract before any
 // authority comparison. A valid signature over an incomplete root is still
 // not an authority grant: its schema, identities, delegation scope, and
