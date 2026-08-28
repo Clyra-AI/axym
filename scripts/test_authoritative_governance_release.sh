@@ -8,6 +8,8 @@ commit="0123456789abcdef0123456789abcdef01234567"
 tag="v0.2.1-test"
 
 grep -Fq 'gait_tag="${AXYM_GAIT_AUTHORITATIVE_RELEASE_TAG:-v1.7.2}"' "$root/.github/workflows/release.yml"
+grep -Fq 'input_dir="${RUNNER_TEMP}/axym-authoritative-input"' "$root/.github/workflows/release.yml"
+! grep -Fq '.tmp/authoritative-input' "$root/.github/workflows/release.yml"
 grep -Fq -- '--gait-public-key "${AXYM_AUTHORITATIVE_GAIT_KEY_INPUT}"' "$root/.github/workflows/release.yml"
 grep -Fq -- '--proposal-input "${AXYM_AUTHORITATIVE_PROPOSAL_INPUT}"' "$root/.github/workflows/release.yml"
 grep -Fq "sha256sum >> checksums.txt" "$root/.github/workflows/release.yml"
