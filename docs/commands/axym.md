@@ -109,6 +109,13 @@ They are explicitly synthetic, quarantined, and non-authoritative; Axym
 preserves their causal references and statuses without creating execution or
 compliance authority.
 
+The tag-triggered release workflow separately publishes an authoritative,
+release-owned Action Contract register and evidence packet for Proof final
+conformance. It generates a fresh Ed25519 key in CI, signs both native
+artifacts, publishes the public key, exact schemas, a compressed bundle, and a
+manifest binding every artifact to the release tag and peeled commit. See the
+[authoritative release contract](../release-authoritative-governance.md).
+
 - `axym init --json`: creates local store scaffolding and policy defaults.
 - `axym init --sample-pack ./axym-sample --json`: creates the local store plus a deterministic sample pack with machine-readable created files and next steps.
 - `axym collect --dry-run --json`: validates fixture and environment readiness without writes and preserves per-source `reason_codes`, including `governanceevent: ["NO_INPUT"]` when no governance-event files are supplied.

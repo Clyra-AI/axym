@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: lint-fast lint-go test-fast test-contracts test-acceptance test-scenarios test-hardening test-chaos test-perf test-security test-adapter-parity test-docs-consistency test-docs-storyline test-docs-links prepush codeql release-local release-go-nogo-local prepush-full
+.PHONY: lint-fast lint-go test-fast test-contracts test-acceptance test-scenarios test-hardening test-chaos test-perf test-security test-adapter-parity test-docs-consistency test-docs-storyline test-docs-links test-authoritative-release prepush codeql release-local release-go-nogo-local prepush-full
 
 lint-fast:
 	@test -z "$$(gofmt -l .)" || (echo "gofmt required"; gofmt -l .; exit 1)
@@ -46,6 +46,9 @@ test-docs-storyline:
 
 test-docs-links:
 	@./scripts/check_docs_links.sh
+
+test-authoritative-release:
+	@./scripts/test_authoritative_governance_release.sh
 
 prepush: lint-fast test-fast test-contracts
 

@@ -56,10 +56,12 @@ type Contract struct {
 	CausalRef     Ref              `json:"causal_ref,omitempty"`
 }
 type Register struct {
-	SchemaID      string     `json:"schema_id"`
-	SchemaVersion string     `json:"schema_version"`
-	Contracts     []Contract `json:"contracts"`
-	SourceDigest  string     `json:"source_digest,omitempty"`
+	SchemaID      string               `json:"schema_id"`
+	SchemaVersion string               `json:"schema_version"`
+	Contracts     []Contract           `json:"contracts"`
+	SourceDigest  string               `json:"source_digest,omitempty"`
+	Digest        string               `json:"digest,omitempty"`
+	Signature     *proofsign.Signature `json:"signature,omitempty"`
 }
 type Evidence struct {
 	Kind        string            `json:"kind"`
@@ -294,6 +296,47 @@ func VerifyPacket(p Packet) error {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
 	if signature != nil && (len(signature.SignedDigest) != 64 || signature.SignedDigest != strings.TrimPrefix(want, "sha256:")) {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
+	return nil
+}
+
+func SignRegister(r Register, priv ed25519.PrivateKey) (Register, error) {
+	r.Signature = nil
+	r.Digest = ""
+	if err := ValidateRegister(r); err != nil {
+		return r, err
+	}
+	d, err := Digest(r)
+	if err != nil {
+		return r, err
+	}
+	r.Digest = d
+	sig, err := proofsign.SignDigestHex(priv, strings.TrimPrefix(d, "sha256:"))
+	if err != nil {
+		return r, err
+	}
+	r.Signature = &sig
+	return r, nil
+}
+
+func VerifySignedRegister(r Register, pub ed25519.PublicKey) error {
+	if err := ValidateRegister(r); err != nil {
+		return err
+	}
+	if r.Signature == nil || r.Signature.KeyID != proofsign.KeyID(pub) {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
+	want := r.Digest
+	signature := r.Signature
+	r.Digest = ""
+	r.Signature = nil
+	got, err := Digest(r)
+	if err != nil || want == "" || want != got || signature.SignedDigest != strings.TrimPrefix(want, "sha256:") {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
+	ok, err := proofsign.VerifyDigestHex(pub, *signature)
+	if err != nil || !ok {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
 	return nil

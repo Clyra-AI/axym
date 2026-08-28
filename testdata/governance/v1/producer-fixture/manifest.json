@@ -23,7 +23,7 @@
     },
     {
       "path": "schemas/action-contract-register.schema.json",
-      "sha256": "sha256:33b0f706aaa37fc6aa06742d550a1ddcaad68623fbff431b43a05cd9b9782c36"
+      "sha256": "sha256:746e3beac09b7a4f0894642c32525fd37144cc8cdc9cdc903f92ad5fab1574df"
     }
   ],
   "fixture_only": true,
