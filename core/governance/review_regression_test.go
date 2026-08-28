@@ -14,14 +14,21 @@ func reviewRef() Ref {
 func TestReviewSignedDigestAndTelemetryRegression(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	b := BoundaryAttestation{SchemaID: "boundary/v1", SchemaVersion: "1", ID: "b", Boundary: "x", ContractRef: reviewRef(), ObservedAt: "2026-01-01T00:00:00Z", FreshUntil: "2026-01-02T00:00:00Z", Source: "gait", Advisory: true}
-	b, _ = SignBoundary(b, priv)
+	var err error
+	b, err = SignBoundary(b, priv)
+	if err != nil || b.Digest == "" || b.Signature.SignedDigest == "" {
+		t.Fatalf("boundary signing failed: %v %+v", err, b)
+	}
 	b.Boundary = "modified"
 	b.Digest, _ = Digest(b)
 	if e := VerifyBoundary(b, pub, time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), "c"); e == nil || e.Error() != ReasonTampered {
 		t.Fatalf("boundary stale signature accepted: %v", e)
 	}
 	j := JudgeEvidence{SchemaID: "judge/v1", SchemaVersion: "1", ID: "j", ContractRef: reviewRef(), Verdict: "pass", ObservedAt: "2026-01-01T00:00:00Z", FreshUntil: "2026-01-02T00:00:00Z", Source: "judge", ProviderVersion: "1", Advisory: true}
-	j, _ = SignJudge(j, priv)
+	j, err = SignJudge(j, priv)
+	if err != nil || j.Digest == "" || j.Signature.SignedDigest == "" {
+		t.Fatalf("judge signing failed: %v %+v", err, j)
+	}
 	j.Verdict = "modified"
 	j.Digest, _ = Digest(j)
 	if e := VerifyJudge(j, pub, time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC), "c"); e == nil || e.Error() != ReasonTampered {

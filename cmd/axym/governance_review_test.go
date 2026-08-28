@@ -59,6 +59,28 @@ func TestGovernanceEmitTelemetryPersistsRedactedTrace(t *testing.T) {
 	if code := execute([]string{"governance", "emit", "--kind", "telemetry", "--input", input, "--store-dir", storeDir, "--json"}, &out, &err); code != 0 {
 		t.Fatalf("emit failed code=%d out=%s err=%s", code, out.String(), err.String())
 	}
+	for _, rawValue := range []string{"raw-auth", "raw-prompt", "SELECT raw-db"} {
+		if bytes.Contains(out.Bytes(), []byte(rawValue)) {
+			t.Fatalf("raw value leaked in telemetry summary: %s", rawValue)
+		}
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	telemetry, _ := payload["data"].(map[string]any)
+	summary, _ := telemetry["telemetry"].(map[string]any)
+	spans, _ := summary["spans"].([]any)
+	if len(spans) != 1 {
+		t.Fatalf("telemetry summary spans missing: %s", out.String())
+	}
+	span, _ := spans[0].(map[string]any)
+	summaryDigest, _ := span["digest"].(string)
+	span["digest"] = ""
+	recomputed, e := governance.Digest(span)
+	if e != nil || recomputed != summaryDigest {
+		t.Fatalf("redacted telemetry summary digest mismatch: %s %s %v", recomputed, summaryDigest, e)
+	}
 	st, e := store.OpenReadOnly(store.Config{RootDir: storeDir})
 	if e != nil {
 		t.Fatal(e)
@@ -76,7 +98,7 @@ func TestGovernanceEmitTelemetryPersistsRedactedTrace(t *testing.T) {
 	trace := chain.Records[0].Event["trace"].(map[string]any)
 	orig := trace["digest"].(string)
 	trace["digest"] = ""
-	recomputed, e := governance.Digest(trace)
+	recomputed, e = governance.Digest(trace)
 	if e != nil || recomputed != orig {
 		t.Fatalf("embedded digest mismatch: %s %s %v", recomputed, orig, e)
 	}

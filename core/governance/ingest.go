@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	ReasonMalformed     = "GOVERNANCE_MALFORMED"
-	ReasonTampered      = "GOVERNANCE_DIGEST_MISMATCH"
-	ReasonStale         = "GOVERNANCE_STALE"
-	ReasonOutOfScope    = "GOVERNANCE_OUT_OF_SCOPE"
-	ReasonAdvisoryOnly  = "JUDGE_ADVISORY_ONLY"
-	ReasonLimitExceeded = "GOVERNANCE_LIMIT_EXCEEDED"
+	ReasonMalformed        = "GOVERNANCE_MALFORMED"
+	ReasonTampered         = "GOVERNANCE_DIGEST_MISMATCH"
+	ReasonStale            = "GOVERNANCE_STALE"
+	ReasonOutOfScope       = "GOVERNANCE_OUT_OF_SCOPE"
+	ReasonAdvisoryOnly     = "JUDGE_ADVISORY_ONLY"
+	ReasonLimitExceeded    = "GOVERNANCE_LIMIT_EXCEEDED"
+	ReasonTelemetryMissing = "GOVERNANCE_TELEMETRY_MISSING"
 )
 const MaxTelemetrySpans = 10000
 
@@ -55,10 +56,15 @@ type BoundaryAttestation struct {
 	ExecutionAuthority bool                `json:"execution_authority"`
 }
 type TelemetryResult struct {
-	Spans         []TraceSpan           `json:"spans"`
-	Attestations  []BoundaryAttestation `json:"attestations"`
-	SourceDigests []string              `json:"source_digests"`
-	ReasonCodes   []string              `json:"reason_codes,omitempty"`
+	Spans            []TraceSpan           `json:"spans"`
+	Attestations     []BoundaryAttestation `json:"attestations"`
+	SourceDigests    []string              `json:"source_digests"`
+	ReasonCodes      []string              `json:"reason_codes,omitempty"`
+	IntegrityState   string                `json:"integrity_state"`
+	FreshnessState   string                `json:"freshness_state"`
+	AttestationState string                `json:"attestation_state"`
+	EnforcementState string                `json:"enforcement_state"`
+	CorrelationState string                `json:"correlation_state"`
 }
 type JudgeEvidence struct {
 	SchemaID           string              `json:"schema_id"`
@@ -113,9 +119,18 @@ func IngestTelemetry(raw []byte, now time.Time, maxAge time.Duration, contractID
 	if len(doc.Spans) > MaxTelemetrySpans {
 		return TelemetryResult{}, fmt.Errorf("%s", ReasonLimitExceeded)
 	}
-	out := TelemetryResult{Spans: doc.Spans, Attestations: doc.Attestations, SourceDigests: []string{rawDigest(raw)}}
+	out := TelemetryResult{Spans: doc.Spans, Attestations: doc.Attestations, SourceDigests: []string{rawDigest(raw)}, IntegrityState: "verified", FreshnessState: "fresh", AttestationState: "absent", EnforcementState: "advisory_only", CorrelationState: "unverifiable"}
+	if len(out.Spans) == 0 {
+		out.IntegrityState = "absent"
+		out.FreshnessState = "absent"
+		out.ReasonCodes = append(out.ReasonCodes, ReasonTelemetryMissing)
+	}
+	if len(out.Attestations) > 0 {
+		out.AttestationState = "present_advisory"
+	}
 	for _, s := range out.Spans {
 		if !traceIDPattern.MatchString(s.TraceID) || !spanIDPattern.MatchString(s.SpanID) || !validDigest(s.Digest) || s.Source == "" {
+			out.IntegrityState = "failed"
 			out.ReasonCodes = append(out.ReasonCodes, ReasonMalformed)
 			continue
 		}
@@ -123,19 +138,30 @@ func IngestTelemetry(raw []byte, now time.Time, maxAge time.Duration, contractID
 		check.Digest = ""
 		expected, _ := Digest(check)
 		if expected != s.Digest {
+			out.IntegrityState = "failed"
 			out.ReasonCodes = append(out.ReasonCodes, ReasonTampered)
 		}
 		st, e1 := time.Parse(time.RFC3339Nano, s.StartTime)
 		et, e2 := time.Parse(time.RFC3339Nano, s.EndTime)
 		if e1 != nil || e2 != nil || !et.After(st) {
+			out.IntegrityState = "failed"
 			out.ReasonCodes = append(out.ReasonCodes, ReasonMalformed)
 		}
 		if !now.IsZero() && maxAge > 0 && now.Sub(et) > maxAge {
+			out.FreshnessState = "stale"
 			out.ReasonCodes = append(out.ReasonCodes, ReasonStale)
 		}
 		if contractID != "" && (s.Attributes["contract.id"] == "" || s.Attributes["contract.id"] != contractID) {
+			out.CorrelationState = "mismatched"
 			out.ReasonCodes = append(out.ReasonCodes, ReasonOutOfScope)
 		}
+	}
+	if contractID != "" && out.CorrelationState == "unverifiable" {
+		// A matching attribute is a caller-reported identifier only. Telemetry
+		// has no trusted signature binding, so it can never be authoritative.
+		out.CorrelationState = "reported_match"
+	} else if contractID == "" && len(out.Spans) > 0 {
+		out.CorrelationState = "identifier_only"
 	}
 	sort.Strings(out.ReasonCodes)
 	return out, nil
@@ -156,7 +182,7 @@ func SignJudge(j JudgeEvidence, priv ed25519.PrivateKey) (JudgeEvidence, error) 
 		return j, e
 	}
 	j.Digest = d
-	s, e := proofsign.SignDigestHex(priv, d)
+	s, e := proofsign.SignDigestHex(priv, strings.TrimPrefix(d, "sha256:"))
 	if e != nil {
 		return j, e
 	}
@@ -171,7 +197,7 @@ func SignBoundary(a BoundaryAttestation, priv ed25519.PrivateKey) (BoundaryAttes
 		return a, e
 	}
 	a.Digest = d
-	s, e := proofsign.SignDigestHex(priv, d)
+	s, e := proofsign.SignDigestHex(priv, strings.TrimPrefix(d, "sha256:"))
 	if e != nil {
 		return a, e
 	}
@@ -199,6 +225,9 @@ func VerifyBoundary(a BoundaryAttestation, pub ed25519.PublicKey, now time.Time,
 	if a.Signature.SignedDigest != strings.TrimPrefix(a.Digest, "sha256:") {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
+	if a.Signature.KeyID != proofsign.KeyID(pub) {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
 	ok, e := proofsign.VerifyDigestHex(pub, a.Signature)
 	if e != nil || !ok {
 		return fmt.Errorf("%s", ReasonTampered)
@@ -224,6 +253,9 @@ func VerifyJudge(j JudgeEvidence, pub ed25519.PublicKey, now time.Time, contract
 		return fmt.Errorf("%s", ReasonTampered)
 	}
 	if j.Signature.SignedDigest != strings.TrimPrefix(j.Digest, "sha256:") {
+		return fmt.Errorf("%s", ReasonTampered)
+	}
+	if j.Signature.KeyID != proofsign.KeyID(pub) {
 		return fmt.Errorf("%s", ReasonTampered)
 	}
 	ok, e := proofsign.VerifyDigestHex(pub, j.Signature)

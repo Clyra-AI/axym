@@ -18,12 +18,15 @@ import (
 	"github.com/Clyra-AI/axym/core/export/oscal"
 	"github.com/Clyra-AI/axym/core/export/safety"
 	"github.com/Clyra-AI/axym/core/gaps"
+	"github.com/Clyra-AI/axym/core/governance"
 	"github.com/Clyra-AI/axym/core/identitygovernance"
+	"github.com/Clyra-AI/axym/core/ingest/actioncontract"
 	"github.com/Clyra-AI/axym/core/review/grade"
 	"github.com/Clyra-AI/axym/core/store"
 	coreverify "github.com/Clyra-AI/axym/core/verify"
 	verifysupport "github.com/Clyra-AI/axym/core/verifysupport"
 	bundleschema "github.com/Clyra-AI/axym/schemas/v1/bundle"
+	governanceschema "github.com/Clyra-AI/axym/schemas/v1/governance"
 	"github.com/Clyra-AI/proof"
 	"gopkg.in/yaml.v3"
 )
@@ -102,9 +105,27 @@ func Build(req BuildRequest) (Result, error) {
 	if strings.TrimSpace(req.AuditName) == "" {
 		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "audit name is required", ExitCode: 6}
 	}
+	if pathsAlias(req.StoreDir, req.OutputDir) {
+		return Result{}, &Error{ReasonCode: ReasonInvalidInput, Message: "output directory must not alias the evidence store", ExitCode: 6}
+	}
+	finalOutputDir := req.OutputDir
+	_, outputStatErr := os.Lstat(finalOutputDir)
+	outputExisted := outputStatErr == nil
 	if err := safety.EnsureManagedOutputDir(req.OutputDir); err != nil {
 		return Result{}, wrapSafetyError(err)
 	}
+	stagedOutputDir, stageErr := os.MkdirTemp(filepath.Dir(finalOutputDir), ".axym-bundle-stage-*")
+	if stageErr != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "create bundle staging directory", ExitCode: 1, Err: stageErr}
+	}
+	promoted := false
+	defer func() {
+		_ = os.RemoveAll(stagedOutputDir)
+		if !outputExisted && !promoted {
+			_ = os.RemoveAll(finalOutputDir)
+		}
+	}()
+	req.OutputDir = stagedOutputDir
 
 	st, err := store.New(store.Config{RootDir: req.StoreDir, ComplianceMode: true})
 	if err != nil {
@@ -126,6 +147,9 @@ func Build(req BuildRequest) (Result, error) {
 	chainVerification, err := coreverify.VerifyChainFromStoreDir(req.StoreDir)
 	if err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "verify chain prior to bundling", ExitCode: 2, Err: err}
+	}
+	if err := governance.VerifyLifecycleRecordsWithRegistry(req.StoreDir, recordSnapshot, proof.PublicKey{KeyID: signingKey.KeyID, Public: signingKey.Public}); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "verify Gait lifecycle provenance", ExitCode: 2, Err: err}
 	}
 
 	definitions, err := framework.LoadMany(req.FrameworkIDs)
@@ -233,6 +257,35 @@ func Build(req BuildRequest) (Result, error) {
 		}
 		artifacts[rel] = payload
 	}
+	if native, err := actioncontract.LoadStored(req.StoreDir); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load stored Action Contract artifacts", ExitCode: 2, Err: err}
+	} else if len(native) > 0 {
+		for _, item := range native {
+			artifacts[item.RelativePath] = append([]byte(nil), item.Raw...)
+			envelopePath := strings.TrimSuffix(item.RelativePath, ".json") + ".envelope.json"
+			envelopeRaw, marshalErr := json.MarshalIndent(item.Envelope, "", "  ")
+			if marshalErr != nil {
+				return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "marshal Action Contract envelope", ExitCode: 1, Err: marshalErr}
+			}
+			artifacts[envelopePath] = append(envelopeRaw, '\n')
+			if item.Envelope.ArtifactType == "activation" {
+				receiptRel := strings.TrimSuffix(item.RelativePath, ".json") + ".verification.json"
+				receiptRaw, receiptErr := os.ReadFile(filepath.Join(req.StoreDir, filepath.FromSlash(receiptRel)))
+				if receiptErr != nil {
+					return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "read Action Contract activation verification receipt", ExitCode: 2, Err: receiptErr}
+				}
+				artifacts[receiptRel] = receiptRaw
+			}
+		}
+		if err := addGovernanceArtifacts(artifacts, native, recordSnapshot, signingKey, req.StoreDir); err != nil {
+			return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "build governed Action Contract artifacts", ExitCode: 3, Err: err}
+		}
+	}
+	if registryRaw, registryErr := loadOptionalStoreArtifact(req.StoreDir, governance.VerifiedLifecycleRegistryFile); registryErr != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "load verified lifecycle registry", ExitCode: 2, Err: registryErr}
+	} else if len(registryRaw) > 0 {
+		artifacts[governance.VerifiedLifecycleRegistryFile] = registryRaw
+	}
 
 	executiveSummary := struct {
 		Version        string     `json:"version"`
@@ -313,9 +366,28 @@ func Build(req BuildRequest) (Result, error) {
 	}); err != nil {
 		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "verify signed bundle", ExitCode: 2, Err: err}
 	}
+	backup, backupErr := os.MkdirTemp(filepath.Dir(finalOutputDir), ".axym-bundle-backup-*")
+	if backupErr != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "prepare bundle output promotion", ExitCode: 1, Err: backupErr}
+	}
+	if err := os.Remove(backup); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "prepare bundle output promotion", ExitCode: 1, Err: err}
+	}
+	if err := os.WriteFile(filepath.Join(stagedOutputDir, safety.ManagedMarker), []byte("managed\n"), 0o600); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "stage bundle marker", ExitCode: 1, Err: err}
+	}
+	if err := os.Rename(finalOutputDir, backup); err != nil {
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "prepare bundle output promotion", ExitCode: 1, Err: err}
+	}
+	if err := os.Rename(stagedOutputDir, finalOutputDir); err != nil {
+		_ = os.Rename(backup, finalOutputDir)
+		return Result{}, &Error{ReasonCode: ReasonBundleBuild, Message: "promote staged bundle", ExitCode: 1, Err: err}
+	}
+	promoted = true
+	_ = os.RemoveAll(backup)
 
 	return Result{
-		Path:       req.OutputDir,
+		Path:       finalOutputDir,
 		Files:      len(signedManifest.Files),
 		Algo:       signedManifest.AlgoID,
 		Frameworks: append([]string(nil), req.FrameworkIDs...),
@@ -327,6 +399,21 @@ func Build(req BuildRequest) (Result, error) {
 		},
 		Compliance: compliance,
 	}, nil
+}
+
+func pathsAlias(left, right string) bool {
+	leftAbs, leftErr := filepath.Abs(filepath.Clean(left))
+	rightAbs, rightErr := filepath.Abs(filepath.Clean(right))
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	resolve := func(path string) string {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return filepath.Clean(resolved)
+		}
+		return filepath.Clean(path)
+	}
+	return resolve(leftAbs) == resolve(rightAbs)
 }
 
 func normalizeRequest(req BuildRequest) BuildRequest {
@@ -537,6 +624,114 @@ func validateDerivedArtifact(name string, payload []byte) error {
 	default:
 		return nil
 	}
+}
+
+func addGovernanceArtifacts(artifacts map[string][]byte, native []actioncontract.StoredArtifact, records []proof.Record, signingKey proof.SigningKey, registryRoot string) error {
+	proposals := make([]actioncontract.Proposal, 0)
+	for _, item := range native {
+		if item.Envelope.ArtifactType != "proposal" {
+			continue
+		}
+		proposal, err := actioncontract.ParseProposal(item.Raw)
+		if err != nil {
+			return err
+		}
+		if !actioncontract.AcceptableSemanticProposal(actioncontract.ValidateProposal(proposal, actioncontract.ValidationOptions{SkipTemporalValidation: true})) {
+			return fmt.Errorf("stored proposal failed producer envelope validation")
+		}
+		proposals = append(proposals, proposal)
+	}
+	if len(proposals) == 0 {
+		return nil
+	}
+	register, packets, err := governance.RegisterAndPacketsVerifiedWithRegistry(proposals, records, proof.PublicKey{KeyID: signingKey.KeyID, Public: signingKey.Public}, registryRoot)
+	if err != nil {
+		return err
+	}
+	register = governance.RedactRegister(register)
+	registerRaw, err := json.MarshalIndent(register, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := governanceschema.ValidateRegister(registerRaw); err != nil {
+		return err
+	}
+	artifacts["action-contract-register.json"] = registerRaw
+
+	ids := make([]string, 0, len(packets))
+	for id := range packets {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		packet, err := governance.SignPacket(governance.RedactPacket(packets[id]), signingKey.Private)
+		if err != nil {
+			return err
+		}
+		packetRaw, err := json.MarshalIndent(packet, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := governanceschema.ValidatePacket(packetRaw); err != nil {
+			return err
+		}
+		pathID := strings.ReplaceAll(id, "/", "_")
+		artifacts[filepath.ToSlash(filepath.Join("action-contract", "packets", pathID+".json"))] = packetRaw
+		timelineEvents := packetTimelineEvents(packet)
+		timeline, timelineErr := governance.ProjectTimeline(id, timelineEvents)
+		if timelineErr != nil {
+			// Illegal or incomplete lifecycle order is itself a governed gap.
+			// Preserve the observed events and make the failure explicit so the
+			// verifier recomputes the same deterministic gap state.
+			timeline = governance.Timeline{ContractID: id, Events: timelineEvents, State: governance.State{ContractID: id, Status: "gap", Events: eventIDs(timelineEvents), SourceDigests: eventDigests(timelineEvents), ReasonCodes: []string{"LIFECYCLE_ILLEGAL_TRANSITION"}}}
+			timelineErr = nil
+		}
+		if timelineErr != nil {
+			return timelineErr
+		}
+		graph, err := governance.ProjectGraph(timeline)
+		if err != nil {
+			return err
+		}
+		timelineRaw, err := json.MarshalIndent(timeline, "", "  ")
+		if err != nil {
+			return err
+		}
+		graphRaw, err := json.MarshalIndent(graph, "", "  ")
+		if err != nil {
+			return err
+		}
+		artifacts[filepath.ToSlash(filepath.Join("action-contract", "timelines", pathID+".json"))] = timelineRaw
+		artifacts[filepath.ToSlash(filepath.Join("action-contract", "graphs", pathID+".json"))] = graphRaw
+		signedDigest := ""
+		if packet.Signature != nil {
+			signedDigest = packet.Signature.SignedDigest
+		}
+		artifacts[filepath.ToSlash(filepath.Join("action-contract", "packets", pathID+".md"))] = []byte(fmt.Sprintf("# Action Contract Evidence Packet\n\n- Contract: %s\n- Completeness: %s\n- Digest: %s\n- Signature: %s\n- Execution authority: false\n\nThis packet is a report-only, offline-verifiable projection.\n", id, packet.Completeness, packet.Digest, signedDigest))
+	}
+	return nil
+}
+
+func eventIDs(events []governance.Event) []string {
+	out := make([]string, 0, len(events))
+	for _, event := range events {
+		out = append(out, event.ID)
+	}
+	return out
+}
+
+func eventDigests(events []governance.Event) []string {
+	out := make([]string, 0, len(events))
+	for _, event := range events {
+		if event.SourceDigest != "" {
+			out = append(out, event.SourceDigest)
+		}
+	}
+	return out
+}
+
+func packetTimelineEvents(packet governance.Packet) []governance.Event {
+	return governance.EventsFromPacket(packet)
 }
 
 func buildExecutiveSummaryPDF(audit string, frameworks []string, recordCount int, report coverage.Report, gapReport gaps.Report) []byte {

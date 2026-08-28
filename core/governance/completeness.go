@@ -2,6 +2,74 @@ package governance
 
 import "sort"
 
+// DeriveCompletenessFromEvents derives lifecycle completeness strictly from
+// verified reducer events. It is the production bridge for callers that have
+// records rather than trusted booleans.
+func DeriveCompletenessFromEvents(events []Event) Completeness {
+	contractID := ""
+	for _, event := range events {
+		if event.ContractRef.ID != "" {
+			contractID = event.ContractRef.ID
+			break
+		}
+	}
+	return DeriveCompleteness(contractID, events)
+}
+
+// DeriveCompleteness derives the same states while enforcing an explicit
+// contract scope, preserving out-of-scope evidence as a distinct result.
+func DeriveCompleteness(contractID string, events []Event) Completeness {
+	seen := map[string]bool{}
+	input := CompletenessInput{Fresh: true}
+	for _, event := range events {
+		if !validRef(event.ContractRef) || !digestPattern.MatchString(event.SourceDigest) {
+			return Completeness{Status: Unverifiable, ReasonCodes: []string{"EVIDENCE_DIGEST_OR_REFERENCE_MISSING"}, EvidenceQuality: Low, EnforcementCoverage: None, CorrelationConfidence: None}
+		}
+		if contractID != "" && event.ContractRef.ID != "" && event.ContractRef.ID != contractID {
+			input.OutOfScope = true
+		}
+		kind := event.Kind
+		seen[kind] = true
+		if event.SourceDigest == "" || !digestPattern.MatchString(event.SourceDigest) {
+			input.Fresh = false
+		}
+		switch kind {
+		case "proposed", "registered":
+			input.ProposalSeen, input.Readiness = true, true
+		case "approved":
+			input.Preconditions, input.AuthorityLineage = true, true
+		case "activated":
+			input.ActivationSeen = true
+		case "execution_started":
+			input.ExecutionOutcome = "started"
+		case "execution_succeeded":
+			input.ExecutionOutcome = "succeeded"
+		case "execution_failed":
+			input.ExecutionOutcome = "failed"
+		case "effect_validated":
+			input.EffectValidated = true
+		case "effect_rejected":
+			input.EffectValidated = false
+		case "contained", "stop_acknowledged", "revocation_acknowledged":
+			input.Containment = "completed"
+			if event.Status == "unresolved" {
+				input.Containment = "unresolved"
+			}
+		case "compensated":
+			input.Compensation = "completed"
+		}
+		if event.ContractRef.ID != "" {
+			input.CorrelationRefs++
+		}
+	}
+	input.CompensationRequired = seen["execution_failed"]
+	input.CorrelationAuthoritative = input.CorrelationRefs > 0
+	if len(events) == 0 {
+		input.Fresh = false
+	}
+	return EvaluateCompleteness(input)
+}
+
 type CompletenessStatus string
 
 const (

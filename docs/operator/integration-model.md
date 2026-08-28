@@ -52,6 +52,8 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 - Best when you already have compatible evidence or translated packs from other Clyra products and need one normalized identity-chain view across them.
 - `--gait-pack` is the source-of-truth path for Gait authorization bundles and structured control artifacts.
 - Gait v1.5 lifecycle evidence requires `--gait-lifecycle-verification <config.json>` containing caller-owned trusted-key, exact lineage, digest, time-window, and fixture-policy fields; Axym never derives verification authority from the lifecycle pack. The config contract is [versioned and strict](../../schemas/v1/gait/lifecycle-verification-config-v1.schema.json), with a [safe illustrative example](../../schemas/v1/gait/lifecycle-verification-config.example.json).
+- Authoritative lifecycle ingestion attaches a signed, digest-bound verification receipt before the aggregate is appended. Manual `record add` cannot assert Gait lifecycle metadata, and bundle/governance projections reverify the receipt and persisted record hash before promoting execution, effect, or containment axes.
+- Lifecycle registry commit is coupled to the append boundary with rollback on registry failure, so an authoritative chain record is not left without its durable verification receipt.
 
 ## Public surface notes
 
@@ -60,12 +62,13 @@ See the linked diagram in [integration-boundary.mmd](integration-boundary.mmd).
 ### Action Contract compatibility
 
 - Axym can consume exactly one Wrkr v3 `proposed_action_contract` with `./axym action-contract consume <path> --json`.
+- Exact producer-native proposal bytes and reference envelopes can be retained in the managed store with `--store-dir`; bundles carry and verify those bytes, envelopes, governed register, signed packet, timeline, and graph.
 - The consumer preserves producer-native bytes, IDs, revisions, supersession, authority/precondition/confirmation/compensation fields, and evidence references.
 - A proposal is report-only evidence, never execution authority. `context_only` activation is explicitly non-binding; `enforce_floor` conformance reports structural preservation/tightening only.
 - Gait `activated_action_contract` artifacts are validated against the Axym-owned schema and can be verified with the typed `core/ingest/actioncontract` package when the activation public key and exact proposal bytes are supplied.
 - Activation verification also requires current-selection evidence for the exact family/revision and an explicit UTC evaluation time. Development-signed activations remain unverifiable even when a test-only allowance is supplied.
 - `enforce_floor` is not interpreted as tightening by mode alone: only an explicit value projection can prove `tightened`; otherwise the exact proposal binding is reported conservatively.
-- Execution, effects, containment, compensation events, and telemetry authenticity remain deferred until corresponding released producer artifacts exist. See [the versioned schema contract](../../schemas/v1/action_contract/README.md).
+- Exact verified Gait lifecycle artifacts now project execution, effect, containment, compensation, freshness, and correlation evidence into the governed packet. Telemetry and Judge projections remain advisory, non-authoritative, and explicitly labelled; they never grant execution authority. See [the versioned schema contract](../../schemas/v1/action_contract/README.md).
 - Internal detail: package names, workflow step ordering, and helper placement are not public extension points.
 - Deprecated surface: none documented in launch docs today.
 

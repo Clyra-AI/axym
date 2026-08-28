@@ -75,6 +75,7 @@ func TranslateLifecycle(result evidence.VerificationResult, pack evidence.Lifecy
 		"source_artifact_digests":  append([]string(nil), result.EvidenceSet.SourceArtifactDigests...),
 		"derived_evidence_digests": append([]string(nil), result.EvidenceSet.DerivedEvidenceDigests...),
 		"reason_codes":             append([]string(nil), result.ReasonCodes...),
+		"gait_lifecycle_events":    lifecycleEventMetadata(pack),
 	}
 	metadata := map[string]any{
 		"evidence_kind":                 "gait_lifecycle",
@@ -107,6 +108,61 @@ func TranslateLifecycle(result evidence.VerificationResult, pack evidence.Lifecy
 		return nil, &Error{ReasonCode: ReasonLifecycleTranslation, Message: "build lifecycle proof record", Err: err}
 	}
 	return record, nil
+}
+
+func lifecycleEventMetadata(pack evidence.LifecyclePack) []map[string]any {
+	out := make([]map[string]any, 0, len(pack.Records))
+	for _, record := range pack.Records {
+		if record.RecordID == "" || record.OccurredAt == "" {
+			continue
+		}
+		entry := map[string]any{
+			"id":            record.RecordID,
+			"kind":          record.Kind,
+			"occurred_at":   record.OccurredAt,
+			"source_digest": "sha256:" + strings.TrimPrefix(record.Signature.SignedDigest, "sha256:"),
+		}
+		if ref := lifecycleEventEvidenceRef(record); ref != nil {
+			entry["evidence_ref"] = ref
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+func lifecycleEventEvidenceRef(record evidence.LifecycleRecord) map[string]any {
+	var id, digest, schemaID, schemaVersion string
+	switch {
+	case record.Execution != nil:
+		id, digest, schemaID, schemaVersion = record.Execution.EvidenceID, record.Execution.CanonicalContentDigest, record.Execution.SchemaID, record.Execution.SchemaVersion
+	case record.Effect != nil:
+		id, digest, schemaID, schemaVersion = record.Effect.EvidenceID, record.Effect.CanonicalContentDigest, record.Effect.SchemaID, record.Effect.SchemaVersion
+	case record.Containment != nil:
+		id, digest, schemaID, schemaVersion = record.Containment.EvidenceID, record.Containment.CanonicalContentDigest, record.Containment.SchemaID, record.Containment.SchemaVersion
+	case record.Compensation != nil:
+		id, digest, schemaID, schemaVersion = record.Compensation.EvidenceID, record.Compensation.CanonicalContentDigest, record.Compensation.SchemaID, record.Compensation.SchemaVersion
+	default:
+		return nil
+	}
+	if id == "" || digest == "" || schemaID == "" || schemaVersion == "" {
+		return nil
+	}
+	return map[string]any{"id": id, "kind": lifecycleEventRefKind(record.Kind), "digest": digest, "source": "gait", "source_product": "gait", "schema_id": schemaID, "schema_version": schemaVersion}
+}
+
+func lifecycleEventRefKind(kind string) string {
+	switch {
+	case strings.HasPrefix(kind, "execution_"):
+		return "execution"
+	case strings.HasPrefix(kind, "effect_"):
+		return "effect_event"
+	case strings.HasPrefix(kind, "containment_"):
+		return "containment"
+	case strings.HasPrefix(kind, "compensation_"):
+		return "compensation"
+	default:
+		return "evidence"
+	}
 }
 
 // TranslateLifecycleEvidence is the descriptive alias used by sibling

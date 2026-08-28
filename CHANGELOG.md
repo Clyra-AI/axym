@@ -6,7 +6,14 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 
 ## Unreleased
 
-No unreleased changes yet.
+### Added
+
+- [semver:minor] Added exact producer-native Action Contract retention and governed register, signed evidence packet, reducer timeline, graph, replay, redaction, completeness, and bundle drift verification paths.
+- Added quarantined Axym v0.2.0 producer fixture coverage joined to exact Wrkr/Gait proposal, activation, lifecycle, gate, schema, and manifest digests.
+
+### Fixed
+
+- Hardened action-contract envelopes, digest-bound causal joins, signature key-ID checks, telemetry verification exit semantics, staged bundle output, and offline fixture regeneration/checks.
 
 ## [0.1.4] - 2026-08-25
 

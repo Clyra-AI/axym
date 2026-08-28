@@ -107,10 +107,17 @@ func IngestOTLP(raw []byte, opt OTLPOptions) (TelemetryResult, error) {
 		}
 		return spans[i].TraceID < spans[j].TraceID
 	})
-	out := TelemetryResult{Spans: spans, SourceDigests: []string{rawDigest(raw)}}
+	out := TelemetryResult{Spans: spans, SourceDigests: []string{rawDigest(raw)}, IntegrityState: "verified", FreshnessState: "fresh", AttestationState: "absent", EnforcementState: "advisory_only", CorrelationState: "identifier_only"}
+	if len(out.Spans) == 0 {
+		out.IntegrityState = "absent"
+		out.FreshnessState = "absent"
+		out.ReasonCodes = append(out.ReasonCodes, ReasonTelemetryMissing)
+	}
 	if opt.ContractID != "" {
+		out.CorrelationState = "reported_match"
 		for _, s := range spans {
 			if id := s.Attributes["axym.contract.id"]; id == "" || id != opt.ContractID {
+				out.CorrelationState = "mismatched"
 				out.ReasonCodes = append(out.ReasonCodes, ReasonOutOfScope)
 			}
 		}
@@ -119,6 +126,7 @@ func IngestOTLP(raw []byte, opt OTLPOptions) (TelemetryResult, error) {
 		for _, s := range spans {
 			et, _ := time.Parse(time.RFC3339Nano, s.EndTime)
 			if opt.Now.Sub(et) > opt.MaxAge {
+				out.FreshnessState = "stale"
 				out.ReasonCodes = append(out.ReasonCodes, ReasonStale)
 			}
 		}
