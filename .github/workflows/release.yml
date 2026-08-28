@@ -45,30 +45,31 @@ jobs:
           AXYM_GAIT_AUTHORITATIVE_RELEASE_TAG: ${{ vars.AXYM_GAIT_AUTHORITATIVE_RELEASE_TAG }}
         run: |
           gait_tag="${AXYM_GAIT_AUTHORITATIVE_RELEASE_TAG:-v1.7.2}"
-          mkdir -p .tmp/authoritative-input
+          input_dir="${RUNNER_TEMP}/axym-authoritative-input"
+          mkdir -p "${input_dir}"
           for attempt in 1 2 3 4 5; do
-            if gh release download "${gait_tag}" --repo Clyra-AI/gait --dir .tmp/authoritative-input --clobber; then
+            if gh release download "${gait_tag}" --repo Clyra-AI/gait --dir "${input_dir}" --clobber; then
               break
             fi
             test "${attempt}" -lt 5 || { echo "failed to download Gait ${gait_tag} authoritative release"; exit 1; }
             sleep $((attempt * 10))
           done
-          mkdir -p .tmp/authoritative-input/action-contract-authoritative
-          mv .tmp/authoritative-input/action-contract-authoritative-evidence-${gait_tag}.zip .tmp/authoritative-input/action-contract-authoritative/
-          mv .tmp/authoritative-input/public-key.b64 .tmp/authoritative-input/action-contract-authoritative/
-          unzip -oq .tmp/authoritative-input/action-contract-authoritative/action-contract-authoritative-evidence-${gait_tag}.zip -d .tmp/authoritative-input/action-contract-authoritative
-          (cd .tmp/authoritative-input && sha256sum -c checksums.txt)
+          mkdir -p "${input_dir}/action-contract-authoritative"
+          mv "${input_dir}/action-contract-authoritative-evidence-${gait_tag}.zip" "${input_dir}/action-contract-authoritative/"
+          mv "${input_dir}/public-key.b64" "${input_dir}/action-contract-authoritative/"
+          unzip -oq "${input_dir}/action-contract-authoritative/action-contract-authoritative-evidence-${gait_tag}.zip" -d "${input_dir}/action-contract-authoritative"
+          (cd "${input_dir}" && sha256sum -c checksums.txt)
           cosign verify-blob \
-            --certificate .tmp/authoritative-input/checksums.txt.pem \
+            --certificate "${input_dir}/checksums.txt.pem" \
             --certificate-identity "https://github.com/Clyra-AI/gait/.github/workflows/release.yml@refs/tags/${gait_tag}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            --signature .tmp/authoritative-input/checksums.txt.sig \
-            .tmp/authoritative-input/checksums.txt
-          proposal_input="$(find .tmp/authoritative-input -type f -name 'proposal.json' -print -quit)"
-          activation_input="$(find .tmp/authoritative-input -type f -name 'activation.json' -print -quit)"
-          lifecycle_input="$(find .tmp/authoritative-input -type f -name 'lifecycle.json' -print -quit)"
-          gate_input="$(find .tmp/authoritative-input -type f -name '*gate*.json' -print -quit)"
-          gait_key_input="$(find .tmp/authoritative-input -type f -name 'public-key.b64' -print -quit)"
+            --signature "${input_dir}/checksums.txt.sig" \
+            "${input_dir}/checksums.txt"
+          proposal_input="$(find "${input_dir}" -type f -name 'proposal.json' -print -quit)"
+          activation_input="$(find "${input_dir}" -type f -name 'activation.json' -print -quit)"
+          lifecycle_input="$(find "${input_dir}" -type f -name 'lifecycle.json' -print -quit)"
+          gate_input="$(find "${input_dir}" -type f -name '*gate*.json' -print -quit)"
+          gait_key_input="$(find "${input_dir}" -type f -name 'public-key.b64' -print -quit)"
           test -n "${proposal_input}" && test -n "${activation_input}" && test -n "${lifecycle_input}" && test -n "${gait_key_input}" || { echo "authoritative input archive must contain proposal, activation, lifecycle, and public key"; exit 1; }
           printf 'AXYM_AUTHORITATIVE_PROPOSAL_INPUT=%s\n' "${proposal_input}" >> "$GITHUB_ENV"
           printf 'AXYM_AUTHORITATIVE_ACTIVATION_INPUT=%s\n' "${activation_input}" >> "$GITHUB_ENV"
