@@ -49,7 +49,7 @@ Axym is part of a shared dependency graph rooted in `Clyra-AI/proof`.
 | Component | Version | Scope |
 |---|---|---|
 | Go | `1.26.6` | Axym repo + CI |
-| `Clyra-AI/proof` | `v0.6.1` | Axym proof primitive dependency |
+| `Clyra-AI/proof` | `v0.7.0` | Axym proof primitive dependency |
 | Python | `3.13` | scripts and tooling |
 | Node | `22` LTS | docs/tooling |
 

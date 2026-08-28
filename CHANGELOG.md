@@ -14,6 +14,7 @@ The format is based on Keep a Changelog, and Axym follows semver-style tagged re
 ### Fixed
 
 - Hardened action-contract envelopes, digest-bound causal joins, signature key-ID checks, telemetry verification exit semantics, staged bundle output, and offline fixture regeneration/checks.
+- Updated the pinned Proof dependency and current documentation/fixture provenance to `v0.7.0`, while retaining legacy Gait and quarantined producer fixture versions as compatibility fixtures.
 
 ## [0.1.4] - 2026-08-25
 

@@ -56,7 +56,7 @@ func TestMapWorkflowFixtureDeterministic(t *testing.T) {
 		GapCount:       5,
 	}
 	if result.Summary != want {
-		t.Fatalf("v0.5 evidence-set coverage mismatch: got %+v want %+v", result.Summary, want)
+		t.Fatalf("evidence-set coverage mismatch: got %+v want %+v", result.Summary, want)
 	}
 	for _, frameworkResult := range result.Frameworks {
 		for _, control := range frameworkResult.Controls {

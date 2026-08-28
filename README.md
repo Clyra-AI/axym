@@ -145,7 +145,7 @@ Axym validates the manual input envelope locally, normalizes compatibility-only 
 
 `ingest` supports deterministic sibling ingest from Wrkr and Gait. Wrkr ingest persists drift baseline state in `.axym/wrkr-last-ingest.json`; Gait ingest supports zip, extracted, and explicit-path packs while preserving relationship envelopes, authorization bundles, and structured control artifacts through `--gait-pack`.
 
-`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes. Proof `v0.6.1` evidence sets are alternatives; one set must satisfy all of its record-type, source-product, field, and frequency requirements. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and the selected closest alternative is identified by `evidence_set=<id>` in the rationale.
+`map` deterministically matches chain evidence to framework controls and emits per-control rationale for `covered`, `partial`, and `gap` outcomes. Proof `v0.7.0` evidence sets are alternatives; one set must satisfy all of its record-type, source-product, field, and frequency requirements. Incomplete multi-type sets emit `REQUIRED_RECORD_TYPES_NOT_MET`, and the selected closest alternative is identified by `evidence_set=<id>` in the rationale.
 
 `gaps` ranks `partial` and `gap` controls with deterministic remediation and auditability grade output.
 

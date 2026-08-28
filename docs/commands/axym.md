@@ -147,7 +147,7 @@ manifest binding every artifact to the release tag and peeled commit. See the
 
 ### Framework evidence-set mapping
 
-Axym supports both legacy Proof framework controls and Proof `v0.6.1` evidence sets. Legacy `required_record_types` keep their existing alternative-match behavior. For `evidence_sets`, Axym treats sets as alternatives, requires every `required_record_type` within one set, and applies that set's `source_products`, `required_fields`, and `minimum_frequency` constraints together. A control is covered when any one set is complete.
+Axym supports both legacy Proof framework controls and Proof `v0.7.0` evidence sets. Legacy `required_record_types` keep their existing alternative-match behavior. For `evidence_sets`, Axym treats sets as alternatives, requires every `required_record_type` within one set, and applies that set's `source_products`, `required_fields`, and `minimum_frequency` constraints together. A control is covered when any one set is complete.
 
 When no set is complete, Axym deterministically reports the closest partial or gap alternative by matched-type completeness, then missing types and fields; the evidence-set ID breaks any remaining tie. `map --json` exposes the selected set as an `evidence_set=<id>` prefix in `rationale`. A multi-type set with only some required types remains `partial` and includes `REQUIRED_RECORD_TYPES_NOT_MET` in `reason_codes`. `gaps`, generated bundles, and `verify --bundle` use the same selected-set requirements, so remediation and audit artifacts do not flatten alternatives into false coverage.
 
